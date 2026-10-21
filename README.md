@@ -46,20 +46,24 @@ Außerdem:
 
 | Entität / Aktion | |
 |---|---|
-| `switch.mitteilungen` | Mitteilungen pausieren (z. B. im Urlaub) |
-| `sensor.mitteilungen_zuletzt_gesendet` | Zeitpunkt der letzten Mitteilung, Attribut `recent` mit den letzten 20 |
+| `switch.notifications` | Mitteilungen pausieren (z. B. im Urlaub) |
+| `sensor.notifications_last_sent` | Zeitpunkt der letzten Mitteilung, Attribut `recent` mit den letzten 20 |
 | `smarthome_ui.test_notify` | Test-Mitteilung an alle Empfänger (auch wenn pausiert) |
 
 ## Geräte
 
-Die Integration legt je Bereich ein Dienst-Gerät an. Die Entitäts-IDs richten sich nach dem Gerätenamen
-(hier mit deutscher Sprache in Home Assistant):
+Die Integration legt je Bereich ein Dienst-Gerät an. Die Namen folgen der Sprache von Home Assistant
+(„Garten“, „Mitteilungen“ …), die Entitäts-IDs sind immer englisch – so passen Automationen und Beispiele
+überall:
 
 | Gerät | Entitäten |
 |---|---|
-| **Mitteilungen** | Schalter zum Pausieren, „Zuletzt gesendet“ |
-| **Haushalt** | ein Sensor je Putz- und Wartungsaufgabe, To-do-Liste mit dem Fälligen |
-| **Garten** | ein Sensor je Aufgabe aus dem Gartenkalender, To-do-Liste mit dem Fälligen |
+| **Mitteilungen** | `switch.notifications` (pausieren), `sensor.notifications_last_sent` |
+| **Haushalt** | `sensor.household_<aufgabe>` je Putz- und Wartungsaufgabe, `todo.household` |
+| **Garten** | `sensor.garden_<aufgabe>` je Aufgabe aus dem Gartenkalender, `todo.garden` |
+
+`<aufgabe>` kommt aus dem Namen im Dashboard, z. B. `sensor.garden_hecke_schneiden`. Umbenennen in
+Home Assistant ist jederzeit möglich.
 
 Weitere Bereiche (z. B. Sicherheit) kommen als eigene Geräte dazu, sobald sie Entitäten haben.
 
@@ -70,8 +74,8 @@ Gartenkalender). Daraus entstehen:
 
 | Entität | |
 |---|---|
-| `sensor.haushalt_<aufgabe>`, `sensor.garten_<aufgabe>` | Fällig am (Zeitstempel), Attribute: zuletzt erledigt, von wem, Intervall, Tage bis fällig |
-| `todo.haushalt`, `todo.garten` | Was heute fällig oder überfällig ist – abhaken = erledigt (auch per Sprache) |
+| `sensor.household_<aufgabe>`, `sensor.garden_<aufgabe>` | Fällig am (Zeitstempel), Attribute: zuletzt erledigt, von wem, Intervall, Tage bis fällig |
+| `todo.household`, `todo.garden` | Was heute fällig oder überfällig ist – abhaken = erledigt (auch per Sprache) |
 
 | Aktion | |
 |---|---|
@@ -83,7 +87,7 @@ Gartenkalender). Daraus entstehen:
 # Beispiel: Erinnerung, wenn das Bad seit 2 Tagen überfällig ist
 triggers:
   - trigger: template
-    value_template: "{{ state_attr('sensor.haushalt_bad_putzen', 'days_left') | int(0) <= -2 }}"
+    value_template: "{{ state_attr('sensor.household_bad_putzen', 'days_left') | int(0) <= -2 }}"
 actions:
   - action: notify.mobile_app_handy
     data:

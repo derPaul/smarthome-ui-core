@@ -24,9 +24,16 @@ class CoreEntity(Entity):
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, entry_id: str, key: str, device: str) -> None:
-        """Initialize the entity."""
+    def __init__(
+        self, entry_id: str, key: str, device: str, domain: str, object_id: str | None = None
+    ) -> None:
+        """Initialize the entity.
+
+        The entity ID is always English (``sensor.garden_…``, ``todo.household``), whatever
+        language Home Assistant uses for the names shown.
+        """
         self._attr_unique_id = f"{entry_id}_{key}"
+        self.entity_id = f"{domain}.{device}" + (f"_{object_id}" if object_id else "")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{device}")},
             translation_key=device,

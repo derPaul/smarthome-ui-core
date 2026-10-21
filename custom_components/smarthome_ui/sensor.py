@@ -66,7 +66,10 @@ class TaskSensor(CoreEntity, SensorEntity):
 
     def __init__(self, entry_id: str, store: CoreStore, key: str, slug: str, device: str) -> None:
         """Initialize the sensor."""
-        super().__init__(entry_id, f"{TASK_PREFIX}{slug}", device)
+        name = next((t.get("name") for t in store.data["tasks"] if t["key"] == key), None)
+        super().__init__(
+            entry_id, f"{TASK_PREFIX}{slug}", device, "sensor", slugify(name or "") or slug
+        )
         self._store = store
         self._key = key
         self.slug = slug
@@ -132,7 +135,7 @@ class LastNotificationSensor(CoreEntity, SensorEntity):
 
     def __init__(self, entry_id: str, store: CoreStore) -> None:
         """Initialize the sensor."""
-        super().__init__(entry_id, "last_notification", DEVICE_NOTIFY)
+        super().__init__(entry_id, "last_notification", DEVICE_NOTIFY, "sensor", "last_sent")
         self._store = store
 
     @property

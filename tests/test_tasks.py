@@ -122,3 +122,28 @@ async def test_devices_per_area(hass: HomeAssistant, entry: MockConfigEntry, fre
     assert device_of("sensor.notifications_last_sent") == "Notifications"
     assert hass.states.get("todo.household").state == "1"
     assert hass.states.get("todo.garden").state == "1"
+
+
+async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_calls) -> None:
+    await hass.config.async_update(language="de")
+    entry = MockConfigEntry(domain="smarthome_ui", data={}, title="Smarthome UI Core")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    entry.runtime_data.store.set_tasks(
+        [{"key": "gd:task:hecke|", "name": "Hecke schneiden", "src": "gd.tasks"}]
+    )
+    await hass.async_block_till_done()
+
+    ids = sorted(
+        e.entity_id for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    )
+    assert ids == [
+        "sensor.garden_hecke_schneiden",
+        "sensor.notifications_last_sent",
+        "switch.notifications",
+        "todo.garden",
+        "todo.household",
+    ]
+    assert hass.states.get("todo.garden").attributes["friendly_name"] == "Garten"
+    assert hass.states.get("switch.notifications").attributes["friendly_name"] == "Mitteilungen"

@@ -32,7 +32,7 @@ class NotificationsSwitch(CoreEntity, SwitchEntity):
 
     def __init__(self, entry_id: str, store: CoreStore) -> None:
         """Initialize the switch."""
-        super().__init__(entry_id, "notifications", DEVICE_NOTIFY)
+        super().__init__(entry_id, "notifications", DEVICE_NOTIFY, "switch")
         self._store = store
 
     @property

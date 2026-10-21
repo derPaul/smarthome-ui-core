@@ -42,7 +42,7 @@ class DueTodoList(CoreEntity, TodoListEntity):
 
     def __init__(self, entry_id: str, store: CoreStore, device: str) -> None:
         """Initialize the list."""
-        super().__init__(entry_id, f"due_{device}", device)
+        super().__init__(entry_id, f"due_{device}", device, "todo")
         self._store = store
         self._device = device
 
