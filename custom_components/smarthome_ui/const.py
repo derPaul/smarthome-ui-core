@@ -18,6 +18,7 @@ SIGNAL_NOTIFY: Final = f"{DOMAIN}_notify"
 SIGNAL_SENT: Final = f"{DOMAIN}_sent"
 SIGNAL_DISPLAY_NEW: Final = f"{DOMAIN}_display_new"
 SIGNAL_MOWER: Final = f"{DOMAIN}_mower"
+SIGNAL_VACUUM: Final = f"{DOMAIN}_vacuum"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)
@@ -29,6 +30,8 @@ RECENT_MAX: Final = 20
 DEFAULT_TASK_HOUR: Final = 9
 # an area only counts as mowed after this many minutes there (unless a job says so)
 MOW_MIN_MINUTES: Final = 10
+# a room counts as cleaned by the robot after this many minutes of cleaning there
+VAC_MIN_MINUTES: Final = 2
 
 SERVICE_TASK_DONE: Final = "task_done"
 SERVICE_TASK_REOPEN: Final = "task_reopen"

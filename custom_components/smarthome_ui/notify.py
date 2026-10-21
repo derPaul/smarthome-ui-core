@@ -104,6 +104,8 @@ class NotifyEngine:
         self._dirty = False
         # further rules from the integration itself (e.g. the configured mowers)
         self.extra_rules: Callable[[], list[dict[str, Any]]] = list
+        # further tasks from the integration itself (e.g. areas due for mowing)
+        self.extra_tasks: Callable[[], list[dict[str, Any]]] = list
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -350,7 +352,7 @@ class NotifyEngine:
         hour = DEFAULT_TASK_HOUR if hour is None else int(hour)
         sources = self.config.get("sources") or {}
         today = local.date()
-        for state in task_states(self.store.data["tasks"], done):
+        for state in task_states([*self.store.data["tasks"], *self.extra_tasks()], done):
             cfg = sources.get(state.src) or {}
             if not cfg.get("push") or state.due_date is None or state.due_date > today:
                 continue

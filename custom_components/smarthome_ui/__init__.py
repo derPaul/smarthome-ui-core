@@ -37,10 +37,12 @@ from .mower import MowerManager
 from .notify import NotifyEngine
 from .store import CoreStore
 from .tasks import find_task, task_states
+from .vacuum import VacuumManager
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
@@ -58,6 +60,17 @@ class CoreRuntime:
     engine: NotifyEngine
     displays: DisplayManager
     mowers: MowerManager
+    vacuums: VacuumManager
+
+    def tasks(self) -> list[dict[str, Any]]:
+        """Return the tasks from the dashboard and from the integration (areas to mow)."""
+        return [*self.store.data["tasks"], *self.mowers.tasks()]
+
+    @callback
+    def complete(self, key: str, who: str | None = None, label: str = "") -> None:
+        """Mark a task done (an area to mow counts as mowed by hand)."""
+        if not self.mowers.complete(key):
+            self.store.mark_done(key, who=who, label=label)
 
 
 type CoreConfigEntry = ConfigEntry[CoreRuntime]
@@ -84,7 +97,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         runtime = _runtime(hass)
         store = runtime.store
         value = call.data[ATTR_TASK]
-        task = find_task(task_states(store.data["tasks"], store.done), value)
+        task = find_task(task_states(runtime.tasks(), store.done), value)
         if task is None and ":" not in value:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
@@ -93,7 +106,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             )
         key = task.key if task else value
         if call.service == SERVICE_TASK_DONE:
-            store.mark_done(
+            runtime.complete(
                 key,
                 who=await _user_name(hass, call.context.user_id),
                 label=task.name if task else "",
@@ -123,7 +136,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
 
     async def area_mowed(call: ServiceCall) -> None:
-        _runtime(hass).store.area_mowed(call.data[ATTR_AREA].strip())
+        runtime = _runtime(hass)
+        area = call.data[ATTR_AREA].strip()
+        for tracker in runtime.mowers.trackers.values():
+            if area.casefold() in (a.casefold() for a in tracker.areas):
+                tracker.mark_mowed(
+                    next(a for a in tracker.areas if a.casefold() == area.casefold())
+                )
+                return
+        runtime.store.area_mowed(area)
 
     hass.services.async_register(
         DOMAIN,
@@ -160,6 +181,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_notify_report,
         ws_display_connect,
         ws_display_update,
+        ws_mower_settings,
+        ws_cleaning_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -171,10 +194,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     await store.async_load()
     engine = NotifyEngine(hass, store)
     mowers = MowerManager(hass, store)
-    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store), mowers)
+    vacuums = VacuumManager(hass, store)
+    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store), mowers, vacuums)
     _remove_single_device(hass, entry)
-    engine.extra_rules = mowers.rules
+    engine.extra_rules = lambda: [*mowers.rules(), *vacuums.rules()]
+    engine.extra_tasks = mowers.tasks
     mowers.async_setup(list(entry.subentries.values()))
+    vacuums.async_setup(list(entry.subentries.values()))
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # a mower added, changed or removed → set up again
@@ -217,6 +243,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     """Unload the config entry."""
     entry.runtime_data.engine.async_stop()
     entry.runtime_data.mowers.async_stop()
+    entry.runtime_data.vacuums.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -242,6 +269,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "data": store.dashboard_data(),
         "migrated": store.data["migrated"],
         "mowers": runtime.mowers.info(),
+        "vacuums": runtime.vacuums.info(),
+        "cleaning": store.data["cleaning"],
         "notify": {
             "enabled": store.data["notify"].get("enabled", True),
             "rules": len(store.data["notify"].get("rules") or []),
@@ -272,7 +301,15 @@ def ws_subscribe(
     @callback
     def changed() -> None:
         connection.send_message(
-            websocket_api.event_message(msg["id"], {"data": runtime.store.dashboard_data()})
+            websocket_api.event_message(
+                msg["id"],
+                {
+                    "data": runtime.store.dashboard_data(),
+                    "mowers": runtime.mowers.info(),
+                    "vacuums": runtime.vacuums.info(),
+                    "cleaning": runtime.store.data["cleaning"],
+                },
+            )
         )
 
     connection.subscriptions[msg["id"]] = async_dispatcher_connect(hass, SIGNAL_DATA, changed)
@@ -431,3 +468,43 @@ def ws_display_update(
             msg["display"], user=msg.get("user"), state=msg.get("state"), options=msg.get("options")
         )
         connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/mower/settings",
+        vol.Required("mower"): str,
+        vol.Optional("plan"): vol.Any(None, {vol.Coerce(str): vol.Coerce(int)}),
+        vol.Optional("interval"): vol.Any(None, vol.Coerce(int)),
+        vol.Optional("freq"): vol.Any(None, {str: str}),
+    }
+)
+@callback
+def ws_mower_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Change the mowing plan of a mower (own values per month, fixed interval, per area)."""
+    if (runtime := _ws_runtime(connection, msg)) is None:
+        return
+    tracker = runtime.mowers.trackers.get(msg["mower"])
+    if tracker is None:
+        connection.send_error(msg["id"], "not_found", "Unknown mower")
+        return
+    tracker.update_settings({k: msg[k] for k in ("plan", "interval", "freq") if k in msg})
+    connection.send_result(msg["id"], tracker.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/cleaning/settings",
+        vol.Required("intervals"): {vol.Coerce(str): vol.Coerce(int)},
+    }
+)
+@callback
+def ws_cleaning_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Replace the own cleaning intervals per area (days, 0 = not tracked)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.store.set_cleaning_intervals(msg["intervals"])
+        connection.send_result(msg["id"], runtime.store.data["cleaning"])

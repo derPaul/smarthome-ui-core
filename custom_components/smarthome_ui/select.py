@@ -1,13 +1,18 @@
-"""Selects per display: page, theme, season, sounds and performance mode."""
+"""Selects: page, theme, season, sounds and performance per display; mowing frequency per area."""
 
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from . import CoreConfigEntry
+from .const import SIGNAL_MOWER
 from .displays import SELECT_KEYS, DisplayEntity, async_setup_display_entities
+from .mower import FREQ_OPTIONS, MowerTracker
 
 
 async def async_setup_entry(
@@ -28,6 +33,23 @@ async def async_setup_entry(
             ],
         )
     )
+    mowers = entry.runtime_data.mowers
+    known: set[tuple[str, str]] = set()
+
+    @callback
+    def add_areas(_mower: str | None = None) -> None:
+        for tracker in mowers.trackers.values():
+            new = [
+                MowFrequencySelect(entry.entry_id, tracker, area)
+                for area in tracker.areas
+                if (tracker.id, area.lower()) not in known
+            ]
+            if new:
+                known.update((tracker.id, s.area.lower()) for s in new)
+                async_add_entities(new, config_subentry_id=tracker.id)
+
+    add_areas()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_MOWER, add_areas))
 
 
 class DisplaySelect(DisplayEntity, SelectEntity):
@@ -51,3 +73,40 @@ class DisplaySelect(DisplayEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Change it on the display."""
         self._command({"type": "set", "key": self._key, "value": option})
+
+
+class MowFrequencySelect(SelectEntity):
+    """How often an area is mowed: often, normal, rarely or not (pause)."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "mow_frequency"
+    _attr_options = FREQ_OPTIONS
+
+    def __init__(self, entry_id: str, tracker: MowerTracker, area: str) -> None:
+        """Initialize the select (entity ID: select.garden_<area>_frequency)."""
+        self._tracker = tracker
+        self.area = area
+        self._attr_unique_id = f"{entry_id}_mower_{tracker.id}_{slugify(area)}_frequency"
+        self._attr_translation_placeholders = {"area": area}
+        self.entity_id = f"select.garden_{slugify(area)}_frequency"
+        if identifiers := tracker.device_identifiers():
+            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+
+    @property
+    def current_option(self) -> str:
+        """Return the frequency."""
+        return self._tracker.frequency(self.area)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the frequency."""
+        self._tracker.set_frequency(self.area, option)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the mowing plan changes."""
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_MOWER, self._changed))
+
+    @callback
+    def _changed(self, mower_id: str) -> None:
+        if mower_id == self._tracker.id:
+            self.async_write_ha_state()

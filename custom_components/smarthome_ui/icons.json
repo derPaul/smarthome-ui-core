@@ -56,6 +56,17 @@
       },
       "display_performance": {
         "default": "mdi:speedometer"
+      },
+      "mow_frequency": {
+        "default": "mdi:calendar-sync-outline",
+        "state": {
+          "pause": "mdi:pause-circle-outline"
+        }
+      }
+    },
+    "number": {
+      "clean_interval": {
+        "default": "mdi:broom"
       }
     }
   },

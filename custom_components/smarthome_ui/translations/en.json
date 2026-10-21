@@ -38,6 +38,34 @@
         "already_configured": "This robot mower is already added.",
         "reconfigure_successful": "Robot mower changed."
       }
+    },
+    "vacuum": {
+      "entry_type": "Robot vacuum",
+      "initiate_flow": {
+        "user": "Add robot vacuum",
+        "reconfigure": "Change robot vacuum"
+      },
+      "step": {
+        "user": {
+          "title": "Add robot vacuum",
+          "description": "Pick the vacuum's device. Smarthome UI Core remembers when it cleaned each room (with a room sensor, e.g. Roborock) and notifies about errors, the station and wear parts – even without an open dashboard.",
+          "data": {
+            "device_id": "Robot vacuum",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Change robot vacuum",
+          "data": {
+            "device_id": "Robot vacuum",
+            "name": "Name (optional)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "This robot vacuum is already added.",
+        "reconfigure_successful": "Robot vacuum changed."
+      }
     }
   },
   "device": {
@@ -64,6 +92,9 @@
       },
       "mow_area": {
         "name": "{area} last mowed"
+      },
+      "vacuum_room": {
+        "name": "{area} last vacuumed"
       }
     },
     "binary_sensor": {
@@ -122,11 +153,25 @@
           "full": "All effects",
           "lite": "Lite"
         }
+      },
+      "mow_frequency": {
+        "name": "Mowing {area}",
+        "state": {
+          "often": "More often",
+          "normal": "Normal",
+          "rare": "Less often",
+          "pause": "Pause"
+        }
       }
     },
     "switch": {
       "display_standby": {
         "name": "Standby"
+      }
+    },
+    "number": {
+      "clean_interval": {
+        "name": "Cleaning {area}"
       }
     }
   },

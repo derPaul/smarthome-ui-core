@@ -14,12 +14,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
-from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS
+from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
 from .mower import MowerTracker
 from .store import CoreStore
 from .tasks import TaskState, task_states
+from .vacuum import VacuumTracker
 
 TASK_PREFIX = "task_"
 
@@ -60,6 +61,23 @@ async def async_setup_entry(
 
     add_areas()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_MOWER, add_areas))
+    vacuums = entry.runtime_data.vacuums
+    rooms: set[tuple[str, str]] = set()
+
+    @callback
+    def add_rooms(_vacuum: str | None = None) -> None:
+        for tracker in vacuums.trackers.values():
+            new = [
+                VacuumRoomSensor(entry.entry_id, tracker, area)
+                for area in tracker.rooms
+                if (tracker.id, area) not in rooms
+            ]
+            if new:
+                rooms.update((tracker.id, s.area_id) for s in new)
+                async_add_entities(new, config_subentry_id=tracker.id)
+
+    add_rooms()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_VACUUM, add_rooms))
     known: dict[str, TaskSensor] = {}
 
     @callback
@@ -229,11 +247,21 @@ class MowAreaSensor(SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return how it was mowed and whether it is being mowed now."""
         rec = self._tracker.area_record(self.area)
+        due = self._tracker.due(self.area)
+        days_left = None
+        if due is not None:
+            due_day = dt_util.as_local(dt_util.utc_from_timestamp(due / 1000)).date()
+            days_left = (due_day - dt_util.now().date()).days
         return {
             "mower": self._tracker.name,
             "mode": rec.get("mode") or None,
             "minutes": rec.get("mins"),
             "mowing": self._tracker.mowing(self.area),
+            "frequency": self._tracker.frequency(self.area),
+            "interval_days": self._tracker.days(self.area) or None,
+            "next_due": dt_util.utc_from_timestamp(due / 1000).isoformat() if due else None,
+            "days_left": days_left,
+            "due": days_left is not None and days_left <= 0,
         }
 
     @property
@@ -248,4 +276,45 @@ class MowAreaSensor(SensorEntity):
     @callback
     def _changed(self, mower_id: str) -> None:
         if mower_id == self._tracker.id:
+            self.async_write_ha_state()
+
+
+class VacuumRoomSensor(SensorEntity):
+    """When the robot last cleaned a room; belongs to the vacuum's own device."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_translation_key = "vacuum_room"
+    _attr_icon = "mdi:robot-vacuum"
+
+    def __init__(self, entry_id: str, tracker: VacuumTracker, area_id: str) -> None:
+        """Initialize the sensor (entity ID: sensor.household_<room>_last_vacuumed)."""
+        self._tracker = tracker
+        self.area_id = area_id
+        name = tracker.area_name(area_id)
+        self._attr_unique_id = f"{entry_id}_vacuum_{tracker.id}_{area_id}"
+        self._attr_translation_placeholders = {"area": name}
+        self.entity_id = f"sensor.household_{slugify(name) or area_id}_last_vacuumed"
+        if identifiers := tracker.device_identifiers():
+            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when the room was last cleaned by the robot."""
+        last = self._tracker.last_cleaned(self.area_id)
+        return dt_util.utc_from_timestamp(last / 1000) if last else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the area and vacuum."""
+        return {"area_id": self.area_id, "vacuum": self._tracker.name}
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the vacuum finished a run."""
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_VACUUM, self._changed))
+
+    @callback
+    def _changed(self, vacuum_id: str) -> None:
+        if vacuum_id == self._tracker.id:
             self.async_write_ha_state()

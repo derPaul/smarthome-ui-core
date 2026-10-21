@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import deepcopy
+from datetime import date
 import re
 from typing import Any
 
@@ -26,8 +27,9 @@ from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, Home
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
-from .const import MOW_MIN_MINUTES, SIGNAL_MOWER, TICK_INTERVAL
+from .const import MOW_MIN_MINUTES, SIGNAL_DATA, SIGNAL_MOWER, SIGNAL_TASKS, TICK_INTERVAL
 from .store import CoreStore, now_ms
 
 SUBENTRY_MOWER = "mower"
@@ -61,6 +63,11 @@ _MODES = {
     "paused": "Pause",
     "returning": "Rückfahrt",
 }
+DAY_MS = 86_400_000
+# days between two mowings per month (lawn in Central Europe; 0 = winter break)
+DEFAULT_PLAN = {1: 0, 2: 0, 3: 5, 4: 4, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 5, 11: 0, 12: 0}
+FREQ_FACTOR = {"often": 0.67, "normal": 1.0, "rare": 1.5}
+FREQ_OPTIONS = ["often", "normal", "rare", "pause"]
 CHECK_OK = ["ok", "OK", "unknown", "unavailable", "", "none", "normal", "rain"]
 CHECK_OK += ["non_working_hours", "low_battery"]
 
@@ -137,13 +144,107 @@ class MowerTracker:
         )
 
     def info(self) -> dict[str, Any]:
-        """Return what the dashboard needs to show this mower."""
+        """Return what the dashboard needs to show this mower (with its mowing plan)."""
+        settings = self.settings()
         return {
             "id": self.id,
             "name": self.name,
             "device_id": self.device_id,
             "entity": self.entity_id,
+            "plan": dict(settings.get("plan") or {}),
+            "interval": settings.get("interval"),
+            "freq": dict(settings.get("freq") or {}),
+            "configured": bool(settings),
         }
+
+    # ---------------------------------------------------------------- mowing plan and due areas
+
+    def settings(self) -> dict[str, Any]:
+        """Return the own plan, fixed interval and frequency per area."""
+        return self.store.data["mowing"].get(self.id) or {}
+
+    @callback
+    def update_settings(self, changes: dict[str, Any]) -> None:
+        """Change plan (own values per month), fixed interval or frequency per area."""
+        settings = deepcopy(self.settings())
+        if "plan" in changes:
+            settings["plan"] = {
+                str(int(k)): max(0, int(v))
+                for k, v in (changes["plan"] or {}).items()
+                if 1 <= int(k) <= 12
+            }
+        if "interval" in changes:
+            settings["interval"] = int(changes["interval"]) if changes["interval"] else None
+        if "freq" in changes:
+            settings["freq"] = {
+                str(a): v for a, v in (changes["freq"] or {}).items() if v in FREQ_OPTIONS
+            }
+        self.store.data["mowing"][self.id] = settings
+        self.store.save(SIGNAL_DATA, SIGNAL_TASKS)
+        async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
+
+    @callback
+    def set_frequency(self, area: str, value: str) -> None:
+        """Change how often one area is mowed."""
+        freq = dict(self.settings().get("freq") or {})
+        if value == "normal":
+            freq.pop(area, None)
+        else:
+            freq[area] = value
+        self.update_settings({"freq": freq})
+
+    def frequency(self, area: str) -> str:
+        """Return often / normal / rare / pause."""
+        return (self.settings().get("freq") or {}).get(area, "normal")
+
+    def days(self, area: str, day: date | None = None) -> int:
+        """Return the days between two mowings of an area (0 = not now)."""
+        day = day or dt_util.now().date()
+        freq = self.frequency(area)
+        own = self.settings().get("plan") or {}
+        base = int(own.get(str(day.month), DEFAULT_PLAN[day.month]))
+        if base <= 0 or freq == "pause":
+            return 0
+        if interval := self.settings().get("interval"):
+            return int(interval)
+        return max(1, round(base * FREQ_FACTOR.get(freq, 1.0)))
+
+    def last_mowed(self, area: str) -> int | None:
+        """Return when an area was last mowed (a short pass without a job does not count)."""
+        rec = self.area_record(area)
+        last = rec.get("last")
+        if last and not rec.get("mode") and (rec.get("mins") or 0) < MOW_MIN_MINUTES:
+            return None
+        return last or None
+
+    def due(self, area: str) -> int | None:
+        """Return when an area is due next (ms), None in a break or if never mowed."""
+        last, days = self.last_mowed(area), self.days(area)
+        return last + days * DAY_MS if last and days else None
+
+    def task_key(self, area: str) -> str:
+        """Return the task key of mowing an area."""
+        return f"mow:{self.id}|{area}"
+
+    def tasks(self) -> list[dict[str, Any]]:
+        """Return "mow <area>" as tasks (garden to-do list and due notification)."""
+        out = []
+        for area in self.areas:
+            if (due := self.due(area)) is None or self.mowing(area):
+                continue
+            out.append(
+                {
+                    "key": self.task_key(area),
+                    "name": f"{area} mähen",
+                    "src": "gd.mower",
+                    "area": area,
+                    "icon": "mdi:grass",
+                    "interval": self.days(area),
+                    "last": self.last_mowed(area),
+                    "due": due,
+                }
+            )
+        return out
 
     def device_identifiers(self) -> set[tuple[str, str]]:
         """Return the identifiers of the mower device (our entities are added to it)."""
@@ -321,6 +422,24 @@ class MowerTracker:
             self.store.set_mow_log(nxt)
         if changed or areas_changed or active_changed:
             async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
+            async_dispatcher_send(self.hass, SIGNAL_TASKS)
+
+    @callback
+    def mark_mowed(self, area: str) -> None:
+        """Mark an area as mowed by hand now."""
+        log = deepcopy(self._log())
+        log[area] = {
+            **log.get(area, {}),
+            "last": now_ms(),
+            "start": None,
+            "mode": "von Hand",
+            "mins": 0,
+            "mower": self.id,
+        }
+        log[area].pop("prev", None)
+        self.store.set_mow_log(log)
+        async_dispatcher_send(self.hass, SIGNAL_TASKS)
+        async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
 
     def area_record(self, name: str) -> dict[str, Any]:
         """Return the log entry of an area."""
@@ -346,6 +465,7 @@ class MowerManager:
         self.store = store
         self.trackers: dict[str, MowerTracker] = {}
         self._unsub: list[CALLBACK_TYPE] = []
+        self._day: date | None = None
 
     @callback
     def async_setup(self, subentries: list[ConfigSubentry]) -> None:
@@ -379,6 +499,12 @@ class MowerManager:
     def _tick(self, _now: Any = None) -> None:
         for tracker in self.trackers.values():
             tracker.evaluate()
+        # a new day: due dates and plan month move on
+        if (today := dt_util.now().date()) != self._day:
+            self._day = today
+            for tracker in self.trackers.values():
+                async_dispatcher_send(self.hass, SIGNAL_MOWER, tracker.id)
+            async_dispatcher_send(self.hass, SIGNAL_TASKS)
 
     @callback
     def async_stop(self) -> None:
@@ -395,6 +521,19 @@ class MowerManager:
     def info(self) -> list[dict[str, Any]]:
         """Return the mowers for the dashboard."""
         return [t.info() for t in self.trackers.values()]
+
+    def tasks(self) -> list[dict[str, Any]]:
+        """Return the due areas of all mowers as tasks."""
+        return [task for t in self.trackers.values() for task in t.tasks()]
+
+    @callback
+    def complete(self, key: str) -> bool:
+        """Mark the area of a "mow:" task as mowed by hand; False if it is not one."""
+        mower_id, _, area = key.removeprefix("mow:").partition("|")
+        if not key.startswith("mow:") or (tracker := self.trackers.get(mower_id)) is None:
+            return False
+        tracker.mark_mowed(area)
+        return True
 
 
 RuleProvider = Callable[[], list[dict[str, Any]]]

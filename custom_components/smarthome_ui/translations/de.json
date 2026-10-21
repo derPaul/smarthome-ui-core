@@ -38,6 +38,34 @@
         "already_configured": "Dieser Mähroboter ist schon hinzugefügt.",
         "reconfigure_successful": "Mähroboter geändert."
       }
+    },
+    "vacuum": {
+      "entry_type": "Saugroboter",
+      "initiate_flow": {
+        "user": "Saugroboter hinzufügen",
+        "reconfigure": "Saugroboter ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Saugroboter hinzufügen",
+          "description": "Gerät des Saugroboters wählen. Smarthome UI Core merkt sich, wann er welchen Raum gereinigt hat (mit Raum-Sensor, z. B. Roborock), und meldet Fehler, Station und Verschleißteile – auch ohne offenes Dashboard.",
+          "data": {
+            "device_id": "Saugroboter",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Saugroboter ändern",
+          "data": {
+            "device_id": "Saugroboter",
+            "name": "Name (optional)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "Dieser Saugroboter ist schon hinzugefügt.",
+        "reconfigure_successful": "Saugroboter geändert."
+      }
     }
   },
   "device": {
@@ -64,6 +92,9 @@
       },
       "mow_area": {
         "name": "{area} zuletzt gemäht"
+      },
+      "vacuum_room": {
+        "name": "{area} zuletzt gesaugt"
       }
     },
     "binary_sensor": {
@@ -122,11 +153,25 @@
           "full": "Alle Effekte",
           "lite": "Sparsam"
         }
+      },
+      "mow_frequency": {
+        "name": "Mähen {area}",
+        "state": {
+          "often": "Öfter",
+          "normal": "Normal",
+          "rare": "Seltener",
+          "pause": "Pause"
+        }
       }
     },
     "switch": {
       "display_standby": {
         "name": "Ruhemodus"
+      }
+    },
+    "number": {
+      "clean_interval": {
+        "name": "Putzen {area}"
       }
     }
   },

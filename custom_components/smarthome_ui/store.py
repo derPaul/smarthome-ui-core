@@ -48,6 +48,10 @@ def _default() -> dict[str, Any]:
         "sent": {},
         "recent": [],
         "displays": {},
+        # robot mowers: {mower_id: {"plan": {month: days}, "interval": days, "freq": {area: …}}}
+        "mowing": {},
+        # household: own cleaning interval per area (days, 0 = not tracked)
+        "cleaning": {"intervals": {}, "configured": False},
     }
 
 
@@ -150,6 +154,26 @@ class CoreStore:
     def reopen(self, key: str) -> None:
         """Mark a key as open again."""
         self.apply_done({key: {"t": 0}})
+
+    @callback
+    def set_cleaning_intervals(self, intervals: dict[str, int]) -> None:
+        """Replace the own cleaning intervals per area."""
+        self.data["cleaning"] = {
+            "intervals": {str(a): max(0, int(v)) for a, v in intervals.items()},
+            "configured": True,
+        }
+        # synced tasks take the new interval right away (the dashboard confirms with its next sync)
+        for task in self.data["tasks"]:
+            area = str(task.get("key", "")).removeprefix("clean:")
+            if (
+                task.get("key", "").startswith("clean:")
+                and area in self.data["cleaning"]["intervals"]
+            ):
+                days = self.data["cleaning"]["intervals"][area]
+                task["interval"] = days or task.get("interval")
+                if days and task.get("last"):
+                    task["due"] = int(task["last"] + days * 86_400_000)
+        self.save(SIGNAL_DATA, SIGNAL_TASKS)
 
     @callback
     def set_mow_log(self, log: dict[str, Any]) -> None:

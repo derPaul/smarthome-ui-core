@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.smarthome_ui.const import DOMAIN
 from homeassistant.config_entries import ConfigSubentryData
@@ -164,3 +164,87 @@ async def test_no_mower_rules_without_push(hass: HomeAssistant, notify_calls) ->
     hass.states.async_set("lawn_mower.luba", "error", {"friendly_name": "Luba"})
     await hass.async_block_till_done()
     assert notify_calls == []
+
+
+async def test_mowing_plan_due_todo_and_notification(
+    hass: HomeAssistant, notify_calls, freezer
+) -> None:
+    freezer.move_to("2026-06-10 10:00:00")  # June: every 2 days by default
+    device_id = _mower_device(hass)
+    entry = await _setup(hass, device_id, {"gd.mower": {"push": True}})
+    tracker = next(iter(entry.runtime_data.mowers.trackers.values()))
+    tracker.mark_mowed("Vorgarten")
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.garden_vorgarten_last_mowed")
+    assert state.attributes["interval_days"] == 2
+    assert state.attributes["days_left"] == 2
+    assert state.attributes["frequency"] == "normal"
+    assert hass.states.get("select.garden_vorgarten_frequency").state == "normal"
+
+    # "often" → 2 × 0.67 → 1 day
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.garden_vorgarten_frequency", "option": "often"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.garden_vorgarten_last_mowed").attributes["interval_days"] == 1
+
+    # own plan from the dashboard: June every 6 days
+    tracker.update_settings({"plan": {"6": 6}, "freq": {"Vorgarten": "normal"}})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.garden_vorgarten_last_mowed").attributes["days_left"] == 6
+
+    # due after 6 days → to-do list "Garten" and a notification at the task hour
+    freezer.tick(timedelta(days=6, hours=10))  # after the task hour (9:00 local)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    items = await hass.services.async_call(
+        "todo",
+        "get_items",
+        {},
+        target={"entity_id": "todo.garden"},
+        blocking=True,
+        return_response=True,
+    )
+    assert [i["summary"] for i in items["todo.garden"]["items"]] == ["Vorgarten mähen"]
+    assert any(c.data["message"] == "Vorgarten mähen" for c in notify_calls)
+
+    # check it off → mowed by hand, no longer due
+    await hass.services.async_call(
+        "todo",
+        "update_item",
+        {"item": "Vorgarten mähen", "status": "completed"},
+        target={"entity_id": "todo.garden"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    rec = entry.runtime_data.store.data["data"]["mow_log"]["Vorgarten"]
+    assert rec["mode"] == "von Hand"
+    assert hass.states.get("todo.garden").state == "0"
+
+    # winter break: nothing due
+    freezer.move_to("2026-12-20 10:00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.garden_vorgarten_last_mowed").attributes["interval_days"] is None
+
+
+async def test_mower_settings_websocket(hass: HomeAssistant, notify_calls, hass_ws_client) -> None:
+    device_id = _mower_device(hass)
+    entry = await _setup(hass, device_id)
+    mower_id = next(iter(entry.subentries))
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "smarthome_ui/mower/settings", "mower": mower_id, "plan": {"6": 6}, "interval": 3}
+    )
+    msg = await client.receive_json()
+    assert msg["success"], msg
+    assert msg["result"]["plan"] == {"6": 6}
+    assert msg["result"]["interval"] == 3
+    assert msg["result"]["configured"] is True
+    await client.send_json_auto_id({"type": "smarthome_ui/get"})
+    msg = await client.receive_json()
+    assert msg["result"]["mowers"][0]["plan"] == {"6": 6}

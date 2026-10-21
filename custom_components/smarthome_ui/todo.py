@@ -8,16 +8,15 @@ from homeassistant.components.todo import (
     TodoListEntity,
     TodoListEntityFeature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import CoreConfigEntry
-from .const import DOMAIN, SIGNAL_TASKS
+from . import CoreConfigEntry, CoreRuntime
+from .const import DOMAIN, SIGNAL_MOWER, SIGNAL_TASKS
 from .entity import DEVICE_GARDEN, DEVICE_HOUSEHOLD, CoreEntity, device_for_source
-from .store import CoreStore
 from .tasks import due_today, task_states
 
 
@@ -27,9 +26,9 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the to-do list."""
-    store = entry.runtime_data.store
+    runtime = entry.runtime_data
     async_add_entities(
-        DueTodoList(entry.entry_id, store, device) for device in (DEVICE_HOUSEHOLD, DEVICE_GARDEN)
+        DueTodoList(entry.entry_id, runtime, device) for device in (DEVICE_HOUSEHOLD, DEVICE_GARDEN)
     )
 
 
@@ -40,16 +39,17 @@ class DueTodoList(CoreEntity, TodoListEntity):
     _attr_translation_key = "due"  # icon
     _attr_supported_features = TodoListEntityFeature.UPDATE_TODO_ITEM
 
-    def __init__(self, entry_id: str, store: CoreStore, device: str) -> None:
+    def __init__(self, entry_id: str, runtime: CoreRuntime, device: str) -> None:
         """Initialize the list."""
         super().__init__(entry_id, f"due_{device}", device, "todo")
-        self._store = store
+        self._runtime = runtime
+        self._store = runtime.store
         self._device = device
 
     def _states(self) -> list:
         return [
             t
-            for t in task_states(self._store.data["tasks"], self._store.done)
+            for t in task_states(self._runtime.tasks(), self._store.done)
             if device_for_source(t.src) == self._device
         ]
 
@@ -85,10 +85,15 @@ class DueTodoList(CoreEntity, TodoListEntity):
             if self._context and self._context.user_id
             else None
         )
-        self._store.mark_done(task.key, who=user.name if user else None, label=task.name)
+        self._runtime.complete(task.key, who=user.name if user else None, label=task.name)
 
     async def async_added_to_hass(self) -> None:
         """Update when tasks or done records change."""
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_TASKS, self.async_write_ha_state)
         )
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_MOWER, self._mower_changed))
+
+    @callback
+    def _mower_changed(self, _mower_id: str) -> None:
+        self.async_write_ha_state()

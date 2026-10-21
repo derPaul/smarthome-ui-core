@@ -111,8 +111,36 @@ findet Core am Gerät selbst (z. B. bei Mammotion, Husqvarna, Gardena):
 - **Mitteilungen** (Quelle „Mähroboter“ im Dashboard, Push an): Fehler, Selbsttest meldet ein Problem
   (länger als 2 Minuten), Messer wechseln.
 
+**Mähplan:** je Mäher, wie viele Tage zwischen zwei Mähgängen liegen (je Monat; Vorschlag für Mitteleuropa,
+November bis Februar Pause) oder ein festes Intervall – und je Fläche öfter / normal / seltener / Pause.
+Bearbeitet wird im Mähplan-Popup des Dashboards; die Häufigkeit je Fläche gibt es auch als
+`select.garden_<fläche>_frequency`. Daraus rechnet Core:
+
+- am Sensor `sensor.garden_<fläche>_last_mowed` die Attribute `interval_days`, `next_due`, `days_left`, `due`,
+- fällige Flächen in `todo.garden` („Vorgarten mähen“ – abhaken = von Hand gemäht),
+- eine Mitteilung am Fälligkeitstag zur Uhrzeit für fällige Aufgaben (Quelle „Mähroboter“, Push an).
+
 Das Dashboard nimmt die Mähroboter dann aus Core – bei mehreren mit Umschalter in der Kachel. Dort lässt sich nur
 noch einstellen, welche Entitäten die Kachel zeigt und wie sie heißen.
+
+## Saugroboter
+
+**„Saugroboter hinzufügen“** funktioniert genauso (beliebig viele, Gerät wählen). Core findet am Gerät – und an einer
+damit verbundenen Station – den Sauger, den Sensor „Aktueller Raum“ (z. B. Roborock), Fehler-Sensoren, die
+gereinigte Fläche und die Verschleißteile.
+
+- **Räume:** Solange der Sauger reinigt, zählt Core die Zeit je Raum mit; ab 2 Minuten gilt ein Raum als gesaugt.
+  Stopps an der Station bis 45 Minuten (Mopp waschen, laden) gehören zum selben Lauf. Ohne Raum-Sensor zählt ein
+  im Dashboard gestarteter Lauf für seine Räume, eine Komplettreinigung für alle zugeordneten Räume.
+  Raumnamen werden über „Staubsauger-Segmente Bereichen zuordnen“ bzw. den Namen den Bereichen zugeordnet.
+- **Entitäten am Sauger-Gerät:** je Raum `sensor.household_<raum>_last_vacuumed`.
+- **Mitteilungen** (Quelle „Saugroboter“, Push an): Fehler, Roboter- und Stationsfehler (z. B. Wasser, Beutel),
+  Verschleißteile unter 10 % (Haupt-/Seitenbürste, Filter, Sieb, Sensoren).
+- **Putz-Intervalle je Raum** (gilt für Roboter und von Hand): `number.household_<raum>_clean_interval`
+  (Tage, 0 = nicht verfolgen) am Gerät „Haushalt“; im Dashboard wie bisher über den Raum änderbar.
+
+Das Dashboard nimmt die Saugroboter dann aus Core (bei mehreren mit Umschalter); die Kachel zeigt nur noch
+Sichtbarkeit und Namen der Entitäten.
 
 ## Bildschirme
 
@@ -155,7 +183,7 @@ actions:
 
 | Befehl | |
 |---|---|
-| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mähroboter und Status |
+| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mäh- und Saugroboter, Putz-Intervalle, Status |
 | `smarthome_ui/subscribe` | Ereignis bei jeder Datenänderung |
 | `smarthome_ui/import` | einmalige Datenübernahme aus dem Dashboard |
 | `smarthome_ui/done` | Abhaken / wieder öffnen / Rückgängig (`changes`, `log`, `unlog`) |
@@ -163,6 +191,8 @@ actions:
 | `smarthome_ui/tasks/sync` | Aufgaben mit Fälligkeit |
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
+| `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
+| `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |
 | `smarthome_ui/display/update` | Zustand eines Bildschirms (Seite, Theme, Jahreszeit, Töne, Leistung, Ruhemodus, Benutzer) |
 
