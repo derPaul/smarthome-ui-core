@@ -10,23 +10,24 @@
       "single_instance_allowed": "Smarthome UI Core ist schon eingerichtet."
     }
   },
+  "device": {
+    "notifications": {
+      "name": "Mitteilungen"
+    },
+    "household": {
+      "name": "Haushalt"
+    },
+    "garden": {
+      "name": "Garten"
+    }
+  },
   "entity": {
     "sensor": {
       "task": {
         "name": "Aufgabe"
       },
       "last_notification": {
-        "name": "Letzte Mitteilung"
-      }
-    },
-    "switch": {
-      "notifications": {
-        "name": "Mitteilungen"
-      }
-    },
-    "todo": {
-      "due": {
-        "name": "Fällige Aufgaben"
+        "name": "Zuletzt gesendet"
       }
     }
   },

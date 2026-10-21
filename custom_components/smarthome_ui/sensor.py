@@ -14,7 +14,7 @@ from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
 from .const import SIGNAL_SENT, SIGNAL_TASKS
-from .entity import CoreEntity
+from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
 from .store import CoreStore
 from .tasks import TaskState, task_states
 
@@ -33,10 +33,11 @@ async def async_setup_entry(
 
     @callback
     def sync() -> None:
-        keys = {slugify(task["key"]): task["key"] for task in store.data["tasks"]}
+        tasks = {slugify(task["key"]): task for task in store.data["tasks"]}
+        keys = {slug: task["key"] for slug, task in tasks.items()}
         new = [
-            TaskSensor(entry.entry_id, store, key, slug)
-            for slug, key in keys.items()
+            TaskSensor(entry.entry_id, store, task["key"], slug, device_for_source(task.get("src")))
+            for slug, task in tasks.items()
             if slug not in known
         ]
         for sensor in new:
@@ -63,9 +64,9 @@ class TaskSensor(CoreEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_translation_key = "task"
 
-    def __init__(self, entry_id: str, store: CoreStore, key: str, slug: str) -> None:
+    def __init__(self, entry_id: str, store: CoreStore, key: str, slug: str, device: str) -> None:
         """Initialize the sensor."""
-        super().__init__(entry_id, f"{TASK_PREFIX}{slug}")
+        super().__init__(entry_id, f"{TASK_PREFIX}{slug}", device)
         self._store = store
         self._key = key
         self.slug = slug
@@ -131,7 +132,7 @@ class LastNotificationSensor(CoreEntity, SensorEntity):
 
     def __init__(self, entry_id: str, store: CoreStore) -> None:
         """Initialize the sensor."""
-        super().__init__(entry_id, "last_notification")
+        super().__init__(entry_id, "last_notification", DEVICE_NOTIFY)
         self._store = store
 
     @property

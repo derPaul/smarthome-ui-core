@@ -172,7 +172,7 @@ async def test_quiet_hours_and_pause(hass: HomeAssistant, entry, notify_calls, f
     await hass.services.async_call(
         "switch",
         "turn_off",
-        target={"entity_id": "switch.smarthome_ui_notifications"},
+        target={"entity_id": "switch.notifications"},
         blocking=True,
     )
     engine.send("Smarthome", "pausiert")
@@ -182,7 +182,7 @@ async def test_quiet_hours_and_pause(hass: HomeAssistant, entry, notify_calls, f
     await hass.async_block_till_done()
     assert len(notify_calls) == 3, "the test notification ignores the pause"
     assert (
-        hass.states.get("sensor.smarthome_ui_last_notification")
+        hass.states.get("sensor.notifications_last_sent")
         .attributes["recent"][0]["message"]
         .startswith("Test")
     )

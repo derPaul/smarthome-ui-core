@@ -46,9 +46,22 @@ Außerdem:
 
 | Entität / Aktion | |
 |---|---|
-| `switch.smarthome_ui_mitteilungen` | Mitteilungen pausieren (z. B. im Urlaub) |
-| `sensor.smarthome_ui_letzte_mitteilung` | Zeitpunkt der letzten Mitteilung, Attribut `recent` mit den letzten 20 |
+| `switch.mitteilungen` | Mitteilungen pausieren (z. B. im Urlaub) |
+| `sensor.mitteilungen_zuletzt_gesendet` | Zeitpunkt der letzten Mitteilung, Attribut `recent` mit den letzten 20 |
 | `smarthome_ui.test_notify` | Test-Mitteilung an alle Empfänger (auch wenn pausiert) |
+
+## Geräte
+
+Die Integration legt je Bereich ein Dienst-Gerät an. Die Entitäts-IDs richten sich nach dem Gerätenamen
+(hier mit deutscher Sprache in Home Assistant):
+
+| Gerät | Entitäten |
+|---|---|
+| **Mitteilungen** | Schalter zum Pausieren, „Zuletzt gesendet“ |
+| **Haushalt** | ein Sensor je Putz- und Wartungsaufgabe, To-do-Liste mit dem Fälligen |
+| **Garten** | ein Sensor je Aufgabe aus dem Gartenkalender, To-do-Liste mit dem Fälligen |
+
+Weitere Bereiche (z. B. Sicherheit) kommen als eigene Geräte dazu, sobald sie Entitäten haben.
 
 ## Haushalt & Garten
 
@@ -57,8 +70,8 @@ Gartenkalender). Daraus entstehen:
 
 | Entität | |
 |---|---|
-| `sensor.smarthome_ui_<aufgabe>` | Fällig am (Zeitstempel), Attribute: zuletzt erledigt, von wem, Intervall, Tage bis fällig |
-| `todo.smarthome_ui_fallige_aufgaben` | Alles, was heute fällig oder überfällig ist – abhaken = erledigt (auch per Sprache) |
+| `sensor.haushalt_<aufgabe>`, `sensor.garten_<aufgabe>` | Fällig am (Zeitstempel), Attribute: zuletzt erledigt, von wem, Intervall, Tage bis fällig |
+| `todo.haushalt`, `todo.garten` | Was heute fällig oder überfällig ist – abhaken = erledigt (auch per Sprache) |
 
 | Aktion | |
 |---|---|
@@ -70,7 +83,7 @@ Gartenkalender). Daraus entstehen:
 # Beispiel: Erinnerung, wenn das Bad seit 2 Tagen überfällig ist
 triggers:
   - trigger: template
-    value_template: "{{ state_attr('sensor.smarthome_ui_bad_putzen', 'days_left') | int(0) <= -2 }}"
+    value_template: "{{ state_attr('sensor.haushalt_bad_putzen', 'days_left') | int(0) <= -2 }}"
 actions:
   - action: notify.mobile_app_handy
     data:

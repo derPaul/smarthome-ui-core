@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
@@ -156,9 +157,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     await store.async_load()
     engine = NotifyEngine(hass, store)
     entry.runtime_data = CoreRuntime(store, engine)
+    _remove_single_device(hass, entry)
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+@callback
+def _remove_single_device(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
+    """Remove the one "Smarthome UI" device of the first preview (now one device per area)."""
+    entities = er.async_get(hass)
+    if old_todo := entities.async_get_entity_id("todo", DOMAIN, f"{entry.entry_id}_due"):
+        entities.async_remove(old_todo)
+    devices = dr.async_get(hass)
+    if old := devices.async_get_device(identifiers={(DOMAIN, entry.entry_id)}):
+        devices.async_remove_device(old.id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool:

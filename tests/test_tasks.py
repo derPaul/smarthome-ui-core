@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.components.todo import DOMAIN as TODO_DOMAIN
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import dt as dt_util
 
 DAY = 86_400_000
@@ -48,22 +49,22 @@ async def test_task_sensors_and_todo(hass: HomeAssistant, entry: MockConfigEntry
     )
     await hass.async_block_till_done()
 
-    bad = hass.states.get("sensor.smarthome_ui_bad_putzen")
+    bad = hass.states.get("sensor.household_bad_putzen")
     assert bad is not None
     assert dt_util.parse_datetime(bad.state).date().isoformat() == "2026-10-19"
     assert bad.attributes["days_left"] == -2
     assert bad.attributes["due"] is True
-    assert hass.states.get("sensor.smarthome_ui_filter_reinigen").attributes["due"] is False
+    assert hass.states.get("sensor.household_filter_reinigen").attributes["due"] is False
 
     items = await hass.services.async_call(
         TODO_DOMAIN,
         "get_items",
         {},
-        target={"entity_id": "todo.smarthome_ui_due_tasks"},
+        target={"entity_id": "todo.household"},
         blocking=True,
         return_response=True,
     )
-    summaries = [i["summary"] for i in items["todo.smarthome_ui_due_tasks"]["items"]]
+    summaries = [i["summary"] for i in items["todo.household"]["items"]]
     assert summaries == ["Bad putzen"]
 
     # check it off in the to-do list → done now, next due in 7 days
@@ -71,16 +72,53 @@ async def test_task_sensors_and_todo(hass: HomeAssistant, entry: MockConfigEntry
         TODO_DOMAIN,
         "update_item",
         {"item": "Bad putzen", "status": "completed"},
-        target={"entity_id": "todo.smarthome_ui_due_tasks"},
+        target={"entity_id": "todo.household"},
         blocking=True,
     )
     await hass.async_block_till_done()
     assert store.done["clean:bad"]["t"] > 0
-    bad = hass.states.get("sensor.smarthome_ui_bad_putzen")
+    bad = hass.states.get("sensor.household_bad_putzen")
     assert dt_util.parse_datetime(bad.state).date().isoformat() == "2026-10-28"
-    assert hass.states.get("todo.smarthome_ui_due_tasks").state == "0"
+    assert hass.states.get("todo.household").state == "0"
 
     # removed from the dashboard → sensor removed
     store.set_tasks([{"key": "clean:bad", "name": "Bad putzen", "interval": 7}])
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.smarthome_ui_filter_reinigen") is None
+    assert hass.states.get("sensor.household_filter_reinigen") is None
+
+
+async def test_devices_per_area(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
+    freezer.move_to("2026-10-21 10:00:00")
+    entry.runtime_data.store.set_tasks(
+        [
+            {
+                "key": "clean:bad",
+                "name": "Bad putzen",
+                "src": "hh.tasks",
+                "interval": 7,
+                "due": _ms("2026-10-20 09:00"),
+            },
+            {
+                "key": "gd:task:hecke|",
+                "name": "Hecke schneiden",
+                "src": "gd.tasks",
+                "due": _ms("2026-10-21 08:00"),
+            },
+        ]
+    )
+    await hass.async_block_till_done()
+
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    names = sorted(d.name for d in dr.async_entries_for_config_entry(devices, entry.entry_id))
+    assert names == ["Garden", "Household", "Notifications"]
+
+    def device_of(entity_id: str) -> str:
+        return devices.async_get(entities.async_get(entity_id).device_id).name
+
+    assert device_of("sensor.household_bad_putzen") == "Household"
+    assert device_of("sensor.garden_hecke_schneiden") == "Garden"
+    assert device_of("switch.notifications") == "Notifications"
+    assert device_of("sensor.notifications_last_sent") == "Notifications"
+    assert hass.states.get("todo.household").state == "1"
+    assert hass.states.get("todo.garden").state == "1"

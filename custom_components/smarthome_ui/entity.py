@@ -1,4 +1,4 @@
-"""Common base for the entities."""
+"""Common base for the entities: one service device per area (notifications, household, garden)."""
 
 from __future__ import annotations
 
@@ -7,19 +7,30 @@ from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
 
+DEVICE_NOTIFY = "notifications"
+DEVICE_HOUSEHOLD = "household"
+DEVICE_GARDEN = "garden"
+DEVICES = (DEVICE_NOTIFY, DEVICE_HOUSEHOLD, DEVICE_GARDEN)
+
+
+def device_for_source(src: str | None) -> str:
+    """Return the device a task belongs to (garden calendar → garden, else household)."""
+    return DEVICE_GARDEN if str(src or "").startswith("gd.") else DEVICE_HOUSEHOLD
+
 
 class CoreEntity(Entity):
-    """An entity of the Smarthome UI Core service device."""
+    """An entity of one of the Smarthome UI Core service devices."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, entry_id: str, key: str) -> None:
+    def __init__(self, entry_id: str, key: str, device: str) -> None:
         """Initialize the entity."""
         self._attr_unique_id = f"{entry_id}_{key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry_id)},
-            name="Smarthome UI",
+            identifiers={(DOMAIN, f"{entry_id}_{device}")},
+            translation_key=device,
             manufacturer="Smarthome UI",
+            model="Smarthome UI Core",
             entry_type=DeviceEntryType.SERVICE,
         )

@@ -1,4 +1,4 @@
-"""To-do list with everything that is due today or overdue; checking an item marks it done."""
+"""To-do lists (household, garden) with the tasks that are due; checking one marks it done."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from . import CoreConfigEntry
 from .const import DOMAIN, SIGNAL_TASKS
-from .entity import CoreEntity
+from .entity import DEVICE_GARDEN, DEVICE_HOUSEHOLD, CoreEntity, device_for_source
 from .store import CoreStore
 from .tasks import due_today, task_states
 
@@ -27,29 +27,37 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the to-do list."""
-    async_add_entities([DueTodoList(entry.entry_id, entry.runtime_data.store)])
+    store = entry.runtime_data.store
+    async_add_entities(
+        DueTodoList(entry.entry_id, store, device) for device in (DEVICE_HOUSEHOLD, DEVICE_GARDEN)
+    )
 
 
 class DueTodoList(CoreEntity, TodoListEntity):
-    """Household and garden tasks that are due."""
+    """The due tasks of one area (household or garden)."""
 
-    _attr_translation_key = "due"
+    _attr_name = None  # main entity of the device: todo.<device name>
+    _attr_translation_key = "due"  # icon
     _attr_supported_features = TodoListEntityFeature.UPDATE_TODO_ITEM
 
-    def __init__(self, entry_id: str, store: CoreStore) -> None:
+    def __init__(self, entry_id: str, store: CoreStore, device: str) -> None:
         """Initialize the list."""
-        super().__init__(entry_id, "due")
+        super().__init__(entry_id, f"due_{device}", device)
         self._store = store
+        self._device = device
+
+    def _states(self) -> list:
+        return [
+            t
+            for t in task_states(self._store.data["tasks"], self._store.done)
+            if device_for_source(t.src) == self._device
+        ]
 
     @property
     def todo_items(self) -> list[TodoItem]:
         """Return the tasks due today or overdue, oldest first."""
         today = dt_util.now().date()
-        due = [
-            t
-            for t in task_states(self._store.data["tasks"], self._store.done)
-            if due_today(t, today)
-        ]
+        due = [t for t in self._states() if due_today(t, today)]
         due.sort(key=lambda t: (t.due or 0, t.name))
         return [
             TodoItem(
@@ -65,8 +73,7 @@ class DueTodoList(CoreEntity, TodoListEntity):
         """Mark a task done when it is checked."""
         if item.status != TodoItemStatus.COMPLETED:
             return
-        states = task_states(self._store.data["tasks"], self._store.done)
-        task = next((t for t in states if t.key == item.uid), None)
+        task = next((t for t in self._states() if t.key == item.uid), None)
         if task is None:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,

@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import CoreConfigEntry
 from .const import SIGNAL_NOTIFY
-from .entity import CoreEntity
+from .entity import DEVICE_NOTIFY, CoreEntity
 from .store import CoreStore
 
 
@@ -27,11 +27,12 @@ async def async_setup_entry(
 class NotificationsSwitch(CoreEntity, SwitchEntity):
     """Notifications on or paused."""
 
-    _attr_translation_key = "notifications"
+    _attr_name = None  # main entity of the device: switch.<device name>
+    _attr_translation_key = "notifications"  # icon
 
     def __init__(self, entry_id: str, store: CoreStore) -> None:
         """Initialize the switch."""
-        super().__init__(entry_id, "notifications")
+        super().__init__(entry_id, "notifications", DEVICE_NOTIFY)
         self._store = store
 
     @property
