@@ -132,7 +132,8 @@
           "announced": "Starting soon",
           "started": "Started",
           "mop_pending": "Mops after vacuuming",
-          "mopping": "Mopping"
+          "mopping": "Mopping",
+          "unreachable": "Due only on another floor"
         }
       }
     },

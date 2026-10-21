@@ -173,6 +173,12 @@ Bedingungen – unter *Smarthome UI Core → Mähroboter/Saugroboter → Zahnrad
 - je Raum `switch.household_<raum>_mop` (z. B. für Teppichräume aus).
 - Gewischte Räume merkt sich Core (Attribut `last_mopped` am Raum-Sensor), auch bei Läufen aus der App.
 
+**Etagen:** Der Sauger startet nur Räume auf seiner Etage. Wo er steht, erkennt Core an einer Karten-Auswahl, deren
+Name zu einer Etage passt (Roborock: eine Karte je Etage, z. B. „Obergeschoss“), sonst am Bereich des Saugers und
+dessen Etage. Sind Räume auf einer anderen Etage fällig, kommt einmal am Tag eine Mitteilung („Robbi steht im
+Erdgeschoss – fällig sind Obergeschoss: Bad. Roboter umsetzen?“); Attribut `unreachable` am Planer-Sensor.
+Räume ohne Etage gelten als erreichbar.
+
 **Übliche Dauer:** Core merkt sich je Fläche bzw. Raum die letzten zehn Laufzeiten (beim Sauger Saugen und Wischen
 getrennt). Ab drei Läufen gibt es eine Warnung, wenn ein Lauf weniger als halb oder fast doppelt so lange dauert
 wie üblich (z. B. „Luba: Vorgarten nur 12 min statt üblich 40 min – nicht fertig geworden?“). Attribute

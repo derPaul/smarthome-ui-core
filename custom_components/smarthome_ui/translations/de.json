@@ -132,7 +132,8 @@
           "announced": "Startet gleich",
           "started": "Gestartet",
           "mop_pending": "Wischt nach dem Saugen",
-          "mopping": "Wischt"
+          "mopping": "Wischt",
+          "unreachable": "Fällig nur auf einer anderen Etage"
         }
       }
     },

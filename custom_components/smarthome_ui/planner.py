@@ -93,6 +93,7 @@ STATUS = [
     "started",
     "mop_pending",
     "mopping",
+    "unreachable",
 ]
 MOP_WAIT_MS = 2 * 60_000  # after vacuuming: let the robot dock and empty before mopping
 MOP_GIVE_UP_MS = 6 * 3600_000
@@ -142,6 +143,7 @@ class RobotPlanner:
         self.status = "off"
         self.due: list[str] = []
         self.mop_due: list[str] = []
+        self.unreachable: list[str] = []
         self.start_at: int | None = None
 
     # ---------------------------------------------------------------- stored switches
@@ -314,6 +316,16 @@ class RobotPlanner:
         before = (self.status, tuple(self.due), tuple(self.mop_due), self.start_at)
         self.due = self.due_areas() if self.is_on else []
         self.mop_due = self.mop_due_areas() if self.is_on else []
+        # rooms on another floor than the vacuum: not started, but mentioned (carry it up/down?)
+        self.unreachable = []
+        if isinstance(self.tracker, VacuumTracker):
+            reach = self.tracker.reachable
+            self.unreachable = [a for a in self._rooms() if not reach(a)]
+            self.due = [a for a in self.due if reach(a)]
+            self.mop_due = [a for a in self.mop_due if reach(a)]
+            if self.unreachable and st.get("unreachable_day") != today and st.get("skip") != today:
+                st["unreachable_day"] = today
+                self._tell_unreachable()
         if st.get("mop_pending"):
             self._mop_pass(st)
         elif not self.is_on:
@@ -323,7 +335,8 @@ class RobotPlanner:
         elif st.get("started") == today:
             self.status, self.start_at = "done_today", None
         elif not self.due and not self.mop_due:
-            self.status, self.start_at = "nothing_due", None
+            self.status = "unreachable" if self.unreachable else "nothing_due"
+            self.start_at = None
         elif (reason := self.blocker(local)) is not None:
             self.status, self.start_at = reason, None
         elif self.start_at is None and int(self.settings.get("announce") or 0) > 0:
@@ -377,6 +390,26 @@ class RobotPlanner:
         st["mop_pending"] = None
         self.status = "mopping"
         self._changed(save=True)
+
+    def _tell_unreachable(self) -> None:
+        """Push once a day: rooms are due on another floor than the vacuum."""
+        cfg = (self.store.data["notify"].get("sources") or {}).get("hh.robot") or {}
+        if not cfg.get("push") or not isinstance(self.tracker, VacuumTracker):
+            return
+        here = self.tracker.floor_name(self.tracker.floor_id())
+        by_floor: dict[str, list[str]] = {}
+        for area in self.unreachable:
+            name = self.tracker.floor_name(self.tracker.area_floor(area)) or "anderen Etage"
+            by_floor.setdefault(name, []).append(self.area_name(area))
+        rooms = "; ".join(f"{floor}: {', '.join(names)}" for floor, names in by_floor.items())
+        self.engine.send(
+            "Saugroboter",
+            f"{self.tracker.name} steht{f' im {here}' if here else ''} – fällig sind {rooms}. "
+            "Roboter umsetzen?",
+            src="hh.robot",
+            url=cfg.get("url") or "/",
+            tag=f"planner-floor|{self.id}",
+        )
 
     def _rooms(self) -> list[str]:
         """Return the rooms of the (first) run: due ones plus rooms to be mopped afterwards."""
@@ -497,6 +530,7 @@ class RobotPlanner:
             "due": self.due,
             "mop_due": self.mop_due,
             "mop": self.can_mop(),
+            "unreachable": self.unreachable,
             "start_at": self.start_at,
             "switch": entity_id_for(self.hass, "switch", f"planner_{self.id}"),
         }

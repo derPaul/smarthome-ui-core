@@ -367,5 +367,6 @@ class PlannerStatus(PlannerEntity, SensorEntity):
         return {
             "due": [self._planner.area_name(a) for a in self._planner.due],
             "mop_due": [self._planner.area_name(a) for a in self._planner.mop_due],
+            "unreachable": [self._planner.area_name(a) for a in self._planner.unreachable],
             "start_at": dt_util.utc_from_timestamp(start / 1000).isoformat() if start else None,
         }

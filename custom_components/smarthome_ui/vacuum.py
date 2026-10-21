@@ -23,7 +23,12 @@ from typing import Any
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+    floor_registry as fr,
+)
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from . import durations
@@ -127,6 +132,54 @@ class VacuumTracker:
             return False
         state = self.hass.states.get(control["entity"])
         return state is not None and state.state not in (control["vacuum"], *INVALID)
+
+    # ---------------------------------------------------------------- floors
+
+    def floor_id(self) -> str | None:
+        """Return the floor the vacuum is on right now.
+
+        1. a map select of the vacuum whose current map is named like a floor (Roborock: one map per
+           floor), 2. the area of the vacuum (entity or device) and its floor.
+        """
+        floors = fr.async_get(self.hass).async_list_floors()
+        for entry in self.entities():
+            if entry.domain != "select" or not re.search(
+                r"(map|karte|floor|etage|stockwerk)", self._text(entry)
+            ):
+                continue
+            state = self.hass.states.get(entry.entity_id)
+            current = _norm(state.state) if state else ""
+            if not current:
+                continue
+            for floor in floors:
+                names = [
+                    _norm(floor.name),
+                    _norm(floor.floor_id),
+                    *(_norm(a) for a in floor.aliases),
+                ]
+                if any(n and (n == current or n in current or current in n) for n in names):
+                    return floor.floor_id
+        entity = er.async_get(self.hass).async_get(self.entity_id or "")
+        area_id = entity.area_id if entity else None
+        if area_id is None:
+            device = dr.async_get(self.hass).async_get(self.device_id)
+            area_id = device.area_id if device else None
+        return self.area_floor(area_id) if area_id else None
+
+    def area_floor(self, area_id: str | None) -> str | None:
+        """Return the floor of an area."""
+        area = ar.async_get(self.hass).async_get_area(area_id) if area_id else None
+        return area.floor_id if area else None
+
+    def floor_name(self, floor_id: str | None) -> str:
+        """Return the name of a floor."""
+        floor = fr.async_get(self.hass).async_get_floor(floor_id) if floor_id else None
+        return floor.name if floor else ""
+
+    def reachable(self, area_id: str) -> bool:
+        """Return True if the vacuum can get to the room (same floor, or a floor is unknown)."""
+        here, there = self.floor_id(), self.area_floor(area_id)
+        return here is None or there is None or here == there
 
     def last_mopped(self, area_id: str) -> int | None:
         """Return when the robot last mopped an area."""
