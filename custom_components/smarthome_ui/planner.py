@@ -75,6 +75,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "solar_entity": None,
         "solar_min": 1000,
         "announce": 10,
+        "mop_every": 7,
     },
 }
 STATUS = [
@@ -90,7 +91,11 @@ STATUS = [
     "not_ready",
     "announced",
     "started",
+    "mop_pending",
+    "mopping",
 ]
+MOP_WAIT_MS = 2 * 60_000  # after vacuuming: let the robot dock and empty before mopping
+MOP_GIVE_UP_MS = 6 * 3600_000
 ACTION_SKIP = "SMARTHOME_SKIP_"
 
 
@@ -136,6 +141,7 @@ class RobotPlanner:
         }
         self.status = "off"
         self.due: list[str] = []
+        self.mop_due: list[str] = []
         self.start_at: int | None = None
 
     # ---------------------------------------------------------------- stored switches
@@ -170,6 +176,45 @@ class RobotPlanner:
         self._state()["off"] = sorted(off)
         self._changed(save=True)
         self.tick()
+
+    def mop_on(self, area: str) -> bool:
+        """Return True if a room may be mopped automatically (off e.g. for carpets)."""
+        return area not in (self._state().get("mop_off") or [])
+
+    @callback
+    def set_mop(self, area: str, on: bool) -> None:
+        """Switch mopping of one room on or off."""
+        off = set(self._state().get("mop_off") or [])
+        off.discard(area) if on else off.add(area)
+        self._state()["mop_off"] = sorted(off)
+        self._changed(save=True)
+        self.tick()
+
+    @property
+    def mop_every(self) -> int:
+        """Return the days between two moppings (0 = the planner does not mop)."""
+        if self.kind != KIND_VACUUM:
+            return 0
+        return int(self.settings.get("mop_every") or 0)
+
+    def can_mop(self) -> bool:
+        """Return True if the vacuum can mop and the planner should plan it."""
+        return (
+            isinstance(self.tracker, VacuumTracker)
+            and self.mop_every > 0
+            and self.tracker.mop_control() is not None
+        )
+
+    def mop_due_areas(self) -> list[str]:
+        """Return the rooms due for mopping (never mopped or mopped longer ago than set)."""
+        if not self.can_mop() or not isinstance(self.tracker, VacuumTracker):
+            return []
+        limit = now_ms() - self.mop_every * 86_400_000
+        return [
+            a
+            for a in self.tracker.known_rooms()
+            if self.area_on(a) and self.mop_on(a) and (self.tracker.last_mopped(a) or 0) <= limit
+        ]
 
     @callback
     def skip_today(self) -> None:
@@ -266,15 +311,18 @@ class RobotPlanner:
         local = dt_util.now()
         today = local.date().isoformat()
         st = self._state()
-        before = (self.status, tuple(self.due), self.start_at)
+        before = (self.status, tuple(self.due), tuple(self.mop_due), self.start_at)
         self.due = self.due_areas() if self.is_on else []
-        if not self.is_on:
+        self.mop_due = self.mop_due_areas() if self.is_on else []
+        if st.get("mop_pending"):
+            self._mop_pass(st)
+        elif not self.is_on:
             self.status, self.start_at = "off", None
         elif st.get("skip") == today:
             self.status, self.start_at = "skipped", None
         elif st.get("started") == today:
             self.status, self.start_at = "done_today", None
-        elif not self.due:
+        elif not self.due and not self.mop_due:
             self.status, self.start_at = "nothing_due", None
         elif (reason := self.blocker(local)) is not None:
             self.status, self.start_at = reason, None
@@ -289,8 +337,50 @@ class RobotPlanner:
             st["started"] = today
             self.status, self.start_at = "started", None
             self._changed(save=True)
-        if (self.status, tuple(self.due), self.start_at) != before:
+        if (self.status, tuple(self.due), tuple(self.mop_due), self.start_at) != before:
             self._changed()
+
+    def _mop_pass(self, st: dict[str, Any]) -> None:
+        """Second pass: mop the rooms once vacuuming has finished and the robot is back."""
+        pending = st["mop_pending"]
+        now = now_ms()
+        session = getattr(self.tracker, "_session", None)
+        finished = session is None or session.get("end") is not None
+        ended = (session or {}).get("end") or pending.get("at", now)
+        if now - pending.get("at", now) > MOP_GIVE_UP_MS:
+            st["mop_pending"] = None
+            self.status = "done_today"
+            self._changed(save=True)
+            return
+        if not (
+            finished
+            and self._ready()
+            and now - ended >= MOP_WAIT_MS
+            and now - pending["at"] >= MOP_WAIT_MS
+        ):
+            self.status = "mop_pending"
+            return
+        control = self.tracker.mop_control() if isinstance(self.tracker, VacuumTracker) else None
+        entity = self.tracker.entity_id
+        steps = []
+        if control:
+            steps.append(
+                (
+                    "select",
+                    "select_option",
+                    {"entity_id": control["entity"], "option": control["mop"]},
+                )
+            )
+        steps.append(self._clean_step(entity, pending["rooms"]))
+        self._record_run(pending["rooms"])
+        self._call_seq(steps)
+        st["mop_pending"] = None
+        self.status = "mopping"
+        self._changed(save=True)
+
+    def _rooms(self) -> list[str]:
+        """Return the rooms of the (first) run: due ones plus rooms to be mopped afterwards."""
+        return [*self.due, *[a for a in self.mop_due if a not in self.due]]
 
     def _names(self, areas: list[str]) -> str:
         return ", ".join(self.area_name(a) for a in areas)
@@ -304,7 +394,8 @@ class RobotPlanner:
         verb = "mäht" if self.kind == KIND_MOWER else "saugt"
         self.engine.send(
             "Mähroboter" if self.kind == KIND_MOWER else "Saugroboter",
-            f"{self.tracker.name} {verb} ab {at:%H:%M}: {self._names(self.due)}",
+            f"{self.tracker.name} {verb} ab {at:%H:%M}: {self._names(self._rooms())}"
+            + (f" – danach wischen: {self._names(self.mop_due)}" if self.mop_due else ""),
             src=src,
             url=cfg.get("url") or "/",
             tag=f"planner|{self.id}",
@@ -316,16 +407,22 @@ class RobotPlanner:
         if not entity:
             return
         if isinstance(self.tracker, VacuumTracker):
-            hh = self.store.data["data"].setdefault("household", {})
-            now = now_ms()
-            runs = [r for r in hh.get("runs") or [] if now - r.get("t", 0) < 14 * 86_400_000]
-            self.store.set_data(
-                {"household": {**hh, "runs": [*runs[-19:], {"t": now, "areas": areas}]}}
-            )
-            if self.hass.services.has_service("vacuum", "clean_area"):
-                self._call("vacuum", "clean_area", {"entity_id": entity, "cleaning_area_id": areas})
-            else:
-                self._call("vacuum", "start", {"entity_id": entity})
+            rooms = self._rooms()
+            steps = []
+            # with a mop: vacuum only first (more often); rooms due for mopping follow later
+            if self.can_mop() and (control := self.tracker.mop_control()):
+                steps.append(
+                    (
+                        "select",
+                        "select_option",
+                        {"entity_id": control["entity"], "option": control["vacuum"]},
+                    )
+                )
+                if self.mop_due:
+                    self._state()["mop_pending"] = {"rooms": list(self.mop_due), "at": now_ms()}
+            steps.append(self._clean_step(entity, rooms))
+            self._record_run(rooms)
+            self._call_seq(steps)
             return
         switches: dict[str, str] = {}
         buttons: dict[str, str] = {}
@@ -350,6 +447,32 @@ class RobotPlanner:
         else:
             self._call("lawn_mower", "start_mowing", {"entity_id": entity})
 
+    def _clean_step(self, entity: str | None, rooms: list[str]) -> tuple[str, str, dict[str, Any]]:
+        if self.hass.services.has_service("vacuum", "clean_area"):
+            return ("vacuum", "clean_area", {"entity_id": entity, "cleaning_area_id": rooms})
+        return ("vacuum", "start", {"entity_id": entity})
+
+    def _record_run(self, rooms: list[str]) -> None:
+        """Tell the room tracking which rooms a run is for (needed without a room sensor)."""
+        hh = self.store.data["data"].setdefault("household", {})
+        now = now_ms()
+        runs = [r for r in hh.get("runs") or [] if now - r.get("t", 0) < 14 * 86_400_000]
+        self.store.set_data(
+            {"household": {**hh, "runs": [*runs[-19:], {"t": now, "areas": rooms}]}}
+        )
+
+    def _call_seq(self, steps: list[tuple[str, str, dict[str, Any]]]) -> None:
+        """Call services one after the other (e.g. set the mop mode, then start)."""
+
+        async def run() -> None:
+            for domain, service, data in steps:
+                try:
+                    await self.hass.services.async_call(domain, service, data, blocking=True)
+                except Exception:  # noqa: BLE001 - a failed step must not break the planner
+                    _LOGGER.warning("Robot planner: %s.%s failed", domain, service, exc_info=True)
+
+        self.hass.async_create_task(run())
+
     def _call(self, domain: str, service: str, data: dict[str, Any]) -> None:
         async def run() -> None:
             try:
@@ -372,6 +495,8 @@ class RobotPlanner:
             "on": self.is_on,
             "status": self.status,
             "due": self.due,
+            "mop_due": self.mop_due,
+            "mop": self.can_mop(),
             "start_at": self.start_at,
             "switch": entity_id_for(self.hass, "switch", f"planner_{self.id}"),
         }
@@ -481,7 +606,7 @@ def async_setup_planner_entities(
     manager: PlannerManager,
     async_add_entities: AddConfigEntryEntitiesCallback,
     robot: Callable[[RobotPlanner], list[Entity]],
-    per_area: Callable[[RobotPlanner, str], Entity] | None = None,
+    per_area: Callable[[RobotPlanner, str], Entity | None] | None = None,
 ) -> CALLBACK_TYPE:
     """Add the planner entities of every robot (and per area as areas appear)."""
     for planner in manager.planners.values():
@@ -496,9 +621,9 @@ def async_setup_planner_entities(
             new = [a for a in planner.areas() if (planner.id, a) not in known]
             if new:
                 known.update((planner.id, a) for a in new)
-                async_add_entities(
-                    [per_area(planner, a) for a in new], config_subentry_id=planner.id
-                )
+                entities = [e for a in new if (e := per_area(planner, a)) is not None]
+                if entities:
+                    async_add_entities(entities, config_subentry_id=planner.id)
 
     add_areas()
     unsubs = [

@@ -76,7 +76,8 @@
             "cond_solar": "Only with solar power",
             "solar_entity": "Sensor PV power or surplus",
             "solar_min": "At least",
-            "announce": "Announce ahead (0 = start right away)"
+            "announce": "Announce ahead (0 = start right away)",
+            "mop_every": "Mop every … days (0 = planner does not mop)"
           },
           "description": "Mow/vacuum automatically: when the robot may start on its own if areas or rooms are due (switch \"... automatically\" on the device). Every condition can be switched off."
         }
@@ -129,7 +130,9 @@
           "waiting_solar": "Waiting for solar power",
           "not_ready": "Robot not ready",
           "announced": "Starting soon",
-          "started": "Started"
+          "started": "Started",
+          "mop_pending": "Mops after vacuuming",
+          "mopping": "Mopping"
         }
       }
     },
@@ -215,6 +218,9 @@
       },
       "planner_area": {
         "name": "{area} automatically"
+      },
+      "planner_mop": {
+        "name": "Mop {area}"
       }
     },
     "number": {

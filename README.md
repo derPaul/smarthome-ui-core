@@ -164,6 +164,20 @@ Bedingungen – unter *Smarthome UI Core → Mähroboter/Saugroboter → Zahnrad
 - **vorher ankündigen** (Standard 10 Minuten): Push „Robbi saugt ab 10:30: Küche, Flur“ mit dem Knopf
   **„Heute nicht“** (Quelle „Saugroboter“ bzw. „Mähroboter“ muss Push an haben). 0 = sofort starten.
 
+**Wischen** (Saugroboter mit Wischfunktion): Core erkennt sie am Reinigungsmodus (z. B. „Saugen“ /
+„Saugen und Wischen“) oder an einer Wasser-/Wischstufe mit „Aus“ (z. B. Roborock). Dann plant der Sauger getrennt:
+
+- **Nur saugen** – so oft wie das Putz-Intervall des Raums (Wischen dabei aus),
+- **Wischen** – alle *N* Tage (Einstellung „Wischen alle … Tage“, Standard 7, 0 = Planer wischt nicht):
+  erst wird gesaugt, danach – sobald der Sauger zurück ist – wird im zweiten Durchgang gewischt.
+- je Raum `switch.household_<raum>_mop` (z. B. für Teppichräume aus).
+- Gewischte Räume merkt sich Core (Attribut `last_mopped` am Raum-Sensor), auch bei Läufen aus der App.
+
+**Übliche Dauer:** Core merkt sich je Fläche bzw. Raum die letzten zehn Laufzeiten (beim Sauger Saugen und Wischen
+getrennt). Ab drei Läufen gibt es eine Warnung, wenn ein Lauf weniger als halb oder fast doppelt so lange dauert
+wie üblich (z. B. „Luba: Vorgarten nur 12 min statt üblich 40 min – nicht fertig geworden?“). Attribute
+`usual_minutes` (und `last_minutes`) an den Flächen- und Raum-Sensoren.
+
 Gestartet wird nur mit den fälligen Flächen/Räumen – Sauger über `vacuum.clean_area` (Räume aus „Staubsauger-Segmente
 Bereichen zuordnen“, sonst `vacuum.start`), Mäher über seine Bereichs-Schalter und `lawn_mower.start_mowing` (sonst
 eine Aufgabe mit dem Namen der Fläche). Höchstens ein automatischer Start je Roboter und Tag. Fällig heißt: Mähplan

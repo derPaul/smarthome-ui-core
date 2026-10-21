@@ -14,6 +14,7 @@ The result goes to the dashboard's household data: ``household.cleaned[area].r``
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import deepcopy
 import json
 import re
@@ -25,6 +26,7 @@ from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, Home
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from . import durations
 from .const import SIGNAL_TASKS, SIGNAL_VACUUM, VAC_MIN_MINUTES
 from .store import CoreStore, now_ms
 
@@ -50,6 +52,13 @@ CONSUMABLES = [
     (r"(sensor)", "Sensoren", 30, "reinigen"),
 ]
 _HOURS = {"s": 1 / 3600, "min": 1 / 60, "h": 1, "d": 24}
+_VAC = re.compile(r"(sweep|vacuum|saug)")
+_MOP = re.compile(r"(mop|wisch|wipe)")
+_MOP_LEVEL = re.compile(
+    r"(mop_intensity|mop intensity|water_box|water box|wassermenge|wischintensit|scrub|"
+    r"water_flow|water level|wasserstufe|wasserdurchfluss|mop_mode|wischmodus)"
+)
+_MOP_OFF = ("off", "aus", "closed", "close", "no_water", "none", "kein wasser")
 
 
 def _norm(text: str | None) -> str:
@@ -72,6 +81,56 @@ class VacuumTracker:
         self._session: dict[str, Any] | None = None
         self._cur: tuple[bool, str | None, int] | None = None
         self.rooms: list[str] = []
+        self.on_unusual: Callable[[Any, str, dict[str, Any]], None] | None = None
+        self._mop_level: str | None = None
+
+    # ---------------------------------------------------------------- mopping
+
+    def mop_control(self) -> dict[str, Any] | None:
+        """Return how to switch between vacuuming only and vacuuming + mopping (None = no mop).
+
+        Either a cleaning-mode select (e.g. Dreame: sweeping / sweeping_and_mopping) or a mop /
+        water level select with an "off" option (e.g. Roborock mop intensity).
+        """
+        selects = []
+        for entry in self.entities():
+            if entry.domain != "select":
+                continue
+            state = self.hass.states.get(entry.entity_id)
+            options = [str(o) for o in (state.attributes.get("options") or [])] if state else []
+            if options:
+                selects.append((entry, state, options))
+        for entry, _state, options in selects:
+            vac = [o for o in options if _VAC.search(o.lower()) and not _MOP.search(o.lower())]
+            both = [o for o in options if _VAC.search(o.lower()) and _MOP.search(o.lower())]
+            if vac and both:
+                return {"entity": entry.entity_id, "vacuum": vac[0], "mop": both[0]}
+        for entry, state, options in selects:
+            if not _MOP_LEVEL.search(self._text(entry)):
+                continue
+            off = next((o for o in options if o.lower() in _MOP_OFF), None)
+            if off is None:
+                continue
+            if state.state not in (off, *INVALID):
+                self._mop_level = state.state
+            on = self._mop_level or next(
+                (o for o in options if o.lower() in ("medium", "moderate", "standard", "mittel")),
+                next(o for o in options if o != off),
+            )
+            return {"entity": entry.entity_id, "vacuum": off, "mop": on}
+        return None
+
+    def is_mopping(self) -> bool:
+        """Return True if the vacuum is set to mop right now."""
+        control = self.mop_control()
+        if control is None:
+            return False
+        state = self.hass.states.get(control["entity"])
+        return state is not None and state.state not in (control["vacuum"], *INVALID)
+
+    def last_mopped(self, area_id: str) -> int | None:
+        """Return when the robot last mopped an area."""
+        return ((self._household().get("cleaned") or {}).get(area_id) or {}).get("w") or None
 
     # ---------------------------------------------------------------- entities of the device
 
@@ -242,9 +301,11 @@ class VacuumTracker:
                     "dwell": {},
                     "clean_ms": 0,
                     "max_area": 0,
+                    "mop": self.is_mopping(),
                 }
-            else:
+            elif session.get("end"):
                 session["end"] = None
+                session["mop"] = session.get("mop") or self.is_mopping()
         elif (
             session is not None
             and session.get("end") is None
@@ -292,6 +353,17 @@ class VacuumTracker:
         for area_id, at in done.items():
             rec = cleaned.get(area_id) or {}
             cleaned[area_id] = {**rec, "r": max(rec.get("r") or 0, at), "vac": self.id}
+            if session.get("mop"):
+                cleaned[area_id]["w"] = max(rec.get("w") or 0, at)
+        # usual time per room (vacuuming and mopping counted separately)
+        for area_id, dwell in session["dwell"].items():
+            minutes = round(dwell["ms"] / 60_000)
+            if area_id not in done or minutes < VAC_MIN_MINUTES:
+                continue
+            key = f"{area_id}|mop" if session.get("mop") else area_id
+            result = durations.record(self.store, self.id, key, minutes, min_diff=3)
+            if result is not None and self.on_unusual is not None:
+                self.on_unusual(self, area_id, result)
         changes: dict[str, Any] = {
             "cleaned": cleaned,
             "synced": max(hh.get("synced") or 0, session["end"]),
@@ -299,6 +371,7 @@ class VacuumTracker:
         if session["max_area"] > float(hh.get("full_area") or 0):
             changes["full_area"] = session["max_area"]
         self.store.set_data({"household": {**hh, **changes}})
+        self.rooms = self.known_rooms()
         async_dispatcher_send(self.hass, SIGNAL_VACUUM, self.id)
         async_dispatcher_send(self.hass, SIGNAL_TASKS)
 
@@ -383,13 +456,16 @@ class VacuumManager:
         self.store = store
         self.trackers: dict[str, VacuumTracker] = {}
         self._unsub: list[CALLBACK_TYPE] = []
+        self.on_unusual: Callable[[Any, str, dict[str, Any]], None] | None = None
 
     @callback
     def async_setup(self, subentries: list[ConfigSubentry]) -> None:
         """Start tracking the vacuums."""
         for subentry in subentries:
             if subentry.subentry_type == SUBENTRY_VACUUM:
-                self.trackers[subentry.subentry_id] = VacuumTracker(self.hass, self.store, subentry)
+                tracker = VacuumTracker(self.hass, self.store, subentry)
+                tracker.on_unusual = self.on_unusual
+                self.trackers[subentry.subentry_id] = tracker
         if not self.trackers:
             return
         registry = er.async_get(self.hass)

@@ -13,7 +13,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
 
-from . import CoreConfigEntry
+from . import CoreConfigEntry, durations
 from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
@@ -271,6 +271,7 @@ class MowAreaSensor(SensorEntity):
             "next_due": dt_util.utc_from_timestamp(due / 1000).isoformat() if due else None,
             "days_left": days_left,
             "due": days_left is not None and days_left <= 0,
+            "usual_minutes": durations.usual(self._tracker.store, self._tracker.id, self.area),
         }
 
     @property
@@ -317,7 +318,19 @@ class VacuumRoomSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the area and vacuum."""
-        return {"area_id": self.area_id, "vacuum": self._tracker.name}
+        store, vac, area = self._tracker.store, self._tracker.id, self.area_id
+        last_runs = durations.history(store, vac, area)
+        mopped = self._tracker.last_mopped(area)
+        return {
+            "area_id": area,
+            "vacuum": self._tracker.name,
+            "last_minutes": last_runs[-1] if last_runs else None,
+            "usual_minutes": durations.usual(store, vac, area),
+            "usual_minutes_mopping": durations.usual(store, vac, f"{area}|mop"),
+            "last_mopped": dt_util.utc_from_timestamp(mopped / 1000).isoformat()
+            if mopped
+            else None,
+        }
 
     async def async_added_to_hass(self) -> None:
         """Update when the vacuum finished a run."""
@@ -353,5 +366,6 @@ class PlannerStatus(PlannerEntity, SensorEntity):
         start = self._planner.start_at
         return {
             "due": [self._planner.area_name(a) for a in self._planner.due],
+            "mop_due": [self._planner.area_name(a) for a in self._planner.mop_due],
             "start_at": dt_util.utc_from_timestamp(start / 1000).isoformat() if start else None,
         }

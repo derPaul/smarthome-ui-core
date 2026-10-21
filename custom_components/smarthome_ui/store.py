@@ -52,6 +52,8 @@ def _default() -> dict[str, Any]:
         "mowing": {},
         # robot planner: {robot_id: {"on": bool, "off": [areas], "skip": day, "started": day}}
         "planner": {},
+        # last durations per robot and area (minutes): {robot_id: {area: [..]}}
+        "durations": {},
         # household: own cleaning interval per area (days, 0 = not tracked)
         "cleaning": {"intervals": {}, "configured": False},
     }

@@ -76,7 +76,8 @@
             "cond_solar": "Nur mit Solarstrom",
             "solar_entity": "Sensor PV-Leistung oder Überschuss",
             "solar_min": "Mindestens",
-            "announce": "Vorher ankündigen (0 = sofort starten)"
+            "announce": "Vorher ankündigen (0 = sofort starten)",
+            "mop_every": "Wischen alle … Tage (0 = Planer wischt nicht)"
           },
           "description": "Automatisch mähen/saugen: Wann der Roboter selbst starten darf, wenn Flächen bzw. Räume fällig sind (Schalter „Automatisch …“ am Gerät). Jede Bedingung lässt sich abschalten."
         }
@@ -129,7 +130,9 @@
           "waiting_solar": "Wartet auf Solarstrom",
           "not_ready": "Roboter nicht bereit",
           "announced": "Startet gleich",
-          "started": "Gestartet"
+          "started": "Gestartet",
+          "mop_pending": "Wischt nach dem Saugen",
+          "mopping": "Wischt"
         }
       }
     },
@@ -215,6 +218,9 @@
       },
       "planner_area": {
         "name": "{area} automatisch"
+      },
+      "planner_mop": {
+        "name": "{area} wischen"
       }
     },
     "number": {

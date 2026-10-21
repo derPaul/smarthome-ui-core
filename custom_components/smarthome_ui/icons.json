@@ -41,6 +41,12 @@
         "state": {
           "off": "mdi:calendar-remove-outline"
         }
+      },
+      "planner_mop": {
+        "default": "mdi:water",
+        "state": {
+          "off": "mdi:water-off-outline"
+        }
       }
     },
     "todo": {

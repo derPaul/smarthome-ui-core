@@ -18,6 +18,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
+from . import durations
 from .const import (
     ATTR_AREA,
     ATTR_DATE,
@@ -210,6 +211,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     _remove_single_device(hass, entry)
     engine.extra_rules = lambda: [*mowers.rules(), *vacuums.rules()]
     engine.extra_tasks = mowers.tasks
+
+    @callback
+    def unusual(tracker: Any, area: str, result: dict[str, Any]) -> None:
+        """A run took clearly shorter or longer than usual: tell (if push is on for the robot)."""
+        mower = tracker in mowers.trackers.values()
+        src = "gd.mower" if mower else "hh.robot"
+        cfg = (store.data["notify"].get("sources") or {}).get(src) or {}
+        if not cfg.get("push"):
+            return
+        name = area if mower else tracker.area_name(area)
+        engine.send(
+            "Mähroboter" if mower else "Saugroboter",
+            durations.message(tracker.name, name, result, mower),
+            src=src,
+            url=cfg.get("url") or "/",
+            tag=f"duration|{tracker.id}|{area}",
+        )
+
+    mowers.on_unusual = unusual
+    vacuums.on_unusual = unusual
     mowers.async_setup(list(entry.subentries.values()))
     vacuums.async_setup(list(entry.subentries.values()))
     planners.async_setup(list(entry.subentries.values()), mowers.trackers, vacuums.trackers)

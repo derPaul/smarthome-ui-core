@@ -44,6 +44,15 @@ async def async_setup_entry(
             lambda p, area: PlannerAreaSwitch(entry.entry_id, p, area),
         )
     )
+    entry.async_on_unload(
+        async_setup_planner_entities(
+            hass,
+            entry.runtime_data.planners,
+            async_add_entities,
+            lambda p: [],
+            lambda p, area: PlannerMopSwitch(entry.entry_id, p, area) if p.can_mop() else None,
+        )
+    )
 
 
 class NotificationsSwitch(CoreEntity, SwitchEntity):
@@ -140,3 +149,31 @@ class PlannerAreaSwitch(PlannerEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Leave the area out."""
         self._planner.set_area(self._area, False)
+
+
+class PlannerMopSwitch(PlannerEntity, SwitchEntity):
+    """A room may be mopped automatically (switch off e.g. for carpets)."""
+
+    _attr_translation_key = "planner_mop"
+
+    def __init__(self, entry_id: str, planner: RobotPlanner, area: str) -> None:
+        """Initialize (switch.household_<room>_mop)."""
+        name = planner.area_name(area)
+        super().__init__(
+            entry_id, planner, f"_{slugify(area)}_mop", "switch", f"{slugify(name)}_mop"
+        )
+        self._area = area
+        self._attr_translation_placeholders = {"area": name}
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the room is mopped."""
+        return self._planner.mop_on(self._area)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Mop the room."""
+        self._planner.set_mop(self._area, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Do not mop the room."""
+        self._planner.set_mop(self._area, False)

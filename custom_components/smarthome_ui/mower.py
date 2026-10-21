@@ -29,6 +29,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
+from . import durations
 from .const import MOW_MIN_MINUTES, SIGNAL_DATA, SIGNAL_MOWER, SIGNAL_TASKS, TICK_INTERVAL
 from .store import CoreStore, now_ms
 
@@ -108,6 +109,7 @@ class MowerTracker:
         self._seen: dict[str, int] = {}
         self.active: dict[str, dict[str, Any]] = {}
         self.areas: list[str] = []
+        self.on_unusual: Callable[[Any, str, dict[str, Any]], None] | None = None
 
     # ---------------------------------------------------------------- entities of the device
 
@@ -411,6 +413,7 @@ class MowerTracker:
                     "mins": mins,
                     "mower": self.id,
                 }
+                self._duration(name, mins)
             else:  # only passing through: keep the previous result
                 nxt[name] = {**(cur.get("prev") or {}), "mower": self.id}
             changed = True
@@ -423,6 +426,13 @@ class MowerTracker:
         if changed or areas_changed or active_changed:
             async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
             async_dispatcher_send(self.hass, SIGNAL_TASKS)
+
+    def _duration(self, area: str, minutes: int) -> None:
+        """Remember how long the area took; warn if that was unusual."""
+        result = durations.record(self.store, self.id, area, minutes, min_diff=5)
+        async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
+        if result is not None and self.on_unusual is not None:
+            self.on_unusual(self, area, result)
 
     @callback
     def mark_mowed(self, area: str) -> None:
@@ -465,6 +475,7 @@ class MowerManager:
         self.store = store
         self.trackers: dict[str, MowerTracker] = {}
         self._unsub: list[CALLBACK_TYPE] = []
+        self.on_unusual: Callable[[Any, str, dict[str, Any]], None] | None = None
         self._day: date | None = None
 
     @callback
@@ -472,7 +483,9 @@ class MowerManager:
         """Start tracking the mowers."""
         for subentry in subentries:
             if subentry.subentry_type == SUBENTRY_MOWER:
-                self.trackers[subentry.subentry_id] = MowerTracker(self.hass, self.store, subentry)
+                tracker = MowerTracker(self.hass, self.store, subentry)
+                tracker.on_unusual = self.on_unusual
+                self.trackers[subentry.subentry_id] = tracker
         if not self.trackers:
             return
         registry = er.async_get(self.hass)

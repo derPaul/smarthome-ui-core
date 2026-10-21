@@ -88,6 +88,12 @@ class MowerSubentryFlow(ConfigSubentryFlow):
                 min=0, max=20000, step=50, unit_of_measurement="W", mode=NumberSelectorMode.BOX
             )
         )
+        if self._kind == KIND_VACUUM:
+            fields[opt("mop_every")] = NumberSelector(
+                NumberSelectorConfig(
+                    min=0, max=60, step=1, unit_of_measurement="d", mode=NumberSelectorMode.BOX
+                )
+            )
         fields[opt("announce")] = NumberSelector(
             NumberSelectorConfig(
                 min=0, max=60, step=1, unit_of_measurement="min", mode=NumberSelectorMode.BOX
@@ -141,7 +147,7 @@ class MowerSubentryFlow(ConfigSubentryFlow):
             for key in ("auto_from", "auto_to"):
                 if data.get(key):
                     data[key] = str(data[key])[:5]
-            for key in ("solar_min", "announce"):
+            for key in ("solar_min", "announce", "mop_every"):
                 if data.get(key) is not None:
                     data[key] = int(data[key])
             return self.async_update_and_abort(
