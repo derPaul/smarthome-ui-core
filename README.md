@@ -96,6 +96,24 @@ actions:
 
 Wird eine Aufgabe hier erledigt (To-do, Aktion), ist sie sofort im Dashboard abgehakt – und umgekehrt.
 
+## Mähroboter
+
+Unter *Einstellungen → Geräte & Dienste → Smarthome UI Core* gibt es **„Mähroboter hinzufügen“** – beliebig
+viele. Gewählt wird nur das Gerät (alles mit einer `lawn_mower`-Entität), optional ein eigener Name. Den Rest
+findet Core am Gerät selbst (z. B. bei Mammotion, Husqvarna, Gardena):
+
+- **Mähflächen:** aus den Bereichs-Schaltern des Mähers und dem, was er mäht (Flächen-Sensor während einer
+  Aufgabe oder Positions-Sensor). Core merkt sich je Fläche, wann sie zuletzt gemäht wurde, wie lange und wie
+  (z. B. „Kanten“) – **auch ohne offenes Dashboard**. Eine kurze Durchfahrt (unter 10 Minuten, nur laut Position)
+  zählt nicht.
+- **Entitäten am Mäher-Gerät:** je Fläche `sensor.garden_<fläche>_last_mowed` (Zeitstempel, Attribute `mode`,
+  `minutes`, `mowing`). Sie erscheinen auf der Geräteseite des Mähers.
+- **Mitteilungen** (Quelle „Mähroboter“ im Dashboard, Push an): Fehler, Selbsttest meldet ein Problem
+  (länger als 2 Minuten), Messer wechseln.
+
+Das Dashboard nimmt die Mähroboter dann aus Core – bei mehreren mit Umschalter in der Kachel. Dort lässt sich nur
+noch einstellen, welche Entitäten die Kachel zeigt und wie sie heißen.
+
 ## Bildschirme
 
 Jedes Gerät, auf dem das Dashboard offen ist (Wandtablet, Handy, Browser), erscheint automatisch als
@@ -137,7 +155,7 @@ actions:
 
 | Befehl | |
 |---|---|
-| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`) und Status |
+| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mähroboter und Status |
 | `smarthome_ui/subscribe` | Ereignis bei jeder Datenänderung |
 | `smarthome_ui/import` | einmalige Datenübernahme aus dem Dashboard |
 | `smarthome_ui/done` | Abhaken / wieder öffnen / Rückgängig (`changes`, `log`, `unlog`) |

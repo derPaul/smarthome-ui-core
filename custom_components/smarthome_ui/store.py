@@ -152,6 +152,12 @@ class CoreStore:
         self.apply_done({key: {"t": 0}})
 
     @callback
+    def set_mow_log(self, log: dict[str, Any]) -> None:
+        """Replace the mowing log (tracked by the mowers)."""
+        self.data["data"]["mow_log"] = log
+        self.save(SIGNAL_DATA)
+
+    @callback
     def area_mowed(self, area: str) -> None:
         """Mark a mowing area as mowed by hand now."""
         log = self.data["data"].setdefault("mow_log", {})

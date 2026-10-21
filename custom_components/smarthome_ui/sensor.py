@@ -8,14 +8,16 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
-from .const import SIGNAL_SENT, SIGNAL_TASKS
+from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
+from .mower import MowerTracker
 from .store import CoreStore
 from .tasks import TaskState, task_states
 
@@ -40,6 +42,24 @@ async def async_setup_entry(
             lambda did: [DisplayUser(entry.entry_id, manager, did, "user", "sensor")],
         )
     )
+    mowers = entry.runtime_data.mowers
+    areas: set[tuple[str, str]] = set()
+
+    @callback
+    def add_areas(_mower: str | None = None) -> None:
+        for tracker in mowers.trackers.values():
+            new = [
+                MowAreaSensor(entry.entry_id, tracker, name)
+                for name in tracker.areas
+                if (tracker.id, name.lower()) not in areas
+            ]
+            if not new:
+                continue
+            areas.update((tracker.id, s.area.lower()) for s in new)
+            async_add_entities(new, config_subentry_id=tracker.id)
+
+    add_areas()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_MOWER, add_areas))
     known: dict[str, TaskSensor] = {}
 
     @callback
@@ -179,3 +199,53 @@ class DisplayUser(DisplayEntity, SensorEntity):
     def native_value(self) -> str | None:
         """Return the user name."""
         return self._record.get("user")
+
+
+class MowAreaSensor(SensorEntity):
+    """When a mowing area was last mowed; belongs to the mower's own device."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_translation_key = "mow_area"
+
+    def __init__(self, entry_id: str, tracker: MowerTracker, area: str) -> None:
+        """Initialize the sensor (entity ID: sensor.garden_<area>_last_mowed)."""
+        self._tracker = tracker
+        self.area = area
+        self._attr_unique_id = f"{entry_id}_mower_{tracker.id}_{slugify(area)}"
+        self._attr_translation_placeholders = {"area": area}
+        self.entity_id = f"sensor.garden_{slugify(area)}_last_mowed"
+        if identifiers := tracker.device_identifiers():
+            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when the area was last mowed."""
+        last = self._tracker.area_record(self.area).get("last")
+        return dt_util.utc_from_timestamp(last / 1000) if last else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return how it was mowed and whether it is being mowed now."""
+        rec = self._tracker.area_record(self.area)
+        return {
+            "mower": self._tracker.name,
+            "mode": rec.get("mode") or None,
+            "minutes": rec.get("mins"),
+            "mowing": self._tracker.mowing(self.area),
+        }
+
+    @property
+    def icon(self) -> str:
+        """Return a mower while mowing."""
+        return "mdi:robot-mower" if self._tracker.mowing(self.area) else "mdi:grass"
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the mower changes."""
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_MOWER, self._changed))
+
+    @callback
+    def _changed(self, mower_id: str) -> None:
+        if mower_id == self._tracker.id:
+            self.async_write_ha_state()

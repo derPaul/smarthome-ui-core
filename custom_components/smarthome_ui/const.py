@@ -17,6 +17,7 @@ SIGNAL_TASKS: Final = f"{DOMAIN}_tasks"
 SIGNAL_NOTIFY: Final = f"{DOMAIN}_notify"
 SIGNAL_SENT: Final = f"{DOMAIN}_sent"
 SIGNAL_DISPLAY_NEW: Final = f"{DOMAIN}_display_new"
+SIGNAL_MOWER: Final = f"{DOMAIN}_mower"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)
@@ -26,6 +27,8 @@ FORGET_AFTER: Final = timedelta(minutes=15)  # a resolved notification may come 
 CHANGE_COOLDOWN: Final = timedelta(seconds=30)
 RECENT_MAX: Final = 20
 DEFAULT_TASK_HOUR: Final = 9
+# an area only counts as mowed after this many minutes there (unless a job says so)
+MOW_MIN_MINUTES: Final = 10
 
 SERVICE_TASK_DONE: Final = "task_done"
 SERVICE_TASK_REOPEN: Final = "task_reopen"

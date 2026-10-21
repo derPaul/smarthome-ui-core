@@ -17,6 +17,7 @@ dashboard reports them anymore. Due tasks are announced on their due day at ``ta
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, time as dtime, timedelta
 import logging
 from typing import Any
@@ -101,6 +102,8 @@ class NotifyEngine:
         self._deferred: list[dict[str, Any]] = []
         self._priming = False
         self._dirty = False
+        # further rules from the integration itself (e.g. the configured mowers)
+        self.extra_rules: Callable[[], list[dict[str, Any]]] = list
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -128,6 +131,10 @@ class NotifyEngine:
         """Return the notification settings."""
         return self.store.data["notify"]
 
+    def rules(self) -> list[dict[str, Any]]:
+        """Return the rules from the dashboard and from the integration."""
+        return [*(self.config.get("rules") or []), *self.extra_rules()]
+
     @property
     def sent(self) -> dict[str, int]:
         """Return the keys sent and still active (ms)."""
@@ -146,7 +153,7 @@ class NotifyEngine:
         self._clear_rules()
         self._priming = True
         try:
-            for rule in self.config.get("rules") or []:
+            for rule in self.rules():
                 try:
                     self._setup_rule(rule)
                 except Exception:  # noqa: BLE001 - a broken rule must not stop the others
@@ -154,7 +161,7 @@ class NotifyEngine:
         finally:
             self._priming = False
         # forget rule states of rules that no longer exist
-        ids = {f"rule:{r.get('id')}" for r in self.config.get("rules") or []}
+        ids = {f"rule:{r.get('id')}" for r in self.rules()}
         for key in [k for k in self.sent if k.startswith("rule:") and k not in ids]:
             self.sent.pop(key, None)
         self.hass.async_create_task(self._async_poll_calendars())
@@ -324,7 +331,7 @@ class NotifyEngine:
                 self._fire(rule)
         done = self.store.done
         # points in time (waste collection the day before, …)
-        for rule in self.config.get("rules") or []:
+        for rule in self.rules():
             if rule.get("type") != "at":
                 continue
             at = int(rule.get("at") or 0)
@@ -380,7 +387,7 @@ class NotifyEngine:
             self.store.save()
 
     async def _async_poll_calendars(self, _now: datetime | None = None) -> None:
-        rules = [r for r in self.config.get("rules") or [] if r.get("type") == "calendar"]
+        rules = [r for r in self.rules() if r.get("type") == "calendar"]
         entities = sorted({e for r in rules for e in r.get("entities") or []})
         if not entities:
             self._calendar = []

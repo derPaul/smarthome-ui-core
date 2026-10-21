@@ -33,6 +33,7 @@ from .const import (
     SIGNAL_DATA,
 )
 from .displays import DisplayManager
+from .mower import MowerManager
 from .notify import NotifyEngine
 from .store import CoreStore
 from .tasks import find_task, task_states
@@ -56,6 +57,7 @@ class CoreRuntime:
     store: CoreStore
     engine: NotifyEngine
     displays: DisplayManager
+    mowers: MowerManager
 
 
 type CoreConfigEntry = ConfigEntry[CoreRuntime]
@@ -168,10 +170,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     store = CoreStore(hass)
     await store.async_load()
     engine = NotifyEngine(hass, store)
-    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store))
+    mowers = MowerManager(hass, store)
+    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store), mowers)
     _remove_single_device(hass, entry)
+    engine.extra_rules = mowers.rules
+    mowers.async_setup(list(entry.subentries.values()))
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # a mower added, changed or removed → set up again
+    entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
 
@@ -202,9 +209,14 @@ async def async_remove_config_entry_device(
     return False
 
 
+async def _async_reload(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool:
     """Unload the config entry."""
     entry.runtime_data.engine.async_stop()
+    entry.runtime_data.mowers.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -229,6 +241,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "version": 1,
         "data": store.dashboard_data(),
         "migrated": store.data["migrated"],
+        "mowers": runtime.mowers.info(),
         "notify": {
             "enabled": store.data["notify"].get("enabled", True),
             "rules": len(store.data["notify"].get("rules") or []),

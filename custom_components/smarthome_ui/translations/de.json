@@ -10,6 +10,36 @@
       "single_instance_allowed": "Smarthome UI Core ist schon eingerichtet."
     }
   },
+  "config_subentries": {
+    "mower": {
+      "entry_type": "Mähroboter",
+      "initiate_flow": {
+        "user": "Mähroboter hinzufügen",
+        "reconfigure": "Mähroboter ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Mähroboter hinzufügen",
+          "description": "Gerät des Mähroboters wählen. Smarthome UI Core findet Status, Flächen, Selbsttest und Messer selbst und merkt sich, wann welche Fläche gemäht wurde – auch ohne offenes Dashboard.",
+          "data": {
+            "device_id": "Mähroboter",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Mähroboter ändern",
+          "data": {
+            "device_id": "Mähroboter",
+            "name": "Name (optional)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "Dieser Mähroboter ist schon hinzugefügt.",
+        "reconfigure_successful": "Mähroboter geändert."
+      }
+    }
+  },
   "device": {
     "notifications": {
       "name": "Mitteilungen"
@@ -31,6 +61,9 @@
       },
       "display_user": {
         "name": "Benutzer"
+      },
+      "mow_area": {
+        "name": "{area} zuletzt gemäht"
       }
     },
     "binary_sensor": {

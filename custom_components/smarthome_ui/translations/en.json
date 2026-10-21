@@ -10,6 +10,36 @@
       "single_instance_allowed": "Smarthome UI Core is already set up."
     }
   },
+  "config_subentries": {
+    "mower": {
+      "entry_type": "Robot mower",
+      "initiate_flow": {
+        "user": "Add robot mower",
+        "reconfigure": "Change robot mower"
+      },
+      "step": {
+        "user": {
+          "title": "Add robot mower",
+          "description": "Pick the mower's device. Smarthome UI Core finds state, areas, self check and blades itself and remembers when each area was mowed – even without an open dashboard.",
+          "data": {
+            "device_id": "Robot mower",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Change robot mower",
+          "data": {
+            "device_id": "Robot mower",
+            "name": "Name (optional)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "This robot mower is already added.",
+        "reconfigure_successful": "Robot mower changed."
+      }
+    }
+  },
   "device": {
     "notifications": {
       "name": "Notifications"
@@ -31,6 +61,9 @@
       },
       "display_user": {
         "name": "User"
+      },
+      "mow_area": {
+        "name": "{area} last mowed"
       }
     },
     "binary_sensor": {
