@@ -1,0 +1,106 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smarthome UI Core",
+        "description": "Notifications and household data for the Smarthome UI dashboard. Everything is set up in the dashboard."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Smarthome UI Core is already set up."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "task": {
+        "name": "Task"
+      },
+      "last_notification": {
+        "name": "Last notification"
+      }
+    },
+    "switch": {
+      "notifications": {
+        "name": "Notifications"
+      }
+    },
+    "todo": {
+      "due": {
+        "name": "Due tasks"
+      }
+    }
+  },
+  "services": {
+    "task_done": {
+      "name": "Task done",
+      "description": "Marks a task (name or key) as done.",
+      "fields": {
+        "task": {
+          "name": "Task",
+          "description": "Name as in the dashboard, e.g. \"Clean bathroom\", or a key like clean:bad."
+        }
+      }
+    },
+    "task_reopen": {
+      "name": "Reopen task",
+      "description": "Sets a done task back to open.",
+      "fields": {
+        "task": {
+          "name": "Task",
+          "description": "Name or key of the task."
+        }
+      }
+    },
+    "waste_ack": {
+      "name": "Waste put out",
+      "description": "Marks the waste collection on this day as put out.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Day of the collection."
+        }
+      }
+    },
+    "waste_skip": {
+      "name": "Skip waste",
+      "description": "Do not put out this time – no reminder.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Day of the collection."
+        }
+      }
+    },
+    "area_mowed": {
+      "name": "Area mowed",
+      "description": "Marks a mowing area as mowed now.",
+      "fields": {
+        "area": {
+          "name": "Area",
+          "description": "Name of the area as in the dashboard."
+        }
+      }
+    },
+    "test_notify": {
+      "name": "Test notification",
+      "description": "Sends a test notification to all targets.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "Optional text."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Smarthome UI Core is not set up."
+    },
+    "unknown_task": {
+      "message": "There is no task \"{task}\"."
+    },
+    "no_targets": {
+      "message": "No notify target found (notify.mobile_app_… or targets chosen in the dashboard)."
+    }
+  }
+}

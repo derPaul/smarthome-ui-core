@@ -1,0 +1,42 @@
+{
+  "entity": {
+    "sensor": {
+      "last_notification": {
+        "default": "mdi:bell-ring-outline"
+      }
+    },
+    "switch": {
+      "notifications": {
+        "default": "mdi:bell",
+        "state": {
+          "off": "mdi:bell-off"
+        }
+      }
+    },
+    "todo": {
+      "due": {
+        "default": "mdi:clipboard-check-outline"
+      }
+    }
+  },
+  "services": {
+    "task_done": {
+      "service": "mdi:check-circle-outline"
+    },
+    "task_reopen": {
+      "service": "mdi:restore"
+    },
+    "waste_ack": {
+      "service": "mdi:trash-can-outline"
+    },
+    "waste_skip": {
+      "service": "mdi:debug-step-over"
+    },
+    "area_mowed": {
+      "service": "mdi:robot-mower-outline"
+    },
+    "test_notify": {
+      "service": "mdi:bell-ring-outline"
+    }
+  }
+}

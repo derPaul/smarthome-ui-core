@@ -1,0 +1,44 @@
+task_done:
+  fields:
+    task:
+      required: true
+      example: "Bad putzen"
+      selector:
+        text:
+
+task_reopen:
+  fields:
+    task:
+      required: true
+      example: "Bad putzen"
+      selector:
+        text:
+
+waste_ack:
+  fields:
+    date:
+      required: true
+      selector:
+        date:
+
+waste_skip:
+  fields:
+    date:
+      required: true
+      selector:
+        date:
+
+area_mowed:
+  fields:
+    area:
+      required: true
+      example: "Vorgarten"
+      selector:
+        text:
+
+test_notify:
+  fields:
+    message:
+      example: "Hallo von Smarthome UI"
+      selector:
+        text:

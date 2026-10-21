@@ -1,0 +1,106 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smarthome UI Core",
+        "description": "Mitteilungen und Haushaltsdaten für das Smarthome-UI-Dashboard. Eingestellt wird alles im Dashboard."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Smarthome UI Core ist schon eingerichtet."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "task": {
+        "name": "Aufgabe"
+      },
+      "last_notification": {
+        "name": "Letzte Mitteilung"
+      }
+    },
+    "switch": {
+      "notifications": {
+        "name": "Mitteilungen"
+      }
+    },
+    "todo": {
+      "due": {
+        "name": "Fällige Aufgaben"
+      }
+    }
+  },
+  "services": {
+    "task_done": {
+      "name": "Aufgabe erledigt",
+      "description": "Markiert eine Aufgabe (Name oder Schlüssel) als erledigt.",
+      "fields": {
+        "task": {
+          "name": "Aufgabe",
+          "description": "Name wie im Dashboard, z. B. „Bad putzen“, oder Schlüssel wie clean:bad."
+        }
+      }
+    },
+    "task_reopen": {
+      "name": "Aufgabe wieder öffnen",
+      "description": "Setzt eine erledigte Aufgabe wieder auf offen.",
+      "fields": {
+        "task": {
+          "name": "Aufgabe",
+          "description": "Name oder Schlüssel der Aufgabe."
+        }
+      }
+    },
+    "waste_ack": {
+      "name": "Müll rausgestellt",
+      "description": "Markiert die Müllabfuhr an diesem Tag als rausgestellt.",
+      "fields": {
+        "date": {
+          "name": "Datum",
+          "description": "Tag der Abfuhr."
+        }
+      }
+    },
+    "waste_skip": {
+      "name": "Müll diesmal nicht",
+      "description": "Diesmal nicht rausstellen – keine Erinnerung.",
+      "fields": {
+        "date": {
+          "name": "Datum",
+          "description": "Tag der Abfuhr."
+        }
+      }
+    },
+    "area_mowed": {
+      "name": "Fläche gemäht",
+      "description": "Markiert eine Mähfläche als jetzt gemäht.",
+      "fields": {
+        "area": {
+          "name": "Fläche",
+          "description": "Name der Fläche wie im Dashboard."
+        }
+      }
+    },
+    "test_notify": {
+      "name": "Test-Mitteilung",
+      "description": "Schickt eine Test-Mitteilung an alle Empfänger.",
+      "fields": {
+        "message": {
+          "name": "Text",
+          "description": "Optionaler Text."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Smarthome UI Core ist nicht eingerichtet."
+    },
+    "unknown_task": {
+      "message": "Aufgabe „{task}“ gibt es nicht."
+    },
+    "no_targets": {
+      "message": "Kein Empfänger gefunden (notify.mobile_app_… oder im Dashboard gewählte Empfänger)."
+    }
+  }
+}
