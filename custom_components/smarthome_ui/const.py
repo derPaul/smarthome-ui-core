@@ -19,9 +19,11 @@ SIGNAL_SENT: Final = f"{DOMAIN}_sent"
 SIGNAL_DISPLAY_NEW: Final = f"{DOMAIN}_display_new"
 SIGNAL_MOWER: Final = f"{DOMAIN}_mower"
 SIGNAL_VACUUM: Final = f"{DOMAIN}_vacuum"
+SIGNAL_PLANNER: Final = f"{DOMAIN}_planner"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)
+PLANNER_INTERVAL: Final = timedelta(minutes=1)
 CALENDAR_INTERVAL: Final = timedelta(minutes=5)
 REPORT_TTL: Final = timedelta(minutes=2)  # a dashboard counts as gone if it stops reporting
 FORGET_AFTER: Final = timedelta(minutes=15)  # a resolved notification may come again after this

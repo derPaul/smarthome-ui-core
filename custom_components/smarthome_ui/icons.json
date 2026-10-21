@@ -6,6 +6,9 @@
       },
       "display_user": {
         "default": "mdi:account"
+      },
+      "planner": {
+        "default": "mdi:calendar-clock"
       }
     },
     "switch": {
@@ -19,6 +22,24 @@
         "default": "mdi:sleep",
         "state": {
           "off": "mdi:sleep-off"
+        }
+      },
+      "planner_mower": {
+        "default": "mdi:robot-mower",
+        "state": {
+          "off": "mdi:robot-mower-outline"
+        }
+      },
+      "planner_vacuum": {
+        "default": "mdi:robot-vacuum",
+        "state": {
+          "off": "mdi:robot-vacuum-off"
+        }
+      },
+      "planner_area": {
+        "default": "mdi:calendar-check",
+        "state": {
+          "off": "mdi:calendar-remove-outline"
         }
       }
     },
@@ -35,6 +56,9 @@
     "button": {
       "display_reload": {
         "default": "mdi:reload"
+      },
+      "planner_skip": {
+        "default": "mdi:debug-step-over"
       }
     },
     "select": {

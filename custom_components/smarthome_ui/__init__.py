@@ -35,6 +35,7 @@ from .const import (
 from .displays import DisplayManager
 from .mower import MowerManager
 from .notify import NotifyEngine
+from .planner import PlannerManager
 from .store import CoreStore
 from .tasks import find_task, task_states
 from .vacuum import VacuumManager
@@ -61,6 +62,13 @@ class CoreRuntime:
     displays: DisplayManager
     mowers: MowerManager
     vacuums: VacuumManager
+    planners: PlannerManager
+
+    def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Return mowers and vacuums with their planner state (for the dashboard)."""
+        mowers = [{**m, "planner": self.planners.info(m["id"])} for m in self.mowers.info()]
+        vacuums = [{**v, "planner": self.planners.info(v["id"])} for v in self.vacuums.info()]
+        return mowers, vacuums
 
     def tasks(self) -> list[dict[str, Any]]:
         """Return the tasks from the dashboard and from the integration (areas to mow)."""
@@ -195,12 +203,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     engine = NotifyEngine(hass, store)
     mowers = MowerManager(hass, store)
     vacuums = VacuumManager(hass, store)
-    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store), mowers, vacuums)
+    planners = PlannerManager(hass, store, engine)
+    entry.runtime_data = CoreRuntime(
+        store, engine, DisplayManager(hass, store), mowers, vacuums, planners
+    )
     _remove_single_device(hass, entry)
     engine.extra_rules = lambda: [*mowers.rules(), *vacuums.rules()]
     engine.extra_tasks = mowers.tasks
     mowers.async_setup(list(entry.subentries.values()))
     vacuums.async_setup(list(entry.subentries.values()))
+    planners.async_setup(list(entry.subentries.values()), mowers.trackers, vacuums.trackers)
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # a mower added, changed or removed → set up again
@@ -244,6 +256,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.engine.async_stop()
     entry.runtime_data.mowers.async_stop()
     entry.runtime_data.vacuums.async_stop()
+    entry.runtime_data.planners.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -268,8 +281,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "version": 1,
         "data": store.dashboard_data(),
         "migrated": store.data["migrated"],
-        "mowers": runtime.mowers.info(),
-        "vacuums": runtime.vacuums.info(),
+        "mowers": runtime.robots()[0],
+        "vacuums": runtime.robots()[1],
         "cleaning": store.data["cleaning"],
         "notify": {
             "enabled": store.data["notify"].get("enabled", True),
@@ -305,8 +318,8 @@ def ws_subscribe(
                 msg["id"],
                 {
                     "data": runtime.store.dashboard_data(),
-                    "mowers": runtime.mowers.info(),
-                    "vacuums": runtime.vacuums.info(),
+                    "mowers": runtime.robots()[0],
+                    "vacuums": runtime.robots()[1],
                     "cleaning": runtime.store.data["cleaning"],
                 },
             )

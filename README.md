@@ -142,6 +142,33 @@ gereinigte Fläche und die Verschleißteile.
 Das Dashboard nimmt die Saugroboter dann aus Core (bei mehreren mit Umschalter); die Kachel zeigt nur noch
 Sichtbarkeit und Namen der Entitäten.
 
+## Automatisch mähen und saugen (Roboter-Planer)
+
+Je Mäh- und Saugroboter gibt es einen Planer, der den Roboter **von selbst startet, wenn Flächen bzw. Räume fällig
+sind**. Er ist zunächst aus.
+
+| Entität (am Roboter-Gerät) | |
+|---|---|
+| `switch.garden_<mäher>_auto` / `switch.household_<sauger>_auto` | Automatisch mähen / saugen – an oder aus |
+| `switch.garden_<fläche>_auto` / `switch.household_<raum>_auto` | je Fläche bzw. Raum: darf automatisch dran sein |
+| `sensor.garden_<mäher>_planner` / `sensor.household_<sauger>_planner` | worauf der Planer wartet (Zeitfenster, Ruhezeit, jemand zuhause, Regen, Solarstrom, Roboter nicht bereit), „Startet gleich“, „Gestartet“ – Attribute `due` (fällige Flächen/Räume) und `start_at` |
+| `button.garden_<mäher>_skip_today` / `button.household_<sauger>_skip_today` | heute nicht |
+
+Bedingungen – unter *Smarthome UI Core → Mähroboter/Saugroboter → Zahnrad (ändern)*, jede abschaltbar:
+
+- **Zeitfenster** (Mäher 10–19 Uhr, Sauger 9–18 Uhr),
+- **nicht in der Ruhezeit** der Mitteilungen,
+- **nur wenn niemand zuhause ist** (`person.*`; beim Sauger an, beim Mäher aus),
+- **nicht bei Regen** (Mäher: Wetter und Regensensor des Mähers),
+- **nur mit Solarstrom**: ein Sensor mit PV-Leistung oder Überschuss (W/kW) und ein Mindestwert,
+- **vorher ankündigen** (Standard 10 Minuten): Push „Robbi saugt ab 10:30: Küche, Flur“ mit dem Knopf
+  **„Heute nicht“** (Quelle „Saugroboter“ bzw. „Mähroboter“ muss Push an haben). 0 = sofort starten.
+
+Gestartet wird nur mit den fälligen Flächen/Räumen – Sauger über `vacuum.clean_area` (Räume aus „Staubsauger-Segmente
+Bereichen zuordnen“, sonst `vacuum.start`), Mäher über seine Bereichs-Schalter und `lawn_mower.start_mowing` (sonst
+eine Aufgabe mit dem Namen der Fläche). Höchstens ein automatischer Start je Roboter und Tag. Fällig heißt: Mähplan
+(Mäher) bzw. Putz-Intervall des Raums (Sauger, wie im Dashboard).
+
 ## Bildschirme
 
 Jedes Gerät, auf dem das Dashboard offen ist (Wandtablet, Handy, Browser), erscheint automatisch als

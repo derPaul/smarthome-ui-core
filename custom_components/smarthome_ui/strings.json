@@ -30,8 +30,18 @@
           "title": "Change robot mower",
           "data": {
             "device_id": "Robot mower",
-            "name": "Name (optional)"
-          }
+            "name": "Name (optional)",
+            "auto_from": "Automatic from",
+            "auto_to": "Automatic until",
+            "cond_quiet": "Not during quiet hours (notifications)",
+            "cond_away": "Only when nobody is home",
+            "cond_rain": "Not when it rains",
+            "cond_solar": "Only with solar power",
+            "solar_entity": "Sensor PV power or surplus",
+            "solar_min": "At least",
+            "announce": "Announce ahead (0 = start right away)"
+          },
+          "description": "Mow/vacuum automatically: when the robot may start on its own if areas or rooms are due (switch \"... automatically\" on the device). Every condition can be switched off."
         }
       },
       "abort": {
@@ -58,8 +68,17 @@
           "title": "Change robot vacuum",
           "data": {
             "device_id": "Robot vacuum",
-            "name": "Name (optional)"
-          }
+            "name": "Name (optional)",
+            "auto_from": "Automatic from",
+            "auto_to": "Automatic until",
+            "cond_quiet": "Not during quiet hours (notifications)",
+            "cond_away": "Only when nobody is home",
+            "cond_solar": "Only with solar power",
+            "solar_entity": "Sensor PV power or surplus",
+            "solar_min": "At least",
+            "announce": "Announce ahead (0 = start right away)"
+          },
+          "description": "Mow/vacuum automatically: when the robot may start on its own if areas or rooms are due (switch \"... automatically\" on the device). Every condition can be switched off."
         }
       },
       "abort": {
@@ -95,6 +114,23 @@
       },
       "vacuum_room": {
         "name": "{area} last vacuumed"
+      },
+      "planner": {
+        "name": "Automation",
+        "state": {
+          "off": "Off",
+          "skipped": "Skipped today",
+          "done_today": "Already started today",
+          "nothing_due": "Nothing due",
+          "waiting_window": "Waiting for the time window",
+          "waiting_quiet": "Quiet hours",
+          "waiting_home": "Waiting until nobody is home",
+          "waiting_rain": "Waiting: rain",
+          "waiting_solar": "Waiting for solar power",
+          "not_ready": "Robot not ready",
+          "announced": "Starting soon",
+          "started": "Started"
+        }
       }
     },
     "binary_sensor": {
@@ -105,6 +141,9 @@
     "button": {
       "display_reload": {
         "name": "Reload"
+      },
+      "planner_skip": {
+        "name": "Skip today"
       }
     },
     "select": {
@@ -167,6 +206,15 @@
     "switch": {
       "display_standby": {
         "name": "Standby"
+      },
+      "planner_mower": {
+        "name": "Mow automatically"
+      },
+      "planner_vacuum": {
+        "name": "Vacuum automatically"
+      },
+      "planner_area": {
+        "name": "{area} automatically"
       }
     },
     "number": {

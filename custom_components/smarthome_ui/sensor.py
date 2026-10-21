@@ -18,6 +18,7 @@ from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
 from .mower import MowerTracker
+from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
 from .tasks import TaskState, task_states
 from .vacuum import VacuumTracker
@@ -78,6 +79,14 @@ async def async_setup_entry(
 
     add_rooms()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_VACUUM, add_rooms))
+    entry.async_on_unload(
+        async_setup_planner_entities(
+            hass,
+            entry.runtime_data.planners,
+            async_add_entities,
+            lambda p: [PlannerStatus(entry.entry_id, p)],
+        )
+    )
     known: dict[str, TaskSensor] = {}
 
     @callback
@@ -318,3 +327,31 @@ class VacuumRoomSensor(SensorEntity):
     def _changed(self, vacuum_id: str) -> None:
         if vacuum_id == self._tracker.id:
             self.async_write_ha_state()
+
+
+class PlannerStatus(PlannerEntity, SensorEntity):
+    """What the robot planner is waiting for (or that it started)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = STATUS
+    _attr_translation_key = "planner"
+
+    def __init__(self, entry_id: str, planner: RobotPlanner) -> None:
+        """Initialize (sensor.garden_<mower>_planner / sensor.household_<vacuum>_planner)."""
+        super().__init__(
+            entry_id, planner, "_status", "sensor", f"{slugify(planner.tracker.name)}_planner"
+        )
+
+    @property
+    def native_value(self) -> str:
+        """Return the status."""
+        return self._planner.status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the due areas and the planned start."""
+        start = self._planner.start_at
+        return {
+            "due": [self._planner.area_name(a) for a in self._planner.due],
+            "start_at": dt_util.utc_from_timestamp(start / 1000).isoformat() if start else None,
+        }

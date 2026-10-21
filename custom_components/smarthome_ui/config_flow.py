@@ -16,14 +16,22 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     DeviceSelector,
     DeviceSelectorConfig,
     EntityFilterSelectorConfig,
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     TextSelector,
+    TimeSelector,
 )
 
 from .const import DOMAIN
 from .mower import CONF_DEVICE, SUBENTRY_MOWER
+from .planner import DEFAULTS, KIND_MOWER, KIND_VACUUM
 from .vacuum import SUBENTRY_VACUUM
 
 
@@ -53,6 +61,39 @@ class MowerSubentryFlow(ConfigSubentryFlow):
     _domain = "lawn_mower"
     _type = SUBENTRY_MOWER
     _default = "Mähroboter"
+    _kind = KIND_MOWER
+
+    def _planner_schema(self, current: dict[str, Any]) -> dict[Any, Any]:
+        """Settings of the robot planner (when it may start on its own)."""
+        cur = {**DEFAULTS[self._kind], **{k: v for k, v in current.items() if v is not None}}
+
+        def opt(key: str) -> vol.Optional:
+            value = cur.get(key)
+            return vol.Optional(key, default=value) if value is not None else vol.Optional(key)
+
+        fields: dict[Any, Any] = {
+            opt("auto_from"): TimeSelector(),
+            opt("auto_to"): TimeSelector(),
+            opt("cond_quiet"): BooleanSelector(),
+            opt("cond_away"): BooleanSelector(),
+        }
+        if self._kind == KIND_MOWER:
+            fields[opt("cond_rain")] = BooleanSelector()
+        fields[opt("cond_solar")] = BooleanSelector()
+        fields[
+            vol.Optional("solar_entity", description={"suggested_value": cur.get("solar_entity")})
+        ] = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="power"))
+        fields[opt("solar_min")] = NumberSelector(
+            NumberSelectorConfig(
+                min=0, max=20000, step=50, unit_of_measurement="W", mode=NumberSelectorMode.BOX
+            )
+        )
+        fields[opt("announce")] = NumberSelector(
+            NumberSelectorConfig(
+                min=0, max=60, step=1, unit_of_measurement="min", mode=NumberSelectorMode.BOX
+            )
+        )
+        return fields
 
     def _schema(self, device: str | None = None, name: str | None = None) -> vol.Schema:
         return vol.Schema(
@@ -96,16 +137,20 @@ class MowerSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             if self._taken(user_input[CONF_DEVICE], subentry.subentry_id):
                 return self.async_abort(reason="already_configured")
+            data = {k: v for k, v in user_input.items() if k != "name"}
+            for key in ("auto_from", "auto_to"):
+                if data.get(key):
+                    data[key] = str(data[key])[:5]
+            for key in ("solar_min", "announce"):
+                if data.get(key) is not None:
+                    data[key] = int(data[key])
             return self.async_update_and_abort(
-                self._get_entry(),
-                subentry,
-                title=self._title(user_input),
-                data={CONF_DEVICE: user_input[CONF_DEVICE]},
+                self._get_entry(), subentry, title=self._title(user_input), data=data
             )
-        return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=self._schema(subentry.data.get(CONF_DEVICE), subentry.title),
+        schema = self._schema(subentry.data.get(CONF_DEVICE), subentry.title).extend(
+            self._planner_schema(dict(subentry.data))
         )
+        return self.async_show_form(step_id="reconfigure", data_schema=schema)
 
 
 class VacuumSubentryFlow(MowerSubentryFlow):
@@ -114,3 +159,4 @@ class VacuumSubentryFlow(MowerSubentryFlow):
     _domain = "vacuum"
     _type = SUBENTRY_VACUUM
     _default = "Saugroboter"
+    _kind = KIND_VACUUM

@@ -8,11 +8,13 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from . import CoreConfigEntry
 from .const import SIGNAL_NOTIFY
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity
+from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
 
 
@@ -31,6 +33,15 @@ async def async_setup_entry(
             manager,
             async_add_entities,
             lambda did: [DisplayStandby(entry.entry_id, manager, did, "standby", "switch")],
+        )
+    )
+    entry.async_on_unload(
+        async_setup_planner_entities(
+            hass,
+            entry.runtime_data.planners,
+            async_add_entities,
+            lambda p: [PlannerSwitch(entry.entry_id, p)],
+            lambda p, area: PlannerAreaSwitch(entry.entry_id, p, area),
         )
     )
 
@@ -81,3 +92,51 @@ class DisplayStandby(DisplayEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Wake the display."""
         self._command({"type": "set", "key": "standby", "value": False})
+
+
+class PlannerSwitch(PlannerEntity, SwitchEntity):
+    """Mow / vacuum automatically when areas are due (off by default)."""
+
+    def __init__(self, entry_id: str, planner: RobotPlanner) -> None:
+        """Initialize (switch.garden_<mower>_auto / switch.household_<vacuum>_auto)."""
+        super().__init__(entry_id, planner, "", "switch", f"{slugify(planner.tracker.name)}_auto")
+        self._attr_translation_key = f"planner_{planner.kind}"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the robot may start on its own."""
+        return self._planner.is_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Allow automatic starts."""
+        self._planner.set_on(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """No automatic starts."""
+        self._planner.set_on(False)
+
+
+class PlannerAreaSwitch(PlannerEntity, SwitchEntity):
+    """One area / room may be done automatically."""
+
+    _attr_translation_key = "planner_area"
+
+    def __init__(self, entry_id: str, planner: RobotPlanner, area: str) -> None:
+        """Initialize (switch.garden_<area>_auto / switch.household_<room>_auto)."""
+        name = planner.area_name(area)
+        super().__init__(entry_id, planner, f"_{slugify(area)}", "switch", f"{slugify(name)}_auto")
+        self._area = area
+        self._attr_translation_placeholders = {"area": name}
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the area is included."""
+        return self._planner.area_on(self._area)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Include the area."""
+        self._planner.set_area(self._area, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Leave the area out."""
+        self._planner.set_area(self._area, False)

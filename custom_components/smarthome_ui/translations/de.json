@@ -30,8 +30,18 @@
           "title": "Mähroboter ändern",
           "data": {
             "device_id": "Mähroboter",
-            "name": "Name (optional)"
-          }
+            "name": "Name (optional)",
+            "auto_from": "Automatik ab",
+            "auto_to": "Automatik bis",
+            "cond_quiet": "Nicht in der Ruhezeit (Mitteilungen)",
+            "cond_away": "Nur wenn niemand zuhause ist",
+            "cond_rain": "Nicht bei Regen",
+            "cond_solar": "Nur mit Solarstrom",
+            "solar_entity": "Sensor PV-Leistung oder Überschuss",
+            "solar_min": "Mindestens",
+            "announce": "Vorher ankündigen (0 = sofort starten)"
+          },
+          "description": "Automatisch mähen/saugen: Wann der Roboter selbst starten darf, wenn Flächen bzw. Räume fällig sind (Schalter „Automatisch …“ am Gerät). Jede Bedingung lässt sich abschalten."
         }
       },
       "abort": {
@@ -58,8 +68,17 @@
           "title": "Saugroboter ändern",
           "data": {
             "device_id": "Saugroboter",
-            "name": "Name (optional)"
-          }
+            "name": "Name (optional)",
+            "auto_from": "Automatik ab",
+            "auto_to": "Automatik bis",
+            "cond_quiet": "Nicht in der Ruhezeit (Mitteilungen)",
+            "cond_away": "Nur wenn niemand zuhause ist",
+            "cond_solar": "Nur mit Solarstrom",
+            "solar_entity": "Sensor PV-Leistung oder Überschuss",
+            "solar_min": "Mindestens",
+            "announce": "Vorher ankündigen (0 = sofort starten)"
+          },
+          "description": "Automatisch mähen/saugen: Wann der Roboter selbst starten darf, wenn Flächen bzw. Räume fällig sind (Schalter „Automatisch …“ am Gerät). Jede Bedingung lässt sich abschalten."
         }
       },
       "abort": {
@@ -95,6 +114,23 @@
       },
       "vacuum_room": {
         "name": "{area} zuletzt gesaugt"
+      },
+      "planner": {
+        "name": "Automatik",
+        "state": {
+          "off": "Aus",
+          "skipped": "Heute ausgelassen",
+          "done_today": "Heute schon gestartet",
+          "nothing_due": "Nichts fällig",
+          "waiting_window": "Wartet aufs Zeitfenster",
+          "waiting_quiet": "Ruhezeit",
+          "waiting_home": "Wartet, bis niemand zuhause ist",
+          "waiting_rain": "Wartet: Regen",
+          "waiting_solar": "Wartet auf Solarstrom",
+          "not_ready": "Roboter nicht bereit",
+          "announced": "Startet gleich",
+          "started": "Gestartet"
+        }
       }
     },
     "binary_sensor": {
@@ -105,6 +141,9 @@
     "button": {
       "display_reload": {
         "name": "Neu laden"
+      },
+      "planner_skip": {
+        "name": "Heute auslassen"
       }
     },
     "select": {
@@ -167,6 +206,15 @@
     "switch": {
       "display_standby": {
         "name": "Ruhemodus"
+      },
+      "planner_mower": {
+        "name": "Automatisch mähen"
+      },
+      "planner_vacuum": {
+        "name": "Automatisch saugen"
+      },
+      "planner_area": {
+        "name": "{area} automatisch"
       }
     },
     "number": {

@@ -470,6 +470,7 @@ class NotifyEngine:
         urgent: bool = False,
         tag: str | None = None,
         force: bool = False,
+        actions: list[dict[str, str]] | None = None,
     ) -> bool:
         """Send a notification to all targets (unless paused or in quiet hours)."""
         if not force and not self.config.get("enabled", True):
@@ -481,6 +482,7 @@ class NotifyEngine:
             "url": url,
             "urgent": urgent,
             "tag": tag,
+            "actions": actions,
         }
         if not force and not urgent and in_quiet(self.config.get("quiet"), dt_util.now()):
             self._deferred.append(item)
@@ -504,6 +506,8 @@ class NotifyEngine:
         data = {"url": item["url"], "clickAction": item["url"], "group": item["src"] or "smarthome"}
         if item.get("tag"):
             data["tag"] = item["tag"]
+        if item.get("actions"):
+            data["actions"] = item["actions"]
         data.update(urgent_data(item["urgent"]))
         for target in targets:
             self.hass.async_create_task(
