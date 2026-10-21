@@ -16,6 +16,7 @@ SIGNAL_DATA: Final = f"{DOMAIN}_data"
 SIGNAL_TASKS: Final = f"{DOMAIN}_tasks"
 SIGNAL_NOTIFY: Final = f"{DOMAIN}_notify"
 SIGNAL_SENT: Final = f"{DOMAIN}_sent"
+SIGNAL_DISPLAY_NEW: Final = f"{DOMAIN}_display_new"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)

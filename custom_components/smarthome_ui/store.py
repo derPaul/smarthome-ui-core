@@ -47,6 +47,7 @@ def _default() -> dict[str, Any]:
         },
         "sent": {},
         "recent": [],
+        "displays": {},
     }
 
 

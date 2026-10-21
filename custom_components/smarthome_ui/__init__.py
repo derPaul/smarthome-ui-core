@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
@@ -31,11 +32,19 @@ from .const import (
     SERVICE_WASTE_SKIP,
     SIGNAL_DATA,
 )
+from .displays import DisplayManager
 from .notify import NotifyEngine
 from .store import CoreStore
 from .tasks import find_task, task_states
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.TODO]
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.TODO,
+]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -46,6 +55,7 @@ class CoreRuntime:
 
     store: CoreStore
     engine: NotifyEngine
+    displays: DisplayManager
 
 
 type CoreConfigEntry = ConfigEntry[CoreRuntime]
@@ -146,6 +156,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_tasks_sync,
         ws_notify_config,
         ws_notify_report,
+        ws_display_connect,
+        ws_display_update,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -156,7 +168,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     store = CoreStore(hass)
     await store.async_load()
     engine = NotifyEngine(hass, store)
-    entry.runtime_data = CoreRuntime(store, engine)
+    entry.runtime_data = CoreRuntime(store, engine, DisplayManager(hass, store))
     _remove_single_device(hass, entry)
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -174,9 +186,26 @@ def _remove_single_device(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
         devices.async_remove_device(old.id)
 
 
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: CoreConfigEntry, device: DeviceEntry
+) -> bool:
+    """Allow deleting a display that is not open right now (it comes back when opened again)."""
+    prefix = f"{entry.entry_id}_display_"
+    for domain, ident in device.identifiers:
+        if domain == DOMAIN and ident.startswith(prefix):
+            display_id = ident.removeprefix(prefix)
+            manager = entry.runtime_data.displays
+            if manager.online(display_id):
+                return False
+            manager.remove(display_id)
+            return True
+    return False
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool:
     """Unload the config entry."""
     entry.runtime_data.engine.async_stop()
+    entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
@@ -333,4 +362,59 @@ def ws_notify_report(
     """Take the current items of an open dashboard."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.engine.report(msg["client"], msg["items"])
+        connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/display/connect",
+        vol.Required("display"): str,
+        vol.Required("name"): str,
+        vol.Optional("user"): vol.Any(None, str),
+        vol.Optional("state"): dict,
+        vol.Optional("options"): dict,
+    }
+)
+@callback
+def ws_display_connect(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Register an open dashboard as display; commands for it arrive as events."""
+    if (runtime := _ws_runtime(connection, msg)) is None:
+        return
+
+    @callback
+    def send(command: dict[str, Any]) -> None:
+        connection.send_message(websocket_api.event_message(msg["id"], command))
+
+    manager = runtime.displays
+    connection.subscriptions[msg["id"]] = manager.connect(
+        msg["display"],
+        msg["name"],
+        send,
+        user=msg.get("user"),
+        state=msg.get("state"),
+        options=msg.get("options"),
+    )
+    connection.send_result(msg["id"], {"name": manager.displays[msg["display"]]["name"]})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/display/update",
+        vol.Required("display"): str,
+        vol.Optional("user"): vol.Any(None, str),
+        vol.Optional("state"): dict,
+        vol.Optional("options"): dict,
+    }
+)
+@callback
+def ws_display_update(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the current state of a display."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.displays.update(
+            msg["display"], user=msg.get("user"), state=msg.get("state"), options=msg.get("options")
+        )
         connection.send_result(msg["id"])

@@ -1,4 +1,4 @@
-"""Sensors: one per task (when it is due) and the last notification."""
+"""Sensors: one per task (when it is due), the last notification and the user of each display."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
 from .const import SIGNAL_SENT, SIGNAL_TASKS
+from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
 from .store import CoreStore
 from .tasks import TaskState, task_states
@@ -29,6 +30,16 @@ async def async_setup_entry(
     """Set up the sensors; add and remove task sensors when the tasks change."""
     store = entry.runtime_data.store
     async_add_entities([LastNotificationSensor(entry.entry_id, store)])
+    manager = entry.runtime_data.displays
+    entry.async_on_unload(
+        async_setup_display_entities(
+            hass,
+            entry.entry_id,
+            manager,
+            async_add_entities,
+            lambda did: [DisplayUser(entry.entry_id, manager, did, "user", "sensor")],
+        )
+    )
     known: dict[str, TaskSensor] = {}
 
     @callback
@@ -159,3 +170,12 @@ class LastNotificationSensor(CoreEntity, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_SENT, self.async_write_ha_state)
         )
+
+
+class DisplayUser(DisplayEntity, SensorEntity):
+    """Who is logged in on a display."""
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the user name."""
+        return self._record.get("user")

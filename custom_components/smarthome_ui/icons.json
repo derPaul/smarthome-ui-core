@@ -3,6 +3,9 @@
     "sensor": {
       "last_notification": {
         "default": "mdi:bell-ring-outline"
+      },
+      "display_user": {
+        "default": "mdi:account"
       }
     },
     "switch": {
@@ -11,11 +14,48 @@
         "state": {
           "off": "mdi:bell-off"
         }
+      },
+      "display_standby": {
+        "default": "mdi:sleep",
+        "state": {
+          "off": "mdi:sleep-off"
+        }
       }
     },
     "todo": {
       "due": {
         "default": "mdi:clipboard-check-outline"
+      }
+    },
+    "binary_sensor": {
+      "display_online": {
+        "default": "mdi:tablet-dashboard"
+      }
+    },
+    "button": {
+      "display_reload": {
+        "default": "mdi:reload"
+      }
+    },
+    "select": {
+      "display_page": {
+        "default": "mdi:book-open-page-variant-outline"
+      },
+      "display_theme": {
+        "default": "mdi:palette-outline"
+      },
+      "display_season": {
+        "default": "mdi:leaf-maple"
+      },
+      "display_sounds": {
+        "default": "mdi:volume-high",
+        "state": {
+          "off": "mdi:volume-off",
+          "quiet": "mdi:volume-low"
+        }
+      },
+      "display_performance": {
+        "default": "mdi:speedometer"
       }
     }
   },

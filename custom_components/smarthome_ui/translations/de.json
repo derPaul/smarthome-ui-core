@@ -28,6 +28,72 @@
       },
       "last_notification": {
         "name": "Zuletzt gesendet"
+      },
+      "display_user": {
+        "name": "Benutzer"
+      }
+    },
+    "binary_sensor": {
+      "display_online": {
+        "name": "Verbunden"
+      }
+    },
+    "button": {
+      "display_reload": {
+        "name": "Neu laden"
+      }
+    },
+    "select": {
+      "display_page": {
+        "name": "Seite"
+      },
+      "display_theme": {
+        "name": "Theme",
+        "state": {
+          "dark": "Dunkel",
+          "sand": "Sand",
+          "clay": "Clay",
+          "auto": "Automatisch"
+        }
+      },
+      "display_season": {
+        "name": "Jahreszeit",
+        "state": {
+          "auto": "Automatisch",
+          "off": "Aus",
+          "halloween": "Halloween",
+          "herbst": "Herbst",
+          "nikolaus": "Nikolaus",
+          "weihnachten": "Weihnachten",
+          "winter": "Winter",
+          "valentin": "Valentinstag",
+          "fruehling": "Frühling",
+          "ostern": "Ostern",
+          "sommer": "Sommer",
+          "hobbit": "Hobbit-Tag",
+          "geburtstag": "Geburtstag"
+        }
+      },
+      "display_sounds": {
+        "name": "Töne",
+        "state": {
+          "off": "Aus",
+          "quiet": "Leise",
+          "normal": "Normal"
+        }
+      },
+      "display_performance": {
+        "name": "Leistung",
+        "state": {
+          "auto": "Automatisch",
+          "full": "Alle Effekte",
+          "lite": "Sparsam"
+        }
+      }
+    },
+    "switch": {
+      "display_standby": {
+        "name": "Ruhemodus"
       }
     }
   },
@@ -102,6 +168,9 @@
     },
     "no_targets": {
       "message": "Kein Empfänger gefunden (notify.mobile_app_… oder im Dashboard gewählte Empfänger)."
+    },
+    "display_offline": {
+      "message": "Der Bildschirm „{display}“ ist gerade nicht verbunden (Dashboard nicht geöffnet)."
     }
   }
 }

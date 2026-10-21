@@ -28,6 +28,72 @@
       },
       "last_notification": {
         "name": "Last sent"
+      },
+      "display_user": {
+        "name": "User"
+      }
+    },
+    "binary_sensor": {
+      "display_online": {
+        "name": "Connected"
+      }
+    },
+    "button": {
+      "display_reload": {
+        "name": "Reload"
+      }
+    },
+    "select": {
+      "display_page": {
+        "name": "Page"
+      },
+      "display_theme": {
+        "name": "Theme",
+        "state": {
+          "dark": "Dark",
+          "sand": "Sand",
+          "clay": "Clay",
+          "auto": "Automatic"
+        }
+      },
+      "display_season": {
+        "name": "Season",
+        "state": {
+          "auto": "Automatic",
+          "off": "Off",
+          "halloween": "Halloween",
+          "herbst": "Autumn",
+          "nikolaus": "St. Nicholas",
+          "weihnachten": "Christmas",
+          "winter": "Winter",
+          "valentin": "Valentine's Day",
+          "fruehling": "Spring",
+          "ostern": "Easter",
+          "sommer": "Summer",
+          "hobbit": "Hobbit Day",
+          "geburtstag": "Birthday"
+        }
+      },
+      "display_sounds": {
+        "name": "Sounds",
+        "state": {
+          "off": "Off",
+          "quiet": "Quiet",
+          "normal": "Normal"
+        }
+      },
+      "display_performance": {
+        "name": "Performance",
+        "state": {
+          "auto": "Automatic",
+          "full": "All effects",
+          "lite": "Lite"
+        }
+      }
+    },
+    "switch": {
+      "display_standby": {
+        "name": "Standby"
       }
     }
   },
@@ -102,6 +168,9 @@
     },
     "no_targets": {
       "message": "No notify target found (notify.mobile_app_… or targets chosen in the dashboard)."
+    },
+    "display_offline": {
+      "message": "The display \"{display}\" is not connected right now (dashboard not open)."
     }
   }
 }

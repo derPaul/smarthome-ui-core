@@ -96,6 +96,43 @@ actions:
 
 Wird eine Aufgabe hier erledigt (To-do, Aktion), ist sie sofort im Dashboard abgehakt – und umgekehrt.
 
+## Bildschirme
+
+Jedes Gerät, auf dem das Dashboard offen ist (Wandtablet, Handy, Browser), erscheint automatisch als
+eigenes Gerät, z. B. „iPad (Paul)“. Umbenennen geht in Home Assistant am Gerät. Ein Bildschirm,
+der nicht offen ist, lässt sich dort löschen – öffnet man das Dashboard wieder, kommt er zurück.
+
+| Entität | |
+|---|---|
+| `binary_sensor.display_<name>_online` | Dashboard ist offen und verbunden (Attribut `last_seen`) |
+| `select.display_<name>_page` | aktuelle Seite – auswählen springt dorthin |
+| `select.display_<name>_theme` | `dark`, `sand`, `clay`, `auto` |
+| `select.display_<name>_season` | Jahreszeiten-Deko: `auto`, `off` oder eine feste (z. B. `herbst`, `weihnachten`) |
+| `select.display_<name>_sounds` | Töne: `off`, `quiet`, `normal` |
+| `select.display_<name>_performance` | Leistung: `auto`, `full`, `lite` |
+| `switch.display_<name>_standby` | Ruhemodus (Uhr, Wetter) – an zeigt ihn sofort, ein Tipp am Gerät beendet ihn |
+| `sensor.display_<name>_user` | wer angemeldet ist |
+| `button.display_<name>_reload` | Dashboard neu laden |
+
+Die Einstellungen gelten je Gerät – wie im Dashboard selbst. Meldet sich jemand anderes am Gerät an,
+bleibt es derselbe Bildschirm; `sensor.display_<name>_user` zeigt, wer gerade angemeldet ist.
+
+```yaml
+# Beispiel: bei Klingeln das Flur-Tablet aufwecken und die Sicherheitsseite zeigen
+triggers:
+  - trigger: state
+    entity_id: event.haustur_klingel
+actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.display_wandtablet_flur_standby
+  - action: select.select_option
+    target:
+      entity_id: select.display_wandtablet_flur_page
+    data:
+      option: Sicherheit
+```
+
 ## Für Entwickler: WebSocket-API
 
 | Befehl | |
@@ -108,6 +145,8 @@ Wird eine Aufgabe hier erledigt (To-do, Aktion), ist sie sofort im Dashboard abg
 | `smarthome_ui/tasks/sync` | Aufgaben mit Fälligkeit |
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
+| `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |
+| `smarthome_ui/display/update` | Zustand eines Bildschirms (Seite, Theme, Jahreszeit, Töne, Leistung, Ruhemodus, Benutzer) |
 
 ## Entwicklung
 

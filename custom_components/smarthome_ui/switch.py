@@ -1,4 +1,4 @@
-"""Switch to pause all notifications (e.g. on holiday)."""
+"""Switches: pause all notifications (e.g. on holiday) and the standby screen of each display."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import CoreConfigEntry
 from .const import SIGNAL_NOTIFY
+from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_NOTIFY, CoreEntity
 from .store import CoreStore
 
@@ -20,8 +21,18 @@ async def async_setup_entry(
     entry: CoreConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the switch."""
+    """Set up the notifications switch and one standby switch per display."""
     async_add_entities([NotificationsSwitch(entry.entry_id, entry.runtime_data.store)])
+    manager = entry.runtime_data.displays
+    entry.async_on_unload(
+        async_setup_display_entities(
+            hass,
+            entry.entry_id,
+            manager,
+            async_add_entities,
+            lambda did: [DisplayStandby(entry.entry_id, manager, did, "standby", "switch")],
+        )
+    )
 
 
 class NotificationsSwitch(CoreEntity, SwitchEntity):
@@ -53,3 +64,20 @@ class NotificationsSwitch(CoreEntity, SwitchEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_NOTIFY, self.async_write_ha_state)
         )
+
+
+class DisplayStandby(DisplayEntity, SwitchEntity):
+    """Standby screen (clock, weather) of a display; turns off when someone touches it."""
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while the standby screen is shown."""
+        return bool(self._record["state"].get("standby"))
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Show the standby screen."""
+        self._command({"type": "set", "key": "standby", "value": True})
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Wake the display."""
+        self._command({"type": "set", "key": "standby", "value": False})
