@@ -14,11 +14,19 @@ from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry, durations
 from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
-from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM, SIGNAL_WASTE
+from .const import (
+    SIGNAL_MOWER,
+    SIGNAL_SECURITY,
+    SIGNAL_SENT,
+    SIGNAL_TASKS,
+    SIGNAL_VACUUM,
+    SIGNAL_WASTE,
+)
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import (
     DEVICE_HOUSEHOLD,
     DEVICE_NOTIFY,
+    DEVICE_SECURITY,
     CoreEntity,
     attach_device,
     device_for_source,
@@ -43,6 +51,10 @@ async def async_setup_entry(
     """Set up the sensors; add and remove task sensors when the tasks change."""
     store = entry.runtime_data.store
     async_add_entities([LastNotificationSensor(entry.entry_id, store)])
+    security = entry.runtime_data.security
+    async_add_entities(
+        [SecurityOpen(entry.entry_id, security), SecurityLastNight(entry.entry_id, security)]
+    )
     manager = entry.runtime_data.displays
     entry.async_on_unload(
         async_setup_display_entities(
@@ -645,4 +657,78 @@ class PlantNextWatering(PlantEntity, SensorEntity):
             "drying_per_day": round(-rate, 1) if rate is not None else None,
             "min_moisture": self._plant.min_moisture(),
             "outdoor": self._plant.outdoor,
+        }
+
+
+class SecurityEntity(CoreEntity):
+    """An entity of the device "Sicherheit"."""
+
+    def __init__(self, entry_id: str, security: Any, key: str, domain: str) -> None:
+        """Initialize (entity ID: <domain>.security_<key>)."""
+        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, domain, key)
+        self._security = security
+        self._attr_translation_key = f"security_{key}"
+
+    async def async_added_to_hass(self) -> None:
+        """Update when windows, persons or the night log change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_SECURITY, self.async_write_ha_state)
+        )
+
+
+class SecurityOpen(SecurityEntity, SensorEntity):
+    """How many windows and doors are open (list as attribute)."""
+
+    _attr_native_unit_of_measurement = None
+
+    def __init__(self, entry_id: str, security: Any) -> None:
+        """Initialize (sensor.security_open)."""
+        super().__init__(entry_id, security, "open", "sensor")
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of open windows and doors."""
+        return len(self._security.open_now())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return what is open, unlocked and who is home."""
+        sec = self._security
+        return {
+            "open": [sec._name(e) for e in sec.open_now()],
+            "entities": sec.open_now(),
+            "unlocked": [sec._name(e) for e in sec.unlocked()],
+            "persons_home": sec.home_count(),
+        }
+
+
+class SecurityLastNight(SecurityEntity, SensorEntity):
+    """Persons detected last night (counts and events as attributes)."""
+
+    def __init__(self, entry_id: str, security: Any) -> None:
+        """Initialize (sensor.security_last_night)."""
+        super().__init__(entry_id, security, "last_night", "sensor")
+
+    @property
+    def native_value(self) -> int:
+        """Return how many persons were detected."""
+        return int(self._security.night_summary()["counts"].get("persons", 0))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the night window, counts per kind and the events."""
+        night = self._security.night_summary()
+
+        def iso(ms: int) -> str:
+            return dt_util.utc_from_timestamp(ms / 1000).isoformat()
+
+        return {
+            "start": iso(night["start"]),
+            "end": iso(night["end"]),
+            "running": night["running"],
+            **{f"{k}_count": v for k, v in night["counts"].items()},
+            "events": [
+                {"time": iso(e["t"]), "kind": e["cat"], "name": e["name"]}
+                for e in night["events"][-20:]
+            ],
         }

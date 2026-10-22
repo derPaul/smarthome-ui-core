@@ -52,6 +52,7 @@ from .mower import MowerManager
 from .notify import NotifyEngine
 from .planner import PlannerManager
 from .plants import PlantManager
+from .security import Security
 from .store import CoreStore
 from .tasks import find_task, task_states
 from .vacuum import VacuumManager
@@ -65,6 +66,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
+    Platform.TIME,
     Platform.TODO,
 ]
 
@@ -86,6 +88,7 @@ class CoreRuntime:
     appliances: ApplianceManager
     parts: PartManager
     plants: PlantManager
+    security: Security
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -262,6 +265,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_task_defs,
         ws_waste_settings,
         ws_plant_settings,
+        ws_security_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -280,6 +284,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     appliances = ApplianceManager(hass, store)
     parts = PartManager(hass, store)
     plants = PlantManager(hass, store, watchers)
+
+    @callback
+    def security_notify(src: str, title: str, message: str, tag: str) -> None:
+        """Open windows, everybody left, good night, last night (if push is on for src)."""
+        cfg = (store.data["notify"].get("sources") or {}).get(src) or {}
+        if cfg.get("push"):
+            engine.send(
+                title,
+                message,
+                src=src,
+                url=cfg.get("url") or "/",
+                urgent=bool(cfg.get("urgent")),
+                tag=tag,
+            )
+
+    security = Security(
+        hass,
+        store,
+        watchers,
+        security_notify,
+        lambda: {t.device_id for t in appliances.trackers.values()},
+    )
     entry.runtime_data = CoreRuntime(
         store,
         engine,
@@ -292,6 +318,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         appliances,
         parts,
         plants,
+        security,
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -355,6 +382,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     appliances.async_setup(list(entry.subentries.values()))
     parts.async_setup(entry)
     plants.async_setup()
+    security.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -443,6 +471,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.watchers.async_stop()
     entry.runtime_data.appliances.async_stop()
     entry.runtime_data.plants.async_stop()
+    entry.runtime_data.security.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -474,7 +503,16 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "parts": runtime.parts.info(),
         "parts_migrated": list(store.data.get("parts_migrated") or []),
         "plants": runtime.plants.info(),
-        "features": ["task_defs", "waste", "watchers", "appliances", "parts", "plants"],
+        "security": runtime.security.info(),
+        "features": [
+            "task_defs",
+            "waste",
+            "watchers",
+            "appliances",
+            "parts",
+            "plants",
+            "security",
+        ],
         "own_tasks": store.own_tasks,
         "waste": {
             "configured": runtime.waste.configured,
@@ -523,6 +561,7 @@ def ws_subscribe(
                     "parts": runtime.parts.info(),
                     "parts_migrated": list(runtime.store.data.get("parts_migrated") or []),
                     "plants": runtime.plants.info(),
+                    "security": runtime.security.info(),
                 },
             )
         )
@@ -788,3 +827,20 @@ def ws_plant_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.plants.set_settings(msg["entity"], msg.get("feed"))
         connection.send_result(msg["id"], runtime.plants.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/security/settings",
+        vol.Optional("openings"): vol.Any(None, [str]),
+        vol.Optional("night"): vol.Any(None, dict),
+    }
+)
+@callback
+def ws_security_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take which windows/doors and night sensors count (and the night times)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.security.set_settings({k: msg[k] for k in ("openings", "night") if k in msg})
+        connection.send_result(msg["id"], runtime.security.info())

@@ -23,6 +23,7 @@ SIGNAL_PLANNER: Final = f"{DOMAIN}_planner"
 SIGNAL_WASTE: Final = f"{DOMAIN}_waste"
 SIGNAL_APPLIANCE: Final = f"{DOMAIN}_appliance"
 SIGNAL_PLANTS: Final = f"{DOMAIN}_plants"
+SIGNAL_SECURITY: Final = f"{DOMAIN}_security"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)

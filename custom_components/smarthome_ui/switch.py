@@ -11,9 +11,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
-from .const import SIGNAL_NOTIFY
+from .const import SIGNAL_NOTIFY, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
-from .entity import DEVICE_NOTIFY, CoreEntity
+from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
 
@@ -25,6 +25,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up the notifications switch and one standby switch per display."""
     async_add_entities([NotificationsSwitch(entry.entry_id, entry.runtime_data.store)])
+    security = entry.runtime_data.security
+    async_add_entities(
+        SecurityCheck(entry.entry_id, security, check, key)
+        for check, key in (
+            ("rain", "rain_warning"),
+            ("leave", "leave_check"),
+            ("good_night", "good_night_check"),
+        )
+    )
     manager = entry.runtime_data.displays
     entry.async_on_unload(
         async_setup_display_entities(
@@ -177,3 +186,33 @@ class PlannerMopSwitch(PlannerEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Do not mop the room."""
         self._planner.set_mop(self._area, False)
+
+
+class SecurityCheck(CoreEntity, SwitchEntity):
+    """A check of the device "Sicherheit" on or off (rain, everybody left, good night)."""
+
+    def __init__(self, entry_id: str, security: Any, check: str, key: str) -> None:
+        """Initialize (switch.security_<key>)."""
+        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, "switch", key)
+        self._security = security
+        self._check = check
+        self._attr_translation_key = f"security_{key}"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the check is on."""
+        return bool(self._security.checks()[self._check])
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the check on."""
+        self._security.set_check(self._check, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the check off."""
+        self._security.set_check(self._check, False)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_SECURITY, self.async_write_ha_state)
+        )

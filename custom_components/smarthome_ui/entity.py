@@ -12,7 +12,8 @@ from .const import DOMAIN
 DEVICE_NOTIFY = "notifications"
 DEVICE_HOUSEHOLD = "household"
 DEVICE_GARDEN = "garden"
-DEVICES = (DEVICE_NOTIFY, DEVICE_HOUSEHOLD, DEVICE_GARDEN)
+DEVICE_SECURITY = "security"
+DEVICES = (DEVICE_NOTIFY, DEVICE_HOUSEHOLD, DEVICE_GARDEN, DEVICE_SECURITY)
 
 
 def attach_device(entity: Entity, hass: HomeAssistant, device_id: str | None) -> None:

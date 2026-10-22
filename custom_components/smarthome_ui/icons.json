@@ -31,6 +31,12 @@
       },
       "plant_next_watering": {
         "default": "mdi:calendar-clock"
+      },
+      "security_open": {
+        "default": "mdi:window-open-variant"
+      },
+      "security_last_night": {
+        "default": "mdi:weather-night"
       }
     },
     "switch": {
@@ -68,6 +74,21 @@
         "default": "mdi:water",
         "state": {
           "off": "mdi:water-off-outline"
+        }
+      },
+      "security_rain_warning": {
+        "default": "mdi:weather-pouring",
+        "state": {
+          "off": "mdi:weather-cloudy"
+        }
+      },
+      "security_leave_check": {
+        "default": "mdi:home-export-outline"
+      },
+      "security_good_night_check": {
+        "default": "mdi:weather-night",
+        "state": {
+          "off": "mdi:moon-waning-crescent"
         }
       }
     },
@@ -146,6 +167,11 @@
     "number": {
       "clean_interval": {
         "default": "mdi:broom"
+      }
+    },
+    "time": {
+      "security_good_night": {
+        "default": "mdi:clock-outline"
       }
     }
   },

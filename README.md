@@ -196,6 +196,26 @@ Pflanze:
 - **Düngen:** mit Dünger-Sensor wie bisher, wenn er „niedrig“ meldet. Ohne Sensor nach Kalender: alle *N* Wochen
   zwischen zwei Monaten (im Dashboard an der Pflanzen-Kachel einstellbar, WebSocket `smarthome_ui/plants/settings`).
 
+## Sicherheit
+
+Gerät **„Sicherheit“** mit Prüfungen für offene Fenster und Türen und einer Übersicht der letzten Nacht. Mitteilungen
+kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an).
+
+| Entität | |
+|---|---|
+| `sensor.security_open` | Anzahl offener Fenster & Türen (Attribute `open`, `unlocked`, `persons_home`) |
+| `switch.security_rain_warning` | Regenwarnung: offen und es regnet oder Regen kommt in den nächsten 2 Stunden |
+| `switch.security_leave_check` | wenn der Letzte das Haus verlässt: was noch offen bzw. nicht abgeschlossen ist |
+| `switch.security_good_night_check` / `time.security_good_night` | Gute-Nacht-Check zur eingestellten Uhrzeit (Standard aus, 22:30): offen, nicht abgeschlossen, Alarm nicht scharf |
+| `sensor.security_last_night` | erkannte Personen der letzten Nacht; Attribute: Anzahl je Art (Personen, Tiere, Fahrzeuge, Bewegung im Haus, Türen) und die Ereignisse |
+
+- **Fenster & Türen:** Fenster-, Tür- und Garagentor-Sensoren – ohne Gerätetüren (Kühlschrank, Spülmaschine …,
+  Briefkasten). Was das Dashboard als Fenster & Türen eingestellt hat, gilt vorrangig.
+- **Letzte Nacht** (Standard 22:00–06:00, Zeiten und Sensoren wie im Dashboard eingestellt): Core zählt live mit –
+  Personen- und Tier-Erkennungen (z. B. Kameras), Fahrzeuge (nur wenn gewählt), Bewegung im Haus (ohne Kameras und
+  Außenbereiche) und geöffnete Türen. Am Ende der Nacht kommt eine Zusammenfassung, wenn eine Person erkannt oder eine
+  Tür geöffnet wurde, z. B. „1 Person erkannt (Einfahrt 02:14) · 1× Tür geöffnet (Haustür 02:14)“.
+
 ## Haushaltsgeräte
 
 **„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder
@@ -354,6 +374,7 @@ actions:
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
+| `smarthome_ui/security/settings` | Fenster & Türen (`openings`) und Nacht (`night`: `start`, `end`, Sensorlisten je Art) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

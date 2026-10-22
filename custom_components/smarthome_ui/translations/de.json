@@ -175,6 +175,9 @@
     },
     "garden": {
       "name": "Garten"
+    },
+    "security": {
+      "name": "Sicherheit"
     }
   },
   "entity": {
@@ -255,6 +258,12 @@
       },
       "plant_next_watering": {
         "name": "Nächstes Gießen"
+      },
+      "security_open": {
+        "name": "Offene Fenster & Türen"
+      },
+      "security_last_night": {
+        "name": "Letzte Nacht"
       }
     },
     "binary_sensor": {
@@ -366,11 +375,25 @@
       },
       "planner_mop": {
         "name": "{area} wischen"
+      },
+      "security_rain_warning": {
+        "name": "Regenwarnung (offene Fenster)"
+      },
+      "security_leave_check": {
+        "name": "Prüfen, wenn alle weg sind"
+      },
+      "security_good_night_check": {
+        "name": "Gute-Nacht-Check"
       }
     },
     "number": {
       "clean_interval": {
         "name": "Putzen {area}"
+      }
+    },
+    "time": {
+      "security_good_night": {
+        "name": "Gute-Nacht-Check um"
       }
     }
   },
