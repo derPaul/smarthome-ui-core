@@ -251,11 +251,6 @@ class VacuumTracker:
             "entity": self.entity_id,
         }
 
-    def device_identifiers(self) -> set[tuple[str, str]]:
-        """Return the identifiers of the vacuum device (our entities are added to it)."""
-        device = dr.async_get(self.hass).async_get(self.device_id)
-        return set(device.identifiers) if device else set()
-
     # ---------------------------------------------------------------- rooms
 
     def _options(self) -> dict[str, Any]:

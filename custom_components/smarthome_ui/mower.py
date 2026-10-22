@@ -24,7 +24,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -247,11 +247,6 @@ class MowerTracker:
                 }
             )
         return out
-
-    def device_identifiers(self) -> set[tuple[str, str]]:
-        """Return the identifiers of the mower device (our entities are added to it)."""
-        device = dr.async_get(self.hass).async_get(self.device_id)
-        return set(device.identifiers) if device else set()
 
     # ---------------------------------------------------------------- notifications
 

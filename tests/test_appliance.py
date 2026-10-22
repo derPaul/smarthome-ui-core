@@ -281,3 +281,15 @@ async def test_fridge(hass: HomeAssistant, notify_calls, freezer) -> None:
     await hass.async_block_till_done()
     assert hass.states.get("sensor.household_kuhli_status").state == "alarm"
     assert notify_calls[-1].data["message"] == "Kühli: Alarm"
+
+
+async def test_fridge_entities_on_appliance_device(hass: HomeAssistant, notify_calls) -> None:
+    """Core's entities go onto the fridge's own device – no device named after Core."""
+    device_id = _device(
+        hass,
+        "Kühlschrank",
+        [("sensor", "kuehl_temp", "5", {"device_class": "temperature"})],
+    )
+    await _setup(hass, device_id, "Kühli")
+    assert er.async_get(hass).async_get("sensor.household_kuhli_status").device_id == device_id
+    assert not [d for d in dr.async_get(hass).devices.values() if d.name == "Smarthome UI Core"]

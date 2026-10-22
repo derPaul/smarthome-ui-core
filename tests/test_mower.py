@@ -248,3 +248,17 @@ async def test_mower_settings_websocket(hass: HomeAssistant, notify_calls, hass_
     await client.send_json_auto_id({"type": "smarthome_ui/get"})
     msg = await client.receive_json()
     assert msg["result"]["mowers"][0]["plan"] == {"6": 6}
+
+
+async def test_entities_on_mower_device(hass: HomeAssistant, notify_calls) -> None:
+    """Area sensors, frequency selects and planner go onto the mower's own device."""
+    device_id = _mower_device(hass)
+    await _setup(hass, device_id)
+    registry = er.async_get(hass)
+    for entity_id in (
+        "sensor.garden_vorgarten_last_mowed",
+        "select.garden_vorgarten_frequency",
+        "sensor.garden_luba_planner",
+    ):
+        assert registry.async_get(entity_id).device_id == device_id, entity_id
+    assert not [d for d in dr.async_get(hass).devices.values() if d.name == "Smarthome UI Core"]

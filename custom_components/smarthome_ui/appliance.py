@@ -226,11 +226,6 @@ class ApplianceTracker:
         """Return the done key of "unloaded" (shared with the dashboard)."""
         return f"appl:device:{self.device_id}"
 
-    def device_identifiers(self) -> set[tuple[str, str]]:
-        """Return the identifiers of the device (our entities are added to it)."""
-        device = dr.async_get(self.hass).async_get(self.device_id)
-        return set(device.identifiers) if device else set()
-
     def entities(self) -> list[er.RegistryEntry]:
         """Return the entities of the device (not our own)."""
         return [

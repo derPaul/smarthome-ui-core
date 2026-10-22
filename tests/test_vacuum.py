@@ -196,3 +196,14 @@ async def test_cleaning_interval_numbers(
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"] == {"intervals": {"kuche": 3, "bad": 0}, "configured": True}
+
+
+async def test_entities_on_vacuum_device(hass: HomeAssistant, notify_calls) -> None:
+    """The planner (and room sensors once rooms are known) go onto the vacuum's own device."""
+    device_id = _vacuum_device(hass)
+    await _setup(hass, device_id)
+    registry = er.async_get(hass)
+    ours = [e for e in registry.entities.values() if e.platform == "smarthome_ui" and e.device_id]
+    on_vacuum = [e for e in ours if e.device_id == device_id]
+    assert any(e.entity_id.endswith("_planner") for e in on_vacuum)
+    assert not [d for d in dr.async_get(hass).devices.values() if d.name == "Smarthome UI Core"]
