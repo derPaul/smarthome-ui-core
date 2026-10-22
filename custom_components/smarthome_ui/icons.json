@@ -43,6 +43,12 @@
       },
       "doorbell_last_ring": {
         "default": "mdi:doorbell"
+      },
+      "security_nightwalk_until": {
+        "default": "mdi:stairs-down"
+      },
+      "security_alarm_reason": {
+        "default": "mdi:alarm-light-outline"
       }
     },
     "switch": {
@@ -102,6 +108,18 @@
         "state": {
           "off": "mdi:bell-off-outline"
         }
+      },
+      "security_alarm_logic": {
+        "default": "mdi:shield-check-outline",
+        "state": {
+          "off": "mdi:shield-off-outline"
+        }
+      },
+      "security_guests": {
+        "default": "mdi:account-group",
+        "state": {
+          "off": "mdi:account-group-outline"
+        }
       }
     },
     "todo": {
@@ -159,6 +177,9 @@
       },
       "plant_watered": {
         "default": "mdi:watering-can"
+      },
+      "security_nightwalk_open": {
+        "default": "mdi:stairs-down"
       }
     },
     "select": {

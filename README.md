@@ -196,6 +196,32 @@ Pflanze:
 - **Düngen:** mit Dünger-Sensor wie bisher, wenn er „niedrig“ meldet. Ohne Sensor nach Kalender: alle *N* Wochen
   zwischen zwei Monaten (im Dashboard an der Pflanzen-Kachel einstellbar, WebSocket `smarthome_ui/plants/settings`).
 
+## Alarmanlage
+
+Core führt die Alarm-Logik selbst aus – statt der Automationen, die das Dashboard früher geschrieben hat („Alarm –
+Auslöser“, „Alarm – Reaktion“, „Gäste“, „Nachtweg“, „Nachtweg – Rückfrage“) und seiner Helfer „Gäste da“ und
+„Nachtweg bis“. Die Alarmzentrale selbst (Manual, Alarmo …) bleibt; Core löst sie aus und reagiert auf sie.
+Eingestellt wird weiter im Dashboard (*Sicherheit → Alarmanlage → Zahnrad*); die Einstellungen liegen in Core.
+
+- **Auslöser:** je Sensor die Modi, in denen er den Alarm auslöst (Zuhause, Abwesend, Nacht, Urlaub).
+- **Reaktion:** Push an die gewählten Handys (auf Wunsch kritisch), Vorwarnung bei der Eingangsverzögerung, Entwarnung
+  beim Entschärfen, Sirenen, alle Lichter an, Meldung in Home Assistant mit dem auslösenden Sensor.
+- **Gäste:** Gäste-Geräte, WLANs oder das UniFi-Gästenetz schalten „Gäste da“ ein (aus, wenn alle eine Weile weg
+  sind). Dann sind die gewählten Bewegungsmelder in den Gäste-Modi stumm; auf Wunsch Push beim Scharfschalten.
+- **Nachtweg:** Bewegung oben öffnet ein kurzes Fenster, in dem Bewegung unten nicht als Einbruch zählt – nur wenn
+  unten vorher alles ruhig war. Auf Wunsch fragt Core per Push „bist du das?“ und löst ohne Antwort aus.
+
+| Entität (Gerät „Sicherheit“) | |
+|---|---|
+| `switch.security_alarm_logic` | Alarm-Logik in Core an/aus. Aus: die alten Dashboard-Automationen werden wieder eingeschaltet (sie bleiben erhalten), an: ausgeschaltet – nie beide, nie keine |
+| `switch.security_guests` | Gäste da (Attribut `devices`) – auch von Hand schaltbar |
+| `sensor.security_nightwalk_until` | bis wann der Nachtweg offen ist |
+| `button.security_nightwalk_open` | Nachtweg jetzt öffnen |
+| `sensor.security_alarm_reason` | welcher Sensor zuletzt ausgelöst hat |
+
+Bei der Übergabe (Dashboard: „An Core übergeben“ bzw. Speichern) übernimmt Core auch den aktuellen Stand von
+„Gäste da“ und „Nachtweg bis“ und schaltet die alten Automationen aus.
+
 ## Klingel
 
 **„Klingel hinzufügen“** (beliebig viele): Gerät der Klingel wählen (UniFi Protect, Reolink, Ring …), optional Name,
@@ -391,6 +417,7 @@ actions:
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
+| `smarthome_ui/alarm/settings` | Alarm-Logik übernehmen (`panel`, `rules`, `actions`, `guests`, `nightwalk`, einmalig `guests_on`, `nightwalk_until`) |
 | `smarthome_ui/security/settings` | Fenster & Türen (`openings`) und Nacht (`night`: `start`, `end`, Sensorlisten je Art) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |

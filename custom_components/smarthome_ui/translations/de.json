@@ -302,6 +302,12 @@
       },
       "doorbell_last_ring": {
         "name": "Zuletzt geklingelt"
+      },
+      "security_nightwalk_until": {
+        "name": "Nachtweg bis"
+      },
+      "security_alarm_reason": {
+        "name": "Alarm-Grund"
       }
     },
     "binary_sensor": {
@@ -345,6 +351,9 @@
       },
       "plant_watered": {
         "name": "Gegossen"
+      },
+      "security_nightwalk_open": {
+        "name": "Nachtweg öffnen"
       }
     },
     "select": {
@@ -431,6 +440,12 @@
       },
       "doorbell_notify": {
         "name": "Klingel-Mitteilung"
+      },
+      "security_alarm_logic": {
+        "name": "Alarm-Logik"
+      },
+      "security_guests": {
+        "name": "Gäste da"
       }
     },
     "number": {

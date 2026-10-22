@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
-from .const import SIGNAL_NOTIFY, SIGNAL_SECURITY
+from .const import SIGNAL_ALARM, SIGNAL_NOTIFY, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
 from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
@@ -34,6 +34,10 @@ async def async_setup_entry(
             ("leave", "leave_check"),
             ("good_night", "good_night_check"),
         )
+    )
+    alarm = entry.runtime_data.alarm
+    async_add_entities(
+        [AlarmLogicSwitch(entry.entry_id, alarm), GuestsSwitch(entry.entry_id, alarm)]
     )
     async_setup_doorbell_entities(
         entry.runtime_data.doorbells,
@@ -243,3 +247,71 @@ class DoorbellNotify(DoorbellEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """No notification when it rings."""
         self._tracker.set_muted(True)
+
+
+class _AlarmEntity(CoreEntity):
+    """An alarm entity of the device "Sicherheit" (available once the alarm is in Core)."""
+
+    def __init__(self, entry_id: str, alarm: Any, key: str, domain: str) -> None:
+        """Initialize (<domain>.security_<key>)."""
+        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, domain, key)
+        self._alarm = alarm
+        self._attr_translation_key = f"security_{key}"
+
+    @property
+    def available(self) -> bool:
+        """Return True once the dashboard handed the alarm over."""
+        return self._alarm.configured
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the alarm state changes."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_ALARM, self.async_write_ha_state)
+        )
+
+
+class AlarmLogicSwitch(_AlarmEntity, SwitchEntity):
+    """Core runs the alarm logic (off: Core triggers and reacts to nothing)."""
+
+    def __init__(self, entry_id: str, alarm: Any) -> None:
+        """Initialize (switch.security_alarm_logic)."""
+        super().__init__(entry_id, alarm, "alarm_logic", "switch")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if Core runs the alarm logic."""
+        return self._alarm.enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Run the alarm logic."""
+        self._alarm.set_enabled(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Stop the alarm logic."""
+        self._alarm.set_enabled(False)
+
+
+class GuestsSwitch(_AlarmEntity, SwitchEntity):
+    """Guests are there: the chosen motion sensors are silent in the guest modes."""
+
+    def __init__(self, entry_id: str, alarm: Any) -> None:
+        """Initialize (switch.security_guests)."""
+        super().__init__(entry_id, alarm, "guests", "switch")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while guests are there."""
+        return self._alarm.guests_on
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the guest devices at home."""
+        return {"devices": self._alarm.guests_present() if self._alarm.configured else []}
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Guests are there."""
+        self._alarm.set_guests(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """No guests."""
+        self._alarm.set_guests(False)

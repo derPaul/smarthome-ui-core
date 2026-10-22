@@ -302,6 +302,12 @@
       },
       "doorbell_last_ring": {
         "name": "Last ring"
+      },
+      "security_nightwalk_until": {
+        "name": "Night walk until"
+      },
+      "security_alarm_reason": {
+        "name": "Alarm reason"
       }
     },
     "binary_sensor": {
@@ -345,6 +351,9 @@
       },
       "plant_watered": {
         "name": "Watered"
+      },
+      "security_nightwalk_open": {
+        "name": "Open night walk"
       }
     },
     "select": {
@@ -431,6 +440,12 @@
       },
       "doorbell_notify": {
         "name": "Ring notification"
+      },
+      "security_alarm_logic": {
+        "name": "Alarm logic"
+      },
+      "security_guests": {
+        "name": "Guests present"
       }
     },
     "number": {

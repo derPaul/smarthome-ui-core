@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util, slugify
 from . import CoreConfigEntry, durations
 from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .const import (
+    SIGNAL_ALARM,
     SIGNAL_MOWER,
     SIGNAL_SECURITY,
     SIGNAL_SENT,
@@ -58,6 +59,8 @@ async def async_setup_entry(
             SecurityOpen(entry.entry_id, security),
             SecurityLastNight(entry.entry_id, security),
             SecurityPersonsHome(entry.entry_id, security),
+            NightwalkUntil(entry.entry_id, entry.runtime_data.alarm),
+            AlarmReason(entry.entry_id, entry.runtime_data.alarm),
         ]
     )
     manager = entry.runtime_data.displays
@@ -791,4 +794,65 @@ class DoorbellLastRing(DoorbellEntity, SensorEntity):
                 for t in self._tracker.rings()[-10:]
             ],
             "camera": self._tracker.camera,
+        }
+
+
+class _AlarmSensor(CoreEntity, SensorEntity):
+    """An alarm sensor of the device "Sicherheit"."""
+
+    def __init__(self, entry_id: str, alarm: Any, key: str) -> None:
+        """Initialize (sensor.security_<key>)."""
+        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, "sensor", key)
+        self._alarm = alarm
+        self._attr_translation_key = f"security_{key}"
+
+    @property
+    def available(self) -> bool:
+        """Return True once the alarm is in Core."""
+        return self._alarm.configured
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the alarm state changes."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_ALARM, self.async_write_ha_state)
+        )
+
+
+class NightwalkUntil(_AlarmSensor):
+    """Until when the night walk is open (empty while closed)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, alarm: Any) -> None:
+        """Initialize (sensor.security_nightwalk_until)."""
+        super().__init__(entry_id, alarm, "nightwalk_until")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the end of the night walk window."""
+        until = self._alarm.nightwalk_until
+        return dt_util.utc_from_timestamp(until / 1000) if until else None
+
+
+class AlarmReason(_AlarmSensor):
+    """Which sensor triggered the alarm last."""
+
+    def __init__(self, entry_id: str, alarm: Any) -> None:
+        """Initialize (sensor.security_alarm_reason)."""
+        super().__init__(entry_id, alarm, "alarm_reason")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the name of the sensor."""
+        rec = self._alarm.data.get("reason") or {}
+        return rec.get("name")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when and which entity."""
+        rec = self._alarm.data.get("reason") or {}
+        t = rec.get("t")
+        return {
+            "entity": rec.get("entity"),
+            "time": dt_util.utc_from_timestamp(t / 1000).isoformat() if t else None,
         }

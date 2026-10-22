@@ -12,7 +12,7 @@ from homeassistant.util import slugify
 from . import CoreConfigEntry
 from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .displays import DisplayEntity, async_setup_display_entities
-from .entity import DEVICE_HOUSEHOLD, CoreEntity
+from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
 from .maintenance import Part, PartEntity, async_setup_part_entities
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
@@ -34,7 +34,12 @@ async def async_setup_entry(
             lambda did: [DisplayReload(entry.entry_id, manager, did, "reload", "button")],
         )
     )
-    async_add_entities([WastePutOut(entry.entry_id, entry.runtime_data)])
+    async_add_entities(
+        [
+            WastePutOut(entry.entry_id, entry.runtime_data),
+            NightwalkOpen(entry.entry_id, entry.runtime_data.alarm),
+        ]
+    )
     entry.async_on_unload(
         async_setup_planner_entities(
             hass,
@@ -157,3 +162,25 @@ class PlantWatered(PlantEntity, ButtonEntity):
             else None
         )
         self._plant.mark_watered(user.name if user else None)
+
+
+class NightwalkOpen(CoreEntity, ButtonEntity):
+    """Open the night walk window now (e.g. before going downstairs)."""
+
+    _attr_translation_key = "security_nightwalk_open"
+
+    def __init__(self, entry_id: str, alarm: Any) -> None:
+        """Initialize (button.security_nightwalk_open)."""
+        super().__init__(
+            entry_id, "security_nightwalk_open", DEVICE_SECURITY, "button", "nightwalk_open"
+        )
+        self._alarm = alarm
+
+    @property
+    def available(self) -> bool:
+        """Return True once the alarm is in Core."""
+        return self._alarm.configured
+
+    async def async_press(self) -> None:
+        """Open the window."""
+        self._alarm.open_nightwalk()

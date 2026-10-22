@@ -78,6 +78,8 @@ def _default() -> dict[str, Any]:
         "security": {},
         # doorbells: {doorbell_id: {"rings": [ms], "mute": bool}}
         "doorbells": {},
+        # alarm logic: settings from the dashboard and its state (guests, night walk, reason)
+        "alarm": {},
     }
 
 

@@ -28,6 +28,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from . import durations
+from .alarm import AlarmLogic
 from .appliance import ApplianceManager
 from .const import (
     ATTR_AREA,
@@ -91,6 +92,7 @@ class CoreRuntime:
     plants: PlantManager
     security: Security
     doorbells: DoorbellManager
+    alarm: AlarmLogic
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -268,6 +270,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_waste_settings,
         ws_plant_settings,
         ws_security_settings,
+        ws_alarm_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -302,6 +305,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
             )
 
     doorbells = DoorbellManager(hass, store)
+    alarm = AlarmLogic(hass, store)
 
     @callback
     def doorbell_rang(tracker: Any) -> None:
@@ -342,6 +346,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         plants,
         security,
         doorbells,
+        alarm,
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -407,6 +412,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     plants.async_setup()
     security.async_setup()
     doorbells.async_setup(list(entry.subentries.values()))
+    alarm.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -497,6 +503,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.plants.async_stop()
     entry.runtime_data.security.async_stop()
     entry.runtime_data.doorbells.async_stop()
+    entry.runtime_data.alarm.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -530,6 +537,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "plants": runtime.plants.info(),
         "security": runtime.security.info(),
         "doorbells": runtime.doorbells.info(),
+        "alarm": runtime.alarm.info(),
         "features": [
             "task_defs",
             "waste",
@@ -539,6 +547,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "plants",
             "security",
             "doorbells",
+            "alarm",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -590,6 +599,7 @@ def ws_subscribe(
                     "plants": runtime.plants.info(),
                     "security": runtime.security.info(),
                     "doorbells": runtime.doorbells.info(),
+                    "alarm": runtime.alarm.info(),
                 },
             )
         )
@@ -872,3 +882,25 @@ def ws_security_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.security.set_settings({k: msg[k] for k in ("openings", "night") if k in msg})
         connection.send_result(msg["id"], runtime.security.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/alarm/settings",
+        vol.Required("panel"): str,
+        vol.Required("rules"): {str: [str]},
+        vol.Required("actions"): dict,
+        vol.Required("guests"): dict,
+        vol.Required("nightwalk"): dict,
+        vol.Optional("guests_on"): vol.Any(None, bool),
+        vol.Optional("nightwalk_until"): vol.Any(None, int),
+    }
+)
+@callback
+def ws_alarm_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take over the alarm logic (rules, reaction, guests, night walk) from the dashboard."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.alarm.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
+        connection.send_result(msg["id"], runtime.alarm.info())
