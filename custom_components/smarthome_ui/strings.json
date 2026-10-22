@@ -123,6 +123,47 @@
         "already_configured": "This appliance is already added.",
         "reconfigure_successful": "Appliance changed."
       }
+    },
+    "part": {
+      "entry_type": "Maintenance part",
+      "initiate_flow": {
+        "user": "Add maintenance part",
+        "reconfigure": "Change maintenance part"
+      },
+      "step": {
+        "user": {
+          "title": "Add maintenance part",
+          "description": "Carbon filter, air or water filter, backwash filter, smoke detector … Without a device, Smarthome UI Core creates one in the area. Due cleaning and replacing land in the to-do list \"Household\" and come as notification.",
+          "data": {
+            "kind": "Kind",
+            "area_id": "Area",
+            "device_id": "Belongs to device (optional)",
+            "name": "Name (optional)"
+          }
+        },
+        "intervals": {
+          "title": "Intervals",
+          "description": "Suggested for {kind} – change as you like. Replacing counts as cleaned too.",
+          "data": {
+            "clean_every": "Clean / backwash / test every (0 = off)",
+            "replace_every": "Replace every (0 = off)"
+          }
+        },
+        "reconfigure": {
+          "title": "Change maintenance part",
+          "data": {
+            "kind": "Kind",
+            "area_id": "Area",
+            "device_id": "Belongs to device (optional)",
+            "name": "Name (optional)",
+            "clean_every": "Clean / backwash / test every (0 = off)",
+            "replace_every": "Replace every (0 = off)"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Maintenance part changed."
+      }
     }
   },
   "device": {
@@ -196,6 +237,18 @@
       },
       "appliance_last_run": {
         "name": "Last run"
+      },
+      "part_due_clean": {
+        "name": "Cleaning due"
+      },
+      "part_due_backwash": {
+        "name": "Backwash due"
+      },
+      "part_due_test": {
+        "name": "Test due"
+      },
+      "part_due_replace": {
+        "name": "Replacement due"
       }
     },
     "binary_sensor": {
@@ -218,6 +271,18 @@
       },
       "appliance_unloaded": {
         "name": "Unloaded"
+      },
+      "part_done_clean": {
+        "name": "Cleaned"
+      },
+      "part_done_backwash": {
+        "name": "Backwashed"
+      },
+      "part_done_test": {
+        "name": "Tested"
+      },
+      "part_done_replace": {
+        "name": "Replaced"
       }
     },
     "select": {
@@ -410,6 +475,17 @@
         "dryer": "Dryer",
         "fridge": "Fridge / freezer",
         "other": "Other appliance"
+      }
+    },
+    "part_kind": {
+      "options": {
+        "carbon_filter": "Carbon filter",
+        "air_filter": "Air filter",
+        "hood_filter": "Cooker hood filter",
+        "backwash_filter": "Backwash filter (house water connection)",
+        "water_filter": "Water filter",
+        "smoke_detector": "Smoke detector",
+        "other": "Other"
       }
     }
   }

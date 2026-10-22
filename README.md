@@ -195,6 +195,32 @@ Energiezähler – beim Kühlschrank Temperaturen (Kühl- und Gefrierteil), Tür
 
 Das Dashboard nimmt Geschirrspüler und Kühlschrank dann aus Core; „Ausgeräumt“ gilt überall gleich.
 
+## Wartungsteile
+
+**„Wartungsteil hinzufügen“** (beliebig viele): Kohlefilter, Luftfilter, Dunstabzugsfilter, Rückspülfilter (am
+Druckminderer des Hausanschlusses), Wasserfilter, Rauchmelder oder Sonstiges – mit Bereich und optional dem Gerät, zu
+dem es gehört (z. B. der Lüfter im Bad). Ohne Gerät legt Core eines an („Kohlefilter Bad“) und ordnet es dem Bereich zu.
+
+- **Zwei Intervalle** in Monaten, je 0 = aus, mit Vorschlag je Art: Reinigen bzw. Rückspülen bzw. Testen und Tauschen.
+
+  | Art | Reinigen / Rückspülen / Testen | Tauschen |
+  |---|---|---|
+  | Kohlefilter | 3 | 12 |
+  | Luftfilter | 1 | 6 |
+  | Dunstabzugsfilter | 1 | – |
+  | Rückspülfilter | 6 (rückspülen) | – |
+  | Wasserfilter | – | 6 |
+  | Rauchmelder | 12 (testen) | 120 |
+
+- Tauschen zählt auch als gereinigt. Ohne bisheriges Datum zählt das Intervall ab dem Hinzufügen.
+- **Entitäten am Gerät:** `sensor.household_<teil>_next_clean` / `_next_replace` (Datum; Attribute `last`, `days_left`,
+  `due`) und Knöpfe `button.household_<teil>_cleaned` / `_replaced`.
+- **Fällig:** „Kohlefilter Bad reinigen“ steht in der To-do-Liste „Haushalt“ und kommt zur Aufgaben-Uhrzeit als
+  Mitteilung (Quelle „Wartung & Putzen“).
+- **Umzug:** Wartungsaufgaben aus dem Dashboard, die nach einem solchen Teil klingen („Kohlefilter tauschen“,
+  „Rauchmelder testen“ …), zieht Core einmalig um – je Art und Raum ein Wartungsteil, „reinigen“ und „tauschen“
+  zusammengefasst, mit dem letzten Erledigt-Datum. Das Dashboard blendet die alten Aufgaben dann aus.
+
 ## Automatisch mähen und saugen (Roboter-Planer)
 
 Je Mäh- und Saugroboter gibt es einen Planer, der den Roboter **von selbst startet, wenn Flächen bzw. Räume fällig

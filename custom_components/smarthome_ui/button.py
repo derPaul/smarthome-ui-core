@@ -13,6 +13,7 @@ from . import CoreConfigEntry
 from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, CoreEntity
+from .maintenance import Part, PartEntity, async_setup_part_entities
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 
 
@@ -40,6 +41,11 @@ async def async_setup_entry(
             async_add_entities,
             lambda p: [PlannerSkip(entry.entry_id, p)],
         )
+    )
+    async_setup_part_entities(
+        entry.runtime_data.parts,
+        async_add_entities,
+        lambda p, a: PartDone(entry.entry_id, p, a),
     )
     async_setup_appliance_entities(
         entry.runtime_data.appliances,
@@ -105,3 +111,23 @@ class ApplianceUnloaded(ApplianceEntity, ButtonEntity):
             else None
         )
         self._tracker.unloaded(user.name if user else None)
+
+
+class PartDone(PartEntity, ButtonEntity):
+    """The part has been cleaned (backwashed, tested) or replaced."""
+
+    def __init__(self, entry_id: str, part: Part, action: str) -> None:
+        """Initialize (button.household_<part>_cleaned / _replaced)."""
+        super().__init__(
+            entry_id, part, action, "cleaned" if action == "clean" else "replaced", "button"
+        )
+        self._attr_translation_key = f"part_done_{part.verb_key(action)}"
+
+    async def async_press(self) -> None:
+        """Mark as done now."""
+        user = (
+            await self.hass.auth.async_get_user(self._context.user_id)
+            if self._context and self._context.user_id
+            else None
+        )
+        self._part.mark(self._action, user.name if user else None)

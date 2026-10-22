@@ -93,6 +93,18 @@
       },
       "appliance_unloaded": {
         "default": "mdi:tray-arrow-up"
+      },
+      "part_done_clean": {
+        "default": "mdi:broom"
+      },
+      "part_done_backwash": {
+        "default": "mdi:water-sync"
+      },
+      "part_done_test": {
+        "default": "mdi:smoke-detector-alert-outline"
+      },
+      "part_done_replace": {
+        "default": "mdi:swap-horizontal"
       }
     },
     "select": {

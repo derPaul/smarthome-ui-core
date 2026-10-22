@@ -22,9 +22,10 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 
 from . import durations
 from .appliance import ApplianceManager
@@ -43,8 +44,10 @@ from .const import (
     SERVICE_WASTE_ACK,
     SERVICE_WASTE_SKIP,
     SIGNAL_DATA,
+    SIGNAL_TASKS,
 )
 from .displays import DisplayManager
+from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
 from .notify import NotifyEngine
 from .planner import PlannerManager
@@ -80,6 +83,7 @@ class CoreRuntime:
     waste: WasteManager
     watchers: Watchers
     appliances: ApplianceManager
+    parts: PartManager
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -95,6 +99,7 @@ class CoreRuntime:
             *self.waste.tasks(),
             *self.watchers.tasks(),
             *self.appliances.tasks(),
+            *self.parts.tasks(),
         ]
 
     @callback
@@ -269,6 +274,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     waste = WasteManager(hass, store)
     watchers = Watchers(hass, store)
     appliances = ApplianceManager(hass, store)
+    parts = PartManager(hass, store)
     entry.runtime_data = CoreRuntime(
         store,
         engine,
@@ -279,7 +285,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         waste,
         watchers,
         appliances,
+        parts,
     )
+    # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
+    async_migrate_tasks(hass, entry, store)
     _remove_single_device(hass, entry)
     await hass.async_add_executor_job(_install_blueprints, hass.config.path("blueprints"))
     engine.extra_rules = lambda: [
@@ -288,7 +297,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         *waste.rules(),
         *watchers.rules(),
     ]
-    engine.extra_tasks = lambda: [*mowers.tasks(), *watchers.notify_tasks()]
+    engine.extra_tasks = lambda: [*mowers.tasks(), *watchers.notify_tasks(), *parts.tasks()]
 
     @callback
     def unusual(tracker: Any, area: str, result: dict[str, Any]) -> None:
@@ -332,11 +341,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     waste.async_setup()
     watchers.async_setup()
     appliances.async_setup(list(entry.subentries.values()))
+    parts.async_setup(entry)
 
     # tasks from the definitions: again after every change of the data and every quarter hour
+    today: list[Any] = [dt_util.now().date()]
+
     @callback
     def recompute(*_args: Any) -> None:
         store.recompute_tasks()
+        # a new day: due dates of parts, waste … move on (to-do lists, sensors)
+        if (day := dt_util.now().date()) != today[0]:
+            today[0] = day
+            async_dispatcher_send(hass, SIGNAL_TASKS)
 
     recompute()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_DATA, recompute))
@@ -429,7 +445,9 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "vacuums": runtime.robots()[1],
         "cleaning": store.data["cleaning"],
         "appliances": runtime.appliances.info(),
-        "features": ["task_defs", "waste", "watchers", "appliances"],
+        "parts": runtime.parts.info(),
+        "parts_migrated": list(store.data.get("parts_migrated") or []),
+        "features": ["task_defs", "waste", "watchers", "appliances", "parts"],
         "own_tasks": store.own_tasks,
         "waste": {
             "configured": runtime.waste.configured,
@@ -475,6 +493,8 @@ def ws_subscribe(
                     "vacuums": runtime.robots()[1],
                     "cleaning": runtime.store.data["cleaning"],
                     "appliances": runtime.appliances.info(),
+                    "parts": runtime.parts.info(),
+                    "parts_migrated": list(runtime.store.data.get("parts_migrated") or []),
                 },
             )
         )
@@ -692,6 +712,9 @@ def ws_task_defs(
     """Take the task definitions (maintenance, garden calendar, cleaning rooms)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.store.set_task_defs(msg["tasks"], msg["rooms"])
+        entries = hass.config_entries.async_loaded_entries(DOMAIN)
+        if entries:
+            async_migrate_tasks(hass, entries[0], runtime.store)
         connection.send_result(msg["id"], {"tasks": len(runtime.store.data["tasks"])})
 
 

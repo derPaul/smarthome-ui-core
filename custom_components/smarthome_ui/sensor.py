@@ -18,6 +18,7 @@ from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_ap
 from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM, SIGNAL_WASTE
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, DEVICE_NOTIFY, CoreEntity, device_for_source
+from .maintenance import Part, PartEntity, async_setup_part_entities, days_left
 from .mower import MowerTracker
 from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
@@ -113,6 +114,11 @@ async def async_setup_entry(
             ApplianceStatus(entry.entry_id, t),
             *([ApplianceLastRun(entry.entry_id, t)] if t.kind != "fridge" else []),
         ],
+    )
+    async_setup_part_entities(
+        entry.runtime_data.parts,
+        async_add_entities,
+        lambda p, a: PartDue(entry.entry_id, p, a),
     )
     known: dict[str, TaskSensor] = {}
 
@@ -543,3 +549,41 @@ class ApplianceLastRun(ApplianceEntity, SensorEntity):
             "kwh": last.get("kwh"),
             "usual_minutes": self._tracker.usual(),
         }
+
+
+class PartDue(PartEntity, SensorEntity):
+    """When a maintenance part is due to be cleaned (backwashed, tested) or replaced."""
+
+    _attr_device_class = SensorDeviceClass.DATE
+
+    def __init__(self, entry_id: str, part: Part, action: str) -> None:
+        """Initialize (sensor.household_<part>_next_clean / _next_replace)."""
+        super().__init__(entry_id, part, action, f"next_{action}", "sensor")
+        self._attr_translation_key = f"part_due_{part.verb_key(action)}"
+        self._attr_icon = part.spec["icon"]
+
+    @property
+    def native_value(self) -> date | None:
+        """Return the day it is due."""
+        due = self._part.due(self._action)
+        return dt_util.as_local(dt_util.utc_from_timestamp(due / 1000)).date() if due else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when it was last done, the interval and the days left."""
+        last = self._part.last(self._action)
+        left = days_left(self._part.due(self._action))
+        return {
+            "kind": self._part.kind,
+            "last": dt_util.utc_from_timestamp(last / 1000).isoformat() if last else None,
+            "interval_months": self._part.every[self._action],
+            "days_left": left,
+            "due": left is not None and left <= 0,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Also update with the task recomputation (new day)."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_TASKS, self.async_write_ha_state)
+        )

@@ -14,8 +14,9 @@ from homeassistant.config_entries import (
     SubentryFlowResult,
 )
 from homeassistant.core import callback
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.helpers.selector import (
+    AreaSelector,
     BooleanSelector,
     DeviceSelector,
     DeviceSelectorConfig,
@@ -40,8 +41,18 @@ from .appliance import (
     detect_kind,
 )
 from .const import DOMAIN
+from .maintenance import (
+    CONF_AREA,
+    CONF_KIND as PART_KIND,
+    CONF_SINCE,
+    KIND_OPTIONS as PART_KINDS,
+    KINDS as PART_SPECS,
+    SUBENTRY_PART,
+    default_months,
+)
 from .mower import CONF_DEVICE, SUBENTRY_MOWER
 from .planner import DEFAULTS, KIND_MOWER, KIND_VACUUM
+from .store import now_ms
 from .vacuum import SUBENTRY_VACUUM
 
 
@@ -66,6 +77,7 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_MOWER: MowerSubentryFlow,
             SUBENTRY_VACUUM: VacuumSubentryFlow,
             SUBENTRY_APPLIANCE: ApplianceSubentryFlow,
+            SUBENTRY_PART: PartSubentryFlow,
         }
 
 
@@ -293,3 +305,108 @@ class ApplianceSubentryFlow(MowerSubentryFlow):
             .extend(self._options_schema(self._resolved_kind(current), current))
         )
         return self.async_show_form(step_id="reconfigure", data_schema=schema)
+
+
+class PartSubentryFlow(ConfigSubentryFlow):
+    """Add or change a maintenance part (carbon filter, backwash filter, smoke detector …)."""
+
+    def __init__(self) -> None:
+        """Initialize the flow."""
+        self._data: dict[str, Any] = {}
+
+    def _base_schema(self, cur: dict[str, Any], name: str | None = None) -> dict[Any, Any]:
+        return {
+            vol.Required(PART_KIND, default=cur.get(PART_KIND) or "carbon_filter"): SelectSelector(
+                SelectSelectorConfig(
+                    options=PART_KINDS,
+                    translation_key="part_kind",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional(CONF_AREA, description={"suggested_value": cur.get(CONF_AREA)}): (
+                AreaSelector()
+            ),
+            vol.Optional(CONF_DEVICE, description={"suggested_value": cur.get(CONF_DEVICE)}): (
+                DeviceSelector()
+            ),
+            vol.Optional("name", description={"suggested_value": name}): TextSelector(),
+        }
+
+    def _interval_schema(self, kind: str, cur: dict[str, Any]) -> dict[Any, Any]:
+        fields: dict[Any, Any] = {}
+        for action in ("clean", "replace"):
+            key = f"{action}_every"
+            value = cur.get(key)
+            fields[
+                vol.Required(key, default=default_months(kind, action) if value is None else value)
+            ] = NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=240,
+                    step=1,
+                    unit_of_measurement="months",
+                    mode=NumberSelectorMode.BOX,
+                )
+            )
+        return fields
+
+    def _title(self, data: dict[str, Any], name: str | None) -> str:
+        if name := (name or "").strip():
+            return name
+        label = PART_SPECS.get(data.get(PART_KIND) or "other", PART_SPECS["other"])["label"]
+        area = (
+            ar.async_get(self.hass).async_get_area(data[CONF_AREA]) if data.get(CONF_AREA) else None
+        )
+        return f"{label} {area.name}" if area else label
+
+    @staticmethod
+    def _clean(user_input: dict[str, Any]) -> dict[str, Any]:
+        data = {k: v for k, v in user_input.items() if k != "name"}
+        for key in ("clean_every", "replace_every"):
+            if data.get(key) is not None:
+                data[key] = int(data[key])
+        for key in (CONF_AREA, CONF_DEVICE):
+            if key in data:
+                data[key] = data[key] or None
+        return data
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Pick kind, area, device and name."""
+        if user_input is not None:
+            self._data = {**self._clean(user_input), "name": user_input.get("name")}
+            return await self.async_step_intervals()
+        return self.async_show_form(step_id="user", data_schema=vol.Schema(self._base_schema({})))
+
+    async def async_step_intervals(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """How often to clean and to replace (suggested by the kind)."""
+        if user_input is not None:
+            name = self._data.pop("name", None)
+            data = {**self._data, **self._clean(user_input), CONF_SINCE: now_ms()}
+            return self.async_create_entry(title=self._title(data, name), data=data)
+        return self.async_show_form(
+            step_id="intervals",
+            data_schema=vol.Schema(self._interval_schema(self._data[PART_KIND], {})),
+            description_placeholders={
+                "kind": PART_SPECS[self._data[PART_KIND]]["label"],
+            },
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change everything (when it was last done stays)."""
+        subentry = self._get_reconfigure_subentry()
+        cur = dict(subentry.data)
+        if user_input is not None:
+            data = {**cur, **self._clean(user_input)}
+            return self.async_update_and_abort(
+                self._get_entry(),
+                subentry,
+                title=self._title(data, user_input.get("name")),
+                data=data,
+            )
+        kind = cur.get(PART_KIND) or "other"
+        schema = {**self._base_schema(cur, subentry.title), **self._interval_schema(kind, cur)}
+        return self.async_show_form(step_id="reconfigure", data_schema=vol.Schema(schema))

@@ -106,7 +106,10 @@ def compute(store_data: dict[str, Any], now: int) -> list[dict[str, Any]]:
     hh = data.get("household") or {}
     legacy_maint = hh.get("maint") or {}
     out: list[dict[str, Any]] = []
+    moved = set(store_data.get("parts_migrated") or [])
     for task in defs.get("tasks") or []:
+        if task.get("id") in moved:
+            continue  # now a maintenance part
         scope = task.get("scope") or "hh"
         src = task.get("src") or ("gd.tasks" if scope == "gd" else "hh.tasks")
         names = task.get("names") or {}

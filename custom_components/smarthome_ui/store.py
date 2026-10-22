@@ -68,6 +68,8 @@ def _default() -> dict[str, Any]:
         "cleaning": {"intervals": {}, "configured": False},
         # household appliances: {appliance_id: {"run": {..}, "last": {..}, "finished": ms, ...}}
         "appliances": {},
+        # dashboard maintenance tasks moved to maintenance parts (task ids)
+        "parts_migrated": [],
     }
 
 

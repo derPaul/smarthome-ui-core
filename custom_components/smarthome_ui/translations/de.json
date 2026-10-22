@@ -123,6 +123,47 @@
         "already_configured": "Dieses Gerät ist schon hinzugefügt.",
         "reconfigure_successful": "Haushaltsgerät geändert."
       }
+    },
+    "part": {
+      "entry_type": "Wartungsteil",
+      "initiate_flow": {
+        "user": "Wartungsteil hinzufügen",
+        "reconfigure": "Wartungsteil ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Wartungsteil hinzufügen",
+          "description": "Kohlefilter, Luft- oder Wasserfilter, Rückspülfilter, Rauchmelder … Ohne Gerät legt Smarthome UI Core eines im Bereich an. Fälliges Reinigen und Tauschen steht in der To-do-Liste „Haushalt“ und kommt als Mitteilung.",
+          "data": {
+            "kind": "Art",
+            "area_id": "Bereich",
+            "device_id": "Gehört zu Gerät (optional)",
+            "name": "Name (optional)"
+          }
+        },
+        "intervals": {
+          "title": "Intervalle",
+          "description": "Vorschlag für {kind} – nach Bedarf ändern. Tauschen zählt auch als gereinigt.",
+          "data": {
+            "clean_every": "Reinigen / rückspülen / testen alle (0 = aus)",
+            "replace_every": "Tauschen alle (0 = aus)"
+          }
+        },
+        "reconfigure": {
+          "title": "Wartungsteil ändern",
+          "data": {
+            "kind": "Art",
+            "area_id": "Bereich",
+            "device_id": "Gehört zu Gerät (optional)",
+            "name": "Name (optional)",
+            "clean_every": "Reinigen / rückspülen / testen alle (0 = aus)",
+            "replace_every": "Tauschen alle (0 = aus)"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Wartungsteil geändert."
+      }
     }
   },
   "device": {
@@ -196,6 +237,18 @@
       },
       "appliance_last_run": {
         "name": "Letzter Lauf"
+      },
+      "part_due_clean": {
+        "name": "Reinigen fällig"
+      },
+      "part_due_backwash": {
+        "name": "Rückspülen fällig"
+      },
+      "part_due_test": {
+        "name": "Testen fällig"
+      },
+      "part_due_replace": {
+        "name": "Tauschen fällig"
       }
     },
     "binary_sensor": {
@@ -218,6 +271,18 @@
       },
       "appliance_unloaded": {
         "name": "Ausgeräumt"
+      },
+      "part_done_clean": {
+        "name": "Gereinigt"
+      },
+      "part_done_backwash": {
+        "name": "Rückgespült"
+      },
+      "part_done_test": {
+        "name": "Getestet"
+      },
+      "part_done_replace": {
+        "name": "Getauscht"
       }
     },
     "select": {
@@ -410,6 +475,17 @@
         "dryer": "Trockner",
         "fridge": "Kühl-/Gefrierschrank",
         "other": "Anderes Gerät"
+      }
+    },
+    "part_kind": {
+      "options": {
+        "carbon_filter": "Kohlefilter",
+        "air_filter": "Luftfilter",
+        "hood_filter": "Dunstabzugsfilter",
+        "backwash_filter": "Rückspülfilter (Hauswasseranschluss)",
+        "water_filter": "Wasserfilter",
+        "smoke_detector": "Rauchmelder",
+        "other": "Sonstiges"
       }
     }
   }
