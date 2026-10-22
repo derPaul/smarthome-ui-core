@@ -480,6 +480,43 @@ class RobotPlanner:
         else:
             self._call("lawn_mower", "start_mowing", {"entity_id": entity})
 
+    @callback
+    def vacuum_rooms(
+        self, areas: list[str], skip_hours: float = 0, vacuum_only: bool = True
+    ) -> list[str]:
+        """Vacuum some rooms now (e.g. the entrance when everybody left); return the rooms started.
+
+        Leaves out rooms on another floor and rooms vacuumed within ``skip_hours``; does nothing
+        while the robot is not ready (running, error).
+        """
+        if not isinstance(self.tracker, VacuumTracker) or not self._ready():
+            return []
+        now = now_ms()
+        rooms = [
+            a
+            for a in areas
+            if self.tracker.reachable(a)
+            and (
+                skip_hours <= 0
+                or now - (self.tracker.last_cleaned(a) or 0) >= skip_hours * 3600_000
+            )
+        ]
+        if not rooms:
+            return []
+        steps = []
+        if vacuum_only and (control := self.tracker.mop_control()):
+            steps.append(
+                (
+                    "select",
+                    "select_option",
+                    {"entity_id": control["entity"], "option": control["vacuum"]},
+                )
+            )
+        steps.append(self._clean_step(self.tracker.entity_id, rooms))
+        self._record_run(rooms)
+        self._call_seq(steps)
+        return rooms
+
     def _clean_step(self, entity: str | None, rooms: list[str]) -> tuple[str, str, dict[str, Any]]:
         if self.hass.services.has_service("vacuum", "clean_area"):
             return ("vacuum", "clean_area", {"entity_id": entity, "cleaning_area_id": rooms})

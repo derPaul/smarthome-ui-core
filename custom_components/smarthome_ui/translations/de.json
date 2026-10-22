@@ -290,6 +290,28 @@
           "description": "Optionaler Text."
         }
       }
+    },
+    "vacuum_rooms": {
+      "name": "Räume saugen",
+      "description": "Saugt die gewählten Bereiche jetzt (nur Räume auf der Etage des Saugers; Saugroboter muss in Smarthome UI Core hinzugefügt sein).",
+      "fields": {
+        "entity_id": {
+          "name": "Saugroboter",
+          "description": "Saugroboter aus Smarthome UI Core."
+        },
+        "areas": {
+          "name": "Bereiche",
+          "description": "Zu saugende Bereiche, z. B. der Eingangsbereich."
+        },
+        "skip_hours": {
+          "name": "Auslassen, wenn kürzlich gesaugt",
+          "description": "Bereiche auslassen, die in den letzten … Stunden gesaugt wurden (0 = nie auslassen)."
+        },
+        "vacuum_only": {
+          "name": "Nur saugen",
+          "description": "Wischen dabei ausschalten (falls der Sauger wischen kann)."
+        }
+      }
     }
   },
   "exceptions": {
@@ -304,6 +326,9 @@
     },
     "display_offline": {
       "message": "Der Bildschirm „{display}“ ist gerade nicht verbunden (Dashboard nicht geöffnet)."
+    },
+    "unknown_vacuum": {
+      "message": "Der Saugroboter {entity} ist nicht in Smarthome UI Core hinzugefügt."
     }
   }
 }

@@ -1,0 +1,70 @@
+blueprint:
+  name: Bereiche saugen, wenn alle weg sind (Smarthome UI Core)
+  description: >-
+    Sobald niemand mehr zuhause ist, saugt der Saugroboter die gewählten Bereiche
+    (z. B. den Eingangsbereich) – nur saugen, nur Räume auf seiner Etage und nur,
+    wenn sie nicht gerade erst gesaugt wurden. Der Saugroboter muss in
+    Smarthome UI Core hinzugefügt sein.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/vacuum_when_leaving.yaml
+  input:
+    vacuum:
+      name: Saugroboter
+      selector:
+        entity:
+          filter:
+            domain: vacuum
+    areas:
+      name: Bereiche (z. B. Eingangsbereich)
+      selector:
+        area:
+          multiple: true
+    delay:
+      name: Warten, nachdem der Letzte gegangen ist
+      description: Falls doch jemand noch einmal zurückkommt.
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: min
+    skip_hours:
+      name: Auslassen, wenn in den letzten … Stunden gesaugt
+      default: 4
+      selector:
+        number:
+          min: 0
+          max: 48
+          unit_of_measurement: h
+    after:
+      name: Frühestens um
+      default: "07:00:00"
+      selector:
+        time:
+    before:
+      name: Spätestens um
+      default: "21:00:00"
+      selector:
+        time:
+
+triggers:
+  - trigger: numeric_state
+    entity_id: zone.home
+    below: 1
+    for:
+      minutes: !input delay
+
+conditions:
+  - condition: time
+    after: !input after
+    before: !input before
+
+actions:
+  - action: smarthome_ui.vacuum_rooms
+    data:
+      entity_id: !input vacuum
+      areas: !input areas
+      skip_hours: !input skip_hours
+      vacuum_only: true
+
+mode: single

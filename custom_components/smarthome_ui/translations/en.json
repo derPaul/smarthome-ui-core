@@ -290,6 +290,28 @@
           "description": "Optional text."
         }
       }
+    },
+    "vacuum_rooms": {
+      "name": "Vacuum rooms",
+      "description": "Vacuums the chosen areas now (only rooms on the vacuum's floor; the vacuum must be added in Smarthome UI Core).",
+      "fields": {
+        "entity_id": {
+          "name": "Robot vacuum",
+          "description": "Robot vacuum from Smarthome UI Core."
+        },
+        "areas": {
+          "name": "Areas",
+          "description": "Areas to vacuum, e.g. the entrance."
+        },
+        "skip_hours": {
+          "name": "Skip if vacuumed recently",
+          "description": "Leave out areas vacuumed within the last … hours (0 = never)."
+        },
+        "vacuum_only": {
+          "name": "Vacuum only",
+          "description": "Switch mopping off (if the vacuum can mop)."
+        }
+      }
     }
   },
   "exceptions": {
@@ -304,6 +326,9 @@
     },
     "display_offline": {
       "message": "The display \"{display}\" is not connected right now (dashboard not open)."
+    },
+    "unknown_vacuum": {
+      "message": "The robot vacuum {entity} is not added in Smarthome UI Core."
     }
   }
 }

@@ -42,3 +42,28 @@ test_notify:
       example: "Hallo von Smarthome UI"
       selector:
         text:
+
+vacuum_rooms:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          filter:
+            domain: vacuum
+    areas:
+      required: true
+      selector:
+        area:
+          multiple: true
+    skip_hours:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 48
+          unit_of_measurement: h
+    vacuum_only:
+      default: true
+      selector:
+        boolean:

@@ -118,6 +118,9 @@
     },
     "test_notify": {
       "service": "mdi:bell-ring-outline"
+    },
+    "vacuum_rooms": {
+      "service": "mdi:robot-vacuum"
     }
   }
 }

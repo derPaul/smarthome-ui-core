@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.const import ATTR_ENTITY_ID, Platform
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
@@ -29,6 +36,7 @@ from .const import (
     SERVICE_TASK_DONE,
     SERVICE_TASK_REOPEN,
     SERVICE_TEST_NOTIFY,
+    SERVICE_VACUUM_ROOMS,
     SERVICE_WASTE_ACK,
     SERVICE_WASTE_SKIP,
     SIGNAL_DATA,
@@ -144,6 +152,43 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             DOMAIN, service, waste, schema=vol.Schema({vol.Required(ATTR_DATE): cv.date})
         )
 
+    async def vacuum_rooms(call: ServiceCall) -> ServiceResponse:
+        runtime = _runtime(hass)
+        entity = call.data[ATTR_ENTITY_ID]
+        planner = next(
+            (
+                p
+                for p in runtime.planners.planners.values()
+                if p.kind == "vacuum" and p.tracker.entity_id == entity
+            ),
+            None,
+        )
+        if planner is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_vacuum",
+                translation_placeholders={"entity": entity},
+            )
+        started = planner.vacuum_rooms(
+            list(call.data["areas"]), call.data["skip_hours"], call.data["vacuum_only"]
+        )
+        return {"started": started}
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_VACUUM_ROOMS,
+        vacuum_rooms,
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+                vol.Required("areas"): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional("skip_hours", default=0): vol.Coerce(float),
+                vol.Optional("vacuum_only", default=True): cv.boolean,
+            }
+        ),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
     async def area_mowed(call: ServiceCall) -> None:
         runtime = _runtime(hass)
         area = call.data[ATTR_AREA].strip()
@@ -209,6 +254,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         store, engine, DisplayManager(hass, store), mowers, vacuums, planners
     )
     _remove_single_device(hass, entry)
+    await hass.async_add_executor_job(_install_blueprints, hass.config.path("blueprints"))
     engine.extra_rules = lambda: [*mowers.rules(), *vacuums.rules()]
     engine.extra_tasks = mowers.tasks
 
@@ -239,6 +285,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     # a mower added, changed or removed → set up again
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
+
+
+def _install_blueprints(target: str) -> None:
+    """Copy the blueprints that come with the integration (and keep them up to date)."""
+    source = Path(__file__).parent / "blueprints"
+    folder = Path(target) / "automation" / DOMAIN
+    for file in source.glob("*.yaml"):
+        dest = folder / file.name
+        content = file.read_text(encoding="utf-8")
+        if dest.exists() and dest.read_text(encoding="utf-8") == content:
+            continue
+        folder.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
 
 
 @callback

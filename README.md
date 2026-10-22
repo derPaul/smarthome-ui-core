@@ -189,6 +189,18 @@ Bereichen zuordnen“, sonst `vacuum.start`), Mäher über seine Bereichs-Schalt
 eine Aufgabe mit dem Namen der Fläche). Höchstens ein automatischer Start je Roboter und Tag. Fällig heißt: Mähplan
 (Mäher) bzw. Putz-Intervall des Raums (Sauger, wie im Dashboard).
 
+## Saugen, wenn alle weg sind
+
+Core bringt die Aktion **`smarthome_ui.vacuum_rooms`** mit: saugt die gewählten Bereiche jetzt – nur Räume auf der Etage
+des Saugers, auf Wunsch nur saugen (Wischen aus) und ohne Bereiche, die in den letzten *N* Stunden gesaugt wurden. Läuft
+der Sauger gerade oder hat er einen Fehler, passiert nichts. Antwort: `{"started": [...]}`.
+
+Dazu legt Core eine **Vorlage (Blueprint)** an: *Einstellungen → Automationen & Szenen → Blueprints →
+„Bereiche saugen, wenn alle weg sind“*. Eingaben: Saugroboter, Bereiche (z. B. Eingangsbereich), Wartezeit nach dem
+Gehen (Standard 5 min), Auslassen, wenn kürzlich gesaugt (4 h), Zeitfenster (7–21 Uhr). Ausgelöst wird, wenn
+`zone.home` auf 0 fällt – also wenn der Letzte das Haus verlässt. Im Dashboard lässt sich die Automation in der
+Saugroboter-Kachel anlegen, ein- und ausschalten.
+
 ## Bildschirme
 
 Jedes Gerät, auf dem das Dashboard offen ist (Wandtablet, Handy, Browser), erscheint automatisch als
