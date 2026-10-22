@@ -121,6 +121,7 @@ async def test_moves_dashboard_tasks(hass: HomeAssistant, hass_storage, freezer)
     areas = ar.async_get(hass)
     bad = areas.async_get_or_create("Bad")
     wc = areas.async_get_or_create("Gäste-WC")
+    wohn = areas.async_get_or_create("Wohnzimmer")
     cleaned_at = int(time.time() * 1000) - 30 * 86_400_000
     hass_storage["smarthome_ui_core"] = {
         "version": 1,
@@ -161,6 +162,20 @@ async def test_moves_dashboard_tasks(hass: HomeAssistant, hass_storage, freezer)
                     },
                     {
                         "scope": "hh",
+                        "id": "gitter",
+                        "name": "Filtergitter reinigen",
+                        "every": {"n": 2, "unit": "m"},
+                        "areas": [wohn.id],
+                    },
+                    {
+                        "scope": "hh",
+                        "id": "kf_wohn",
+                        "name": "Kohlefilter tauschen",
+                        "every": {"n": 12, "unit": "m"},
+                        "areas": [wohn.id],
+                    },
+                    {
+                        "scope": "hh",
                         "id": "fenster",
                         "name": "Fenster putzen",
                         "every": {"n": 2, "unit": "m"},
@@ -176,13 +191,26 @@ async def test_moves_dashboard_tasks(hass: HomeAssistant, hass_storage, freezer)
     await hass.async_block_till_done()
 
     parts = {s.title: dict(s.data) for s in entry.subentries.values() if s.subentry_type == "part"}
-    assert set(parts) == {"Kohlefilter Bad", "Kohlefilter Gäste-WC", "Rauchmelder"}
+    assert set(parts) == {
+        "Kohlefilter Bad",
+        "Kohlefilter Gäste-WC",
+        "Kohlefilter Wohnzimmer",
+        "Rauchmelder",
+    }
+    assert parts["Kohlefilter Wohnzimmer"]["clean_every"] == 2
+    assert parts["Kohlefilter Wohnzimmer"]["replace_every"] == 12
     assert parts["Kohlefilter Bad"]["clean_every"] == 3
     assert parts["Kohlefilter Bad"]["replace_every"] == 12
     assert parts["Kohlefilter Gäste-WC"]["replace_every"] == 0
     assert parts["Rauchmelder"]["clean_every"] == 12
     store = entry.runtime_data.store
-    assert sorted(store.data["parts_migrated"]) == ["kf_clean", "kf_swap", "rauch"]
+    assert sorted(store.data["parts_migrated"]) == [
+        "gitter",
+        "kf_clean",
+        "kf_swap",
+        "kf_wohn",
+        "rauch",
+    ]
     # only "Fenster putzen" stays a dashboard task
     assert [t["name"] for t in store.data["tasks"]] == ["Fenster putzen"]
     bad_part = next(
@@ -195,4 +223,4 @@ async def test_moves_dashboard_tasks(hass: HomeAssistant, hass_storage, freezer)
     store.set_task_defs(store.data["task_defs"]["tasks"], [])
     await hass.async_block_till_done()
     entry = hass.config_entries.async_get_entry(entry.entry_id)
-    assert len([s for s in entry.subentries.values() if s.subentry_type == "part"]) == 3
+    assert len([s for s in entry.subentries.values() if s.subentry_type == "part"]) == 4

@@ -78,7 +78,7 @@ KINDS: dict[str, dict[str, Any]] = {
     },
     "smoke_detector": {
         "label": "Rauchmelder",
-        "icon": "mdi:smoke-detector-outline",
+        "icon": "mdi:smoke-detector-variant",
         "clean": (12, "test"),
         "replace": (120, "replace"),
         "match": r"rauchmelder|rauchwarnmelder|smoke",
@@ -311,6 +311,17 @@ def async_migrate_tasks(hass: HomeAssistant, entry: ConfigEntry, store: CoreStor
             last = (record or {}).get("t") or legacy.get(f"{task['id']}|{area or ''}")
             if last:
                 group[f"last_{action}"] = int(last)
+    # "Filtergitter reinigen" and "Kohlefilter tauschen" in the same room: one filter
+    for (kind, area), group in list(groups.items()):
+        carbon = groups.get(("carbon_filter", area))
+        if (
+            kind == "air_filter"
+            and carbon is not None
+            and "clean_every" not in carbon
+            and "replace_every" not in group
+        ):
+            carbon.update(group)
+            del groups[(kind, area)]
     if not groups:
         if migrated:
             store.save()
