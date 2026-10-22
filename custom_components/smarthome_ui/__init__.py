@@ -51,6 +51,7 @@ from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
 from .notify import NotifyEngine
 from .planner import PlannerManager
+from .plants import PlantManager
 from .store import CoreStore
 from .tasks import find_task, task_states
 from .vacuum import VacuumManager
@@ -84,6 +85,7 @@ class CoreRuntime:
     watchers: Watchers
     appliances: ApplianceManager
     parts: PartManager
+    plants: PlantManager
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -100,12 +102,13 @@ class CoreRuntime:
             *self.watchers.tasks(),
             *self.appliances.tasks(),
             *self.parts.tasks(),
+            *self.plants.tasks(),
         ]
 
     @callback
     def complete(self, key: str, who: str | None = None, label: str = "") -> None:
         """Mark a task done (an area to mow counts as mowed by hand)."""
-        if not self.mowers.complete(key):
+        if not self.mowers.complete(key) and not self.plants.complete(key, who):
             self.store.mark_done(key, who=who, label=label)
 
 
@@ -258,6 +261,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_cleaning_settings,
         ws_task_defs,
         ws_waste_settings,
+        ws_plant_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -275,6 +279,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     watchers = Watchers(hass, store)
     appliances = ApplianceManager(hass, store)
     parts = PartManager(hass, store)
+    plants = PlantManager(hass, store, watchers)
     entry.runtime_data = CoreRuntime(
         store,
         engine,
@@ -286,6 +291,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         watchers,
         appliances,
         parts,
+        plants,
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -297,7 +303,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         *waste.rules(),
         *watchers.rules(),
     ]
-    engine.extra_tasks = lambda: [*mowers.tasks(), *watchers.notify_tasks(), *parts.tasks()]
+    engine.extra_tasks = lambda: [
+        *mowers.tasks(),
+        *watchers.notify_tasks(),
+        *parts.tasks(),
+        *plants.tasks(),
+    ]
 
     @callback
     def unusual(tracker: Any, area: str, result: dict[str, Any]) -> None:
@@ -342,6 +353,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     watchers.async_setup()
     appliances.async_setup(list(entry.subentries.values()))
     parts.async_setup(entry)
+    plants.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -417,6 +429,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.waste.async_stop()
     entry.runtime_data.watchers.async_stop()
     entry.runtime_data.appliances.async_stop()
+    entry.runtime_data.plants.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -447,7 +460,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "appliances": runtime.appliances.info(),
         "parts": runtime.parts.info(),
         "parts_migrated": list(store.data.get("parts_migrated") or []),
-        "features": ["task_defs", "waste", "watchers", "appliances", "parts"],
+        "plants": runtime.plants.info(),
+        "features": ["task_defs", "waste", "watchers", "appliances", "parts", "plants"],
         "own_tasks": store.own_tasks,
         "waste": {
             "configured": runtime.waste.configured,
@@ -495,6 +509,7 @@ def ws_subscribe(
                     "appliances": runtime.appliances.info(),
                     "parts": runtime.parts.info(),
                     "parts_migrated": list(runtime.store.data.get("parts_migrated") or []),
+                    "plants": runtime.plants.info(),
                 },
             )
         )
@@ -736,3 +751,27 @@ def ws_waste_settings(
             {k: msg[k] for k in ("calendars", "names", "remind") if k in msg}
         )
         connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/plants/settings",
+        vol.Required("entity"): str,
+        vol.Optional("feed"): vol.Any(
+            None,
+            {
+                vol.Required("every"): vol.All(vol.Coerce(int), vol.Range(min=0, max=52)),
+                vol.Optional("from"): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+                vol.Optional("to"): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+            },
+        ),
+    }
+)
+@callback
+def ws_plant_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Change the fertilizing calendar of a plant (every N weeks between two months)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.plants.set_settings(msg["entity"], msg.get("feed"))
+        connection.send_result(msg["id"], runtime.plants.info())

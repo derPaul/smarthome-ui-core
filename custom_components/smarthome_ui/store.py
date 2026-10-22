@@ -70,6 +70,10 @@ def _default() -> dict[str, Any]:
         "appliances": {},
         # dashboard maintenance tasks moved to maintenance parts (task ids)
         "parts_migrated": [],
+        # plants: {entity: {"watered": ms, "samples": [[ms, moisture]]}}, own settings, last rain
+        "plants": {},
+        "plant_settings": {},
+        "plant_rain": 0,
     }
 
 

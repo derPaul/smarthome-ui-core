@@ -90,7 +90,7 @@ Mitteilung (Quelle „Müllabfuhr“) – bis „rausgestellt“ (Knopf, To-do o
 **Wächter** (werden zu Aufgaben in den To-do-Listen; abhaken blendet sie aus, bis das Problem wieder auftritt):
 
 - **Batterien** unter 15 % (Handys ausgenommen) → „Batterie wechseln: Fenster Bad (9 %)“ (Quelle „Batterien“),
-- **Pflanzen** (`plant.*`) mit zu wenig Feuchte bzw. Dünger → „Monstera gießen“ / „… düngen“ (Quelle „Pflanzen“),
+- **Pflanzen** – siehe [Pflanzen](#pflanzen),
 - **Frost**: die stündliche Vorhersage geht in den nächsten 18 Stunden auf 1 °C oder darunter → „Pflanzen vor Frost
   schützen“ und am späten Nachmittag eine Mitteilung „Frost heute Nacht (−2 °C)“ (Quelle „Frostwarnung“).
 
@@ -171,6 +171,30 @@ gereinigte Fläche und die Verschleißteile.
 
 Das Dashboard nimmt die Saugroboter dann aus Core (bei mehreren mit Umschalter); die Kachel zeigt nur noch
 Sichtbarkeit und Namen der Entitäten.
+
+## Pflanzen
+
+Für jede Pflanze (`plant.*`, z. B. aus der Integration Plant Monitor) hängt Core eigene Entitäten an das Gerät der
+Pflanze:
+
+| Entität | |
+|---|---|
+| `sensor.<garden\|household>_<pflanze>_last_watered` | zuletzt gegossen (Attribut `by`: `auto` oder `hand`) |
+| `sensor.<garden\|household>_<pflanze>_next_watering` | wann die Erde den unteren Grenzwert erreicht (Attribute `drying_per_day`, `min_moisture`) |
+| `button.<garden\|household>_<pflanze>_watered` | „Gegossen“ |
+
+- **Gießen erkennen:** Steigt die Bodenfeuchte innerhalb einer Stunde um 10 Punkte, gilt die Pflanze als gegossen.
+  Ohne Sensor oder zusätzlich: Knopf „Gegossen“ oder die Aufgabe abhaken.
+- **Vorschau:** Aus dem Abtrocknen seit dem letzten Gießen (mindestens 12 Stunden Werte) schätzt Core, wann der untere
+  Grenzwert erreicht ist (Grenzwert von Plant Monitor, sonst 20 %). „<Pflanze> gießen“ steht dann an diesem Tag in der
+  To-do-Liste und kommt zur Aufgaben-Uhrzeit als Mitteilung – ebenso, wenn Plant Monitor „Feuchte niedrig“ meldet.
+- **Richtige Liste:** Pflanzen in einem Bereich wie Garten, Balkon oder Terrasse (und ohne Bereich) → Liste „Garten“,
+  Quelle „Pflanzen“; alle anderen → Liste „Haushalt“, Quelle „Zimmerpflanzen“.
+- **Regen:** Draußen entfällt das Gießen, wenn es in den letzten 12 Stunden geregnet hat (Wetter, Regensensor,
+  Niederschlagssensor) oder in den nächsten 6 Stunden Regen kommt (stündliche Vorhersage).
+- **Sensor ausgefallen:** Liefert der Feuchtesensor 24 Stunden nichts, kommt „Sensor <Pflanze> prüfen“.
+- **Düngen:** mit Dünger-Sensor wie bisher, wenn er „niedrig“ meldet. Ohne Sensor nach Kalender: alle *N* Wochen
+  zwischen zwei Monaten (im Dashboard an der Pflanzen-Kachel einstellbar, WebSocket `smarthome_ui/plants/settings`).
 
 ## Haushaltsgeräte
 
@@ -330,6 +354,7 @@ actions:
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
+| `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |
 | `smarthome_ui/display/update` | Zustand eines Bildschirms (Seite, Theme, Jahreszeit, Töne, Leistung, Ruhemodus, Benutzer) |

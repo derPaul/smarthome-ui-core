@@ -1,12 +1,10 @@
-"""Watchers: low batteries, plants that need water or fertilizer, frost – without a dashboard.
+"""Watchers: low batteries and frost – without a dashboard (plants: see plants.py).
 
 They become tasks (to-do list "Haushalt" or "Garten", due notification at the task hour, check off
 = done until the next time) and – for frost – a notification in the late afternoon before:
 
 * battery: ``sensor`` with device class battery below ``BATTERY_LOW`` % (or a battery
   ``binary_sensor`` that is on) → "Batterie wechseln: <device>" (source ``hh.battery``),
-* plant: ``plant.*`` with moisture / conductivity low → "<plant> gießen" / "… düngen"
-  (``gd.plants``),
 * frost: the hourly forecast of the first weather entity goes down to ``FROST_C`` °C within the
   next 18 hours → "Pflanzen vor Frost schützen" (``gd.frost``).
 
@@ -18,7 +16,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
-import re
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
@@ -37,7 +34,6 @@ BATTERY_LOW = 15
 FROST_C = 1.0
 FROST_HOURS = 18
 FROST_NOTIFY_HOUR = 17
-_PROBLEM = re.compile(r"(moisture|conductivity) (low|high)")
 
 
 def _ms(state: State) -> int:
@@ -49,13 +45,14 @@ def _day(state: State) -> str:
 
 
 class Watchers:
-    """Low batteries, plants and frost as tasks."""
+    """Low batteries and frost as tasks."""
 
     def __init__(self, hass: HomeAssistant, store: CoreStore) -> None:
         """Initialize the watchers."""
         self.hass = hass
         self.store = store
         self.frost: dict[str, Any] | None = None  # {"t": °C, "at": ms}
+        self.hourly: list[dict[str, Any]] = []  # hourly forecast (rain for the plants)
         self._unsub: list[CALLBACK_TYPE] = []
 
     @callback
@@ -107,24 +104,6 @@ class Watchers:
                 out.append((state.entity_id, state))
         return out
 
-    # ---------------------------------------------------------------- plants
-
-    def plant_needs(self) -> list[tuple[str, State, str]]:
-        """Return (entity, state, "water"|"feed") for plants that need something."""
-        out = []
-        for state in self.hass.states.async_all("plant"):
-            attrs = state.attributes
-            needs = set()
-            if str(attrs.get("moisture_status", "")).lower() == "low":
-                needs.add("water")
-            if str(attrs.get("conductivity_status", "")).lower() == "low":
-                needs.add("feed")
-            for kind, level in _PROBLEM.findall(str(attrs.get("problem", "")).lower()):
-                if level == "low":
-                    needs.add("water" if kind == "moisture" else "feed")
-            out.extend((state.entity_id, state, need) for need in sorted(needs))
-        return out
-
     # ---------------------------------------------------------------- frost
 
     async def _async_forecast(self, _now: Any = None) -> None:
@@ -145,7 +124,8 @@ class Watchers:
             return
         now = dt_util.utcnow()
         coldest = None
-        for item in (response or {}).get(weather.entity_id, {}).get("forecast", []):
+        self.hourly = list((response or {}).get(weather.entity_id, {}).get("forecast", []))
+        for item in self.hourly:
             when = dt_util.parse_datetime(str(item.get("datetime", "")))
             temp = item.get("temperature")
             if (
@@ -185,20 +165,6 @@ class Watchers:
                     "src": "hh.battery",
                     "area": None,
                     "icon": "mdi:battery-alert-variant-outline",
-                    "interval": None,
-                    "last": None,
-                    "due": _ms(state),
-                }
-            )
-        for entity_id, state, need in self.plant_needs():
-            name = state.attributes.get("friendly_name") or entity_id
-            out.append(
-                {
-                    "key": f"plant:{entity_id}|{need}|{_day(state)}",
-                    "name": f"{name} {'gießen' if need == 'water' else 'düngen'}",
-                    "src": "gd.plants",
-                    "area": None,
-                    "icon": "mdi:watering-can-outline" if need == "water" else "mdi:sprout-outline",
                     "interval": None,
                     "last": None,
                     "due": _ms(state),

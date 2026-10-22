@@ -25,6 +25,12 @@
       },
       "appliance_last_run": {
         "default": "mdi:history"
+      },
+      "plant_last_watered": {
+        "default": "mdi:watering-can-outline"
+      },
+      "plant_next_watering": {
+        "default": "mdi:calendar-clock"
       }
     },
     "switch": {
@@ -105,6 +111,9 @@
       },
       "part_done_replace": {
         "default": "mdi:swap-horizontal"
+      },
+      "plant_watered": {
+        "default": "mdi:watering-can"
       }
     },
     "select": {

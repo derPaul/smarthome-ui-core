@@ -15,6 +15,7 @@ from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, CoreEntity
 from .maintenance import Part, PartEntity, async_setup_part_entities
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
+from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
 
 
 async def async_setup_entry(
@@ -40,6 +41,14 @@ async def async_setup_entry(
             entry.runtime_data.planners,
             async_add_entities,
             lambda p: [PlannerSkip(entry.entry_id, p)],
+        )
+    )
+    entry.async_on_unload(
+        async_setup_plant_entities(
+            hass,
+            entry.runtime_data.plants,
+            async_add_entities,
+            lambda p: [PlantWatered(entry.entry_id, p)],
         )
     )
     async_setup_part_entities(
@@ -131,3 +140,20 @@ class PartDone(PartEntity, ButtonEntity):
             else None
         )
         self._part.mark(self._action, user.name if user else None)
+
+
+class PlantWatered(PlantEntity, ButtonEntity):
+    """The plant has been watered."""
+
+    def __init__(self, entry_id: str, plant: PlantTracker) -> None:
+        """Initialize (button.<garden|household>_<plant>_watered)."""
+        super().__init__(entry_id, plant, "watered", "button")
+
+    async def async_press(self) -> None:
+        """Mark as watered now."""
+        user = (
+            await self.hass.auth.async_get_user(self._context.user_id)
+            if self._context and self._context.user_id
+            else None
+        )
+        self._plant.mark_watered(user.name if user else None)

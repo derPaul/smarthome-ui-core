@@ -249,6 +249,12 @@
       },
       "part_due_replace": {
         "name": "Replacement due"
+      },
+      "plant_last_watered": {
+        "name": "Last watered"
+      },
+      "plant_next_watering": {
+        "name": "Next watering"
       }
     },
     "binary_sensor": {
@@ -283,6 +289,9 @@
       },
       "part_done_replace": {
         "name": "Replaced"
+      },
+      "plant_watered": {
+        "name": "Watered"
       }
     },
     "select": {

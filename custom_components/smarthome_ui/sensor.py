@@ -21,6 +21,7 @@ from .entity import DEVICE_HOUSEHOLD, DEVICE_NOTIFY, CoreEntity, device_for_sour
 from .maintenance import Part, PartEntity, async_setup_part_entities, days_left
 from .mower import MowerTracker
 from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
+from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
 from .store import CoreStore
 from .tasks import TaskState, task_states
 from .vacuum import VacuumTracker
@@ -114,6 +115,14 @@ async def async_setup_entry(
             ApplianceStatus(entry.entry_id, t),
             *([ApplianceLastRun(entry.entry_id, t)] if t.kind != "fridge" else []),
         ],
+    )
+    entry.async_on_unload(
+        async_setup_plant_entities(
+            hass,
+            entry.runtime_data.plants,
+            async_add_entities,
+            lambda p: [PlantLastWatered(entry.entry_id, p), PlantNextWatering(entry.entry_id, p)],
+        )
     )
     async_setup_part_entities(
         entry.runtime_data.parts,
@@ -587,3 +596,50 @@ class PartDue(PartEntity, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_TASKS, self.async_write_ha_state)
         )
+
+
+class PlantLastWatered(PlantEntity, SensorEntity):
+    """When the plant was last watered (noticed by the moisture or pressed by hand)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, plant: PlantTracker) -> None:
+        """Initialize (sensor.<garden|household>_<plant>_last_watered)."""
+        super().__init__(entry_id, plant, "last_watered", "sensor")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when it was last watered."""
+        last, _by = self._plant.last_watered()
+        return dt_util.utc_from_timestamp(last / 1000) if last else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return how it was noticed."""
+        return {"by": self._plant.last_watered()[1]}
+
+
+class PlantNextWatering(PlantEntity, SensorEntity):
+    """When the soil will reach the lower moisture limit (from how fast it dries)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, plant: PlantTracker) -> None:
+        """Initialize (sensor.<garden|household>_<plant>_next_watering)."""
+        super().__init__(entry_id, plant, "next_watering", "sensor")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return when it needs water next."""
+        nxt = self._plant.next_watering()
+        return dt_util.utc_from_timestamp(nxt / 1000) if nxt else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return drying per day, the lower limit and whether it is outdoor."""
+        rate = self._plant.drying_rate()
+        return {
+            "drying_per_day": round(-rate, 1) if rate is not None else None,
+            "min_moisture": self._plant.min_moisture(),
+            "outdoor": self._plant.outdoor,
+        }

@@ -249,6 +249,12 @@
       },
       "part_due_replace": {
         "name": "Tauschen fällig"
+      },
+      "plant_last_watered": {
+        "name": "Zuletzt gegossen"
+      },
+      "plant_next_watering": {
+        "name": "Nächstes Gießen"
       }
     },
     "binary_sensor": {
@@ -283,6 +289,9 @@
       },
       "part_done_replace": {
         "name": "Getauscht"
+      },
+      "plant_watered": {
+        "name": "Gegossen"
       }
     },
     "select": {
