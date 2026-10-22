@@ -1,4 +1,4 @@
-"""Config flow for Smarthome UI Core; robot mowers and vacuums are added as subentries."""
+"""Config flow for Smarthome UI Core; robots and household appliances are added as subentries."""
 
 from __future__ import annotations
 
@@ -25,10 +25,20 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TimeSelector,
 )
 
+from .appliance import (
+    CONF_KIND,
+    DEFAULTS as APPLIANCE_DEFAULTS,
+    KIND_OPTIONS,
+    SUBENTRY_APPLIANCE,
+    detect_kind,
+)
 from .const import DOMAIN
 from .mower import CONF_DEVICE, SUBENTRY_MOWER
 from .planner import DEFAULTS, KIND_MOWER, KIND_VACUUM
@@ -51,8 +61,12 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_supported_subentry_types(
         cls, config_entry: ConfigEntry
     ) -> dict[str, type[ConfigSubentryFlow]]:
-        """Return the subentries: robot mowers and robot vacuums."""
-        return {SUBENTRY_MOWER: MowerSubentryFlow, SUBENTRY_VACUUM: VacuumSubentryFlow}
+        """Return the subentries: robot mowers, robot vacuums and household appliances."""
+        return {
+            SUBENTRY_MOWER: MowerSubentryFlow,
+            SUBENTRY_VACUUM: VacuumSubentryFlow,
+            SUBENTRY_APPLIANCE: ApplianceSubentryFlow,
+        }
 
 
 class MowerSubentryFlow(ConfigSubentryFlow):
@@ -166,3 +180,116 @@ class VacuumSubentryFlow(MowerSubentryFlow):
     _type = SUBENTRY_VACUUM
     _default = "Saugroboter"
     _kind = KIND_VACUUM
+
+
+class ApplianceSubentryFlow(MowerSubentryFlow):
+    """Add or change a household appliance (dishwasher, washer, dryer, fridge …)."""
+
+    _type = SUBENTRY_APPLIANCE
+    _default = "Haushaltsgerät"
+
+    def _schema(self, device: str | None = None, name: str | None = None) -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Required(CONF_DEVICE, default=device or vol.UNDEFINED): DeviceSelector(),
+                vol.Optional("name", description={"suggested_value": name}): TextSelector(),
+            }
+        )
+
+    def _kind_field(self, current: str) -> dict[Any, Any]:
+        return {
+            vol.Required(CONF_KIND, default=current): SelectSelector(
+                SelectSelectorConfig(
+                    options=KIND_OPTIONS,
+                    translation_key="appliance_kind",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
+        }
+
+    def _resolved_kind(self, data: dict[str, Any]) -> str:
+        kind = data.get(CONF_KIND) or "auto"
+        if kind != "auto":
+            return kind
+        device = dr.async_get(self.hass).async_get(data.get(CONF_DEVICE) or "")
+        if device is None:
+            return "other"
+        return detect_kind(f"{device.name_by_user or ''} {device.name or ''} {device.model or ''}")
+
+    def _options_schema(self, kind: str, current: dict[str, Any]) -> dict[Any, Any]:
+        cur = {
+            **APPLIANCE_DEFAULTS,
+            **{k: v for k, v in current.items() if v is not None},
+        }
+
+        def number(key: str, low: float, high: float, unit: str, step: float = 1) -> tuple:
+            return (
+                vol.Optional(key, default=cur[key]),
+                NumberSelector(
+                    NumberSelectorConfig(
+                        min=low,
+                        max=high,
+                        step=step,
+                        unit_of_measurement=unit,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+            )
+
+        fields: dict[Any, Any] = {}
+        if kind == "fridge":
+            for key, low, high, unit in (
+                ("door_minutes", 1, 60, "min"),
+                ("max_temp", 2, 15, "°C"),
+                ("freezer_max_temp", -30, 0, "°C"),
+            ):
+                field, selector = number(key, low, high, unit)
+                fields[field] = selector
+            return fields
+        field, selector = number("reminder", 0, 600, "min")
+        fields[field] = selector
+        fields[
+            vol.Optional("solar_entity", description={"suggested_value": cur.get("solar_entity")})
+        ] = EntitySelector(EntitySelectorConfig(domain="sensor", device_class="power"))
+        field, selector = number("solar_min", 0, 20000, "W", 50)
+        fields[field] = selector
+        return fields
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Add an appliance."""
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE]):
+                return self.async_abort(reason="already_configured")
+            return self.async_create_entry(
+                title=self._title(user_input),
+                data={
+                    CONF_DEVICE: user_input[CONF_DEVICE],
+                    CONF_KIND: user_input.get(CONF_KIND) or "auto",
+                },
+            )
+        return self.async_show_form(
+            step_id="user", data_schema=self._schema().extend(self._kind_field("auto"))
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change device, name, kind and the settings of the kind."""
+        subentry = self._get_reconfigure_subentry()
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE], subentry.subentry_id):
+                return self.async_abort(reason="already_configured")
+            data = {k: v for k, v in user_input.items() if k != "name"}
+            for key in ("reminder", "solar_min", "door_minutes"):
+                if data.get(key) is not None:
+                    data[key] = int(data[key])
+            return self.async_update_and_abort(
+                self._get_entry(), subentry, title=self._title(user_input), data=data
+            )
+        current = dict(subentry.data)
+        schema = (
+            self._schema(current.get(CONF_DEVICE), subentry.title)
+            .extend(self._kind_field(current.get(CONF_KIND) or "auto"))
+            .extend(self._options_schema(self._resolved_kind(current), current))
+        )
+        return self.async_show_form(step_id="reconfigure", data_schema=schema)

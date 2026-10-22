@@ -86,6 +86,43 @@
         "already_configured": "This robot vacuum is already added.",
         "reconfigure_successful": "Robot vacuum changed."
       }
+    },
+    "appliance": {
+      "entry_type": "Household appliance",
+      "initiate_flow": {
+        "user": "Add household appliance",
+        "reconfigure": "Change household appliance"
+      },
+      "step": {
+        "user": {
+          "title": "Add household appliance",
+          "description": "Pick the device of a dishwasher, washing machine, dryer or fridge. Smarthome UI Core follows its runs and notifies when it is finished, has an error or still needs unloading (fridge: door open, too warm, alarm) – even without an open dashboard.",
+          "data": {
+            "device_id": "Appliance",
+            "name": "Name (optional)",
+            "kind": "Kind"
+          }
+        },
+        "reconfigure": {
+          "title": "Change household appliance",
+          "description": "The solar hint comes while the appliance waits for its delayed start and there is enough solar power.",
+          "data": {
+            "device_id": "Appliance",
+            "name": "Name (optional)",
+            "kind": "Kind",
+            "reminder": "Remind to unload after (0 = never)",
+            "solar_entity": "Sensor PV power or surplus",
+            "solar_min": "Solar hint from",
+            "door_minutes": "Door open warning after",
+            "max_temp": "Fridge too warm from",
+            "freezer_max_temp": "Freezer too warm above"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "This appliance is already added.",
+        "reconfigure_successful": "Appliance changed."
+      }
     }
   },
   "device": {
@@ -141,11 +178,32 @@
       },
       "waste_kind": {
         "name": "Collection {kind}"
+      },
+      "appliance_status": {
+        "name": "Status",
+        "state": {
+          "off": "Off",
+          "idle": "Ready",
+          "waiting": "Waiting to start",
+          "running": "Running",
+          "finished": "Finished",
+          "error": "Error",
+          "ok": "OK",
+          "door_open": "Door open",
+          "warm": "Too warm",
+          "alarm": "Alarm"
+        }
+      },
+      "appliance_last_run": {
+        "name": "Last run"
       }
     },
     "binary_sensor": {
       "display_online": {
         "name": "Connected"
+      },
+      "appliance_to_unload": {
+        "name": "To unload"
       }
     },
     "button": {
@@ -157,6 +215,9 @@
       },
       "waste_put_out": {
         "name": "Waste put out"
+      },
+      "appliance_unloaded": {
+        "name": "Unloaded"
       }
     },
     "select": {
@@ -338,6 +399,18 @@
     },
     "unknown_vacuum": {
       "message": "The robot vacuum {entity} is not added in Smarthome UI Core."
+    }
+  },
+  "selector": {
+    "appliance_kind": {
+      "options": {
+        "auto": "Detect from name",
+        "dishwasher": "Dishwasher",
+        "washer": "Washing machine",
+        "dryer": "Dryer",
+        "fridge": "Fridge / freezer",
+        "other": "Other appliance"
+      }
     }
   }
 }

@@ -172,6 +172,29 @@ gereinigte Fläche und die Verschleißteile.
 Das Dashboard nimmt die Saugroboter dann aus Core (bei mehreren mit Umschalter); die Kachel zeigt nur noch
 Sichtbarkeit und Namen der Entitäten.
 
+## Haushaltsgeräte
+
+**„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder
+Kühlschranks wählen (Home Connect, Miele, LG ThinQ, Electrolux …). Die Art erkennt Core am Namen, sie lässt sich aber
+auch selbst wählen. Am Gerät findet Core Betriebszustand, Restzeit, Fortschritt, Programm, Startvorwahl, Tür und
+Energiezähler – beim Kühlschrank Temperaturen (Kühl- und Gefrierteil), Türen und Alarm.
+
+- **Läufe:** Start, Ende, Dauer, Programm und Verbrauch (kWh) des letzten Laufs; ab 5 Minuten zählt ein Lauf.
+  Die übliche Dauer je Programm merkt sich Core – weicht ein Lauf stark ab, kommt eine Mitteilung.
+- **Ausräumen** (Spüler, Waschmaschine, Trockner): Nach dem Lauf steht „Ausräumen“ an – mit Aufgabe
+  „<Gerät> ausräumen“ in der Haushalts-Liste. Erledigt per Knopf „Ausgeräumt“, Abhaken (Liste oder Dashboard),
+  Öffnen der Tür oder einem neuen Lauf.
+- **Entitäten am Gerät:** `sensor.household_<gerät>_status` (Aus, Bereit, Wartet auf Start, Läuft, Fertig, Störung;
+  Kühlschrank: OK, Tür offen, Zu warm, Alarm – Attribute Restzeit, Programm, Start, Temperaturen),
+  `sensor.household_<gerät>_last_run`, `binary_sensor.household_<gerät>_to_unload`, `button.household_<gerät>_unloaded`.
+- **Mitteilungen** (Quellen „Geschirrspüler“, „Waschmaschine & Trockner“, „Kühlschrank“, „Weitere Geräte“ mit Push an):
+  fertig, Störung, Erinnerung ans Ausräumen (Standard nach 30 Minuten, 0 = nie), Sonnenstrom übrig, während das Gerät
+  per Startvorwahl wartet (Sensor mit PV-Leistung oder Überschuss und Mindestwert, Standard 1500 W). Kühlschrank: Tür
+  länger offen (Standard 3 Minuten), Kühlteil ab 8 °C bzw. Gefrierteil über −15 °C für 15 Minuten, Alarm.
+  Einstellbar unter *Smarthome UI Core → Haushaltsgerät → Zahnrad (ändern)*.
+
+Das Dashboard nimmt Geschirrspüler und Kühlschrank dann aus Core; „Ausgeräumt“ gilt überall gleich.
+
 ## Automatisch mähen und saugen (Roboter-Planer)
 
 Je Mäh- und Saugroboter gibt es einen Planer, der den Roboter **von selbst startet, wenn Flächen bzw. Räume fällig
@@ -272,7 +295,7 @@ actions:
 
 | Befehl | |
 |---|---|
-| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mäh- und Saugroboter, Putz-Intervalle, Status |
+| `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mäh- und Saugroboter, Haushaltsgeräte, Putz-Intervalle, Status |
 | `smarthome_ui/subscribe` | Ereignis bei jeder Datenänderung |
 | `smarthome_ui/import` | einmalige Datenübernahme aus dem Dashboard |
 | `smarthome_ui/done` | Abhaken / wieder öffnen / Rückgängig (`changes`, `log`, `unlog`) |

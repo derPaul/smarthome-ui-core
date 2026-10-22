@@ -1,4 +1,4 @@
-"""Binary sensors: is the dashboard open on a display."""
+"""Binary sensors: is the dashboard open on a display; is an appliance waiting to be emptied."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import CoreConfigEntry
+from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .displays import DisplayEntity, async_setup_display_entities
 
 
@@ -29,6 +30,11 @@ async def async_setup_entry(
             lambda did: [DisplayOnline(entry.entry_id, manager, did, "online", "binary_sensor")],
         )
     )
+    async_setup_appliance_entities(
+        entry.runtime_data.appliances,
+        async_add_entities,
+        lambda t: [ApplianceToUnload(entry.entry_id, t)] if t.unloads else [],
+    )
 
 
 class DisplayOnline(DisplayEntity, BinarySensorEntity):
@@ -46,3 +52,26 @@ class DisplayOnline(DisplayEntity, BinarySensorEntity):
         """Return when the display was last seen."""
         seen = self._record.get("last_seen")
         return {"last_seen": dt_util.utc_from_timestamp(seen / 1000).isoformat() if seen else None}
+
+
+class ApplianceToUnload(ApplianceEntity, BinarySensorEntity):
+    """The run is over and the appliance waits to be emptied."""
+
+    def __init__(self, entry_id: str, tracker: ApplianceTracker) -> None:
+        """Initialize (binary_sensor.household_<appliance>_to_unload)."""
+        super().__init__(entry_id, tracker, "to_unload", "binary_sensor")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while it waits to be emptied."""
+        return self._tracker.to_unload()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return since when."""
+        finished = self._tracker.info()["finished"]
+        return {
+            "since": dt_util.utc_from_timestamp(finished / 1000).isoformat()
+            if finished and self.is_on
+            else None
+        }

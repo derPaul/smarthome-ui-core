@@ -86,6 +86,43 @@
         "already_configured": "Dieser Saugroboter ist schon hinzugefügt.",
         "reconfigure_successful": "Saugroboter geändert."
       }
+    },
+    "appliance": {
+      "entry_type": "Haushaltsgerät",
+      "initiate_flow": {
+        "user": "Haushaltsgerät hinzufügen",
+        "reconfigure": "Haushaltsgerät ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Haushaltsgerät hinzufügen",
+          "description": "Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder Kühlschranks wählen. Smarthome UI Core verfolgt die Läufe und meldet, wenn es fertig ist, eine Störung hat oder noch ausgeräumt werden muss (Kühlschrank: Tür offen, zu warm, Alarm) – auch ohne offenes Dashboard.",
+          "data": {
+            "device_id": "Gerät",
+            "name": "Name (optional)",
+            "kind": "Art"
+          }
+        },
+        "reconfigure": {
+          "title": "Haushaltsgerät ändern",
+          "description": "Der Sonnenstrom-Hinweis kommt, während das Gerät per Startvorwahl wartet und genug Sonnenstrom da ist.",
+          "data": {
+            "device_id": "Gerät",
+            "name": "Name (optional)",
+            "kind": "Art",
+            "reminder": "An Ausräumen erinnern nach (0 = nie)",
+            "solar_entity": "Sensor PV-Leistung oder Überschuss",
+            "solar_min": "Sonnenstrom-Hinweis ab",
+            "door_minutes": "Tür-offen-Warnung nach",
+            "max_temp": "Kühlteil zu warm ab",
+            "freezer_max_temp": "Gefrierteil zu warm über"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "Dieses Gerät ist schon hinzugefügt.",
+        "reconfigure_successful": "Haushaltsgerät geändert."
+      }
     }
   },
   "device": {
@@ -141,11 +178,32 @@
       },
       "waste_kind": {
         "name": "Abfuhr {kind}"
+      },
+      "appliance_status": {
+        "name": "Status",
+        "state": {
+          "off": "Aus",
+          "idle": "Bereit",
+          "waiting": "Wartet auf Start",
+          "running": "Läuft",
+          "finished": "Fertig",
+          "error": "Störung",
+          "ok": "OK",
+          "door_open": "Tür offen",
+          "warm": "Zu warm",
+          "alarm": "Alarm"
+        }
+      },
+      "appliance_last_run": {
+        "name": "Letzter Lauf"
       }
     },
     "binary_sensor": {
       "display_online": {
         "name": "Verbunden"
+      },
+      "appliance_to_unload": {
+        "name": "Ausräumen"
       }
     },
     "button": {
@@ -157,6 +215,9 @@
       },
       "waste_put_out": {
         "name": "Müll rausgestellt"
+      },
+      "appliance_unloaded": {
+        "name": "Ausgeräumt"
       }
     },
     "select": {
@@ -338,6 +399,18 @@
     },
     "unknown_vacuum": {
       "message": "Der Saugroboter {entity} ist nicht in Smarthome UI Core hinzugefügt."
+    }
+  },
+  "selector": {
+    "appliance_kind": {
+      "options": {
+        "auto": "Am Namen erkennen",
+        "dishwasher": "Geschirrspüler",
+        "washer": "Waschmaschine",
+        "dryer": "Trockner",
+        "fridge": "Kühl-/Gefrierschrank",
+        "other": "Anderes Gerät"
+      }
     }
   }
 }

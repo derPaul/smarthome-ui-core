@@ -9,6 +9,22 @@
       },
       "planner": {
         "default": "mdi:calendar-clock"
+      },
+      "appliance_status": {
+        "default": "mdi:information-outline",
+        "state": {
+          "running": "mdi:play-circle-outline",
+          "waiting": "mdi:clock-start",
+          "finished": "mdi:check-circle-outline",
+          "error": "mdi:alert-circle-outline",
+          "door_open": "mdi:door-open",
+          "warm": "mdi:thermometer-alert",
+          "alarm": "mdi:alarm-light-outline",
+          "off": "mdi:power-off"
+        }
+      },
+      "appliance_last_run": {
+        "default": "mdi:history"
       }
     },
     "switch": {
@@ -57,6 +73,12 @@
     "binary_sensor": {
       "display_online": {
         "default": "mdi:tablet-dashboard"
+      },
+      "appliance_to_unload": {
+        "default": "mdi:tray-full",
+        "state": {
+          "off": "mdi:tray"
+        }
       }
     },
     "button": {
@@ -68,6 +90,9 @@
       },
       "waste_put_out": {
         "default": "mdi:trash-can-outline"
+      },
+      "appliance_unloaded": {
+        "default": "mdi:tray-arrow-up"
       }
     },
     "select": {

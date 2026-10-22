@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry, durations
+from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM, SIGNAL_WASTE
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, DEVICE_NOTIFY, CoreEntity, device_for_source
@@ -104,6 +105,14 @@ async def async_setup_entry(
             async_add_entities,
             lambda p: [PlannerStatus(entry.entry_id, p)],
         )
+    )
+    async_setup_appliance_entities(
+        entry.runtime_data.appliances,
+        async_add_entities,
+        lambda t: [
+            ApplianceStatus(entry.entry_id, t),
+            *([ApplianceLastRun(entry.entry_id, t)] if t.kind != "fridge" else []),
+        ],
     )
     known: dict[str, TaskSensor] = {}
 
@@ -483,3 +492,54 @@ class WasteKindSensor(CoreEntity, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_WASTE, self.async_write_ha_state)
         )
+
+
+class ApplianceStatus(ApplianceEntity, SensorEntity):
+    """What the appliance is doing (running, finished, to unload …; fridge: ok, too warm …)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = STATES
+
+    def __init__(self, entry_id: str, tracker: ApplianceTracker) -> None:
+        """Initialize (sensor.household_<appliance>_status)."""
+        super().__init__(entry_id, tracker, "status", "sensor")
+
+    @property
+    def native_value(self) -> str:
+        """Return the state."""
+        return self._tracker.status.get("state", "off")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return remaining time, program, start, door (fridge: temperatures)."""
+        status = {k: v for k, v in self._tracker.status.items() if k != "state"}
+        if start := status.get("start_at"):
+            status["start_at"] = dt_util.utc_from_timestamp(start / 1000).isoformat()
+        return {"kind": self._tracker.kind, **status}
+
+
+class ApplianceLastRun(ApplianceEntity, SensorEntity):
+    """When the last run ended (minutes, program, kWh, usual minutes)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, tracker: ApplianceTracker) -> None:
+        """Initialize (sensor.household_<appliance>_last_run)."""
+        super().__init__(entry_id, tracker, "last_run", "sensor")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the end of the last run."""
+        end = self._tracker.last_run().get("end")
+        return dt_util.utc_from_timestamp(end / 1000) if end else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the details of the last run."""
+        last = self._tracker.last_run()
+        return {
+            "minutes": last.get("minutes"),
+            "program": last.get("program"),
+            "kwh": last.get("kwh"),
+            "usual_minutes": self._tracker.usual(),
+        }

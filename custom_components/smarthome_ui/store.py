@@ -66,6 +66,8 @@ def _default() -> dict[str, Any]:
         },
         # household: own cleaning interval per area (days, 0 = not tracked)
         "cleaning": {"intervals": {}, "configured": False},
+        # household appliances: {appliance_id: {"run": {..}, "last": {..}, "finished": ms, ...}}
+        "appliances": {},
     }
 
 

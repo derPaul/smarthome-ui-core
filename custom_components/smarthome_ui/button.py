@@ -1,4 +1,4 @@
-"""Buttons: reload a display; skip the robot planner today; waste put out."""
+"""Buttons: reload a display; skip the robot planner today; waste put out; appliance emptied."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
+from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, CoreEntity
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
@@ -39,6 +40,11 @@ async def async_setup_entry(
             async_add_entities,
             lambda p: [PlannerSkip(entry.entry_id, p)],
         )
+    )
+    async_setup_appliance_entities(
+        entry.runtime_data.appliances,
+        async_add_entities,
+        lambda t: [ApplianceUnloaded(entry.entry_id, t)] if t.unloads else [],
     )
 
 
@@ -82,3 +88,20 @@ class WastePutOut(CoreEntity, ButtonEntity):
         entry = waste.current() or (waste.days[0] if waste.days else None)
         if entry is not None:
             self._runtime.store.mark_done(waste.key(entry["date"]), label="Müll rausgestellt")
+
+
+class ApplianceUnloaded(ApplianceEntity, ButtonEntity):
+    """The appliance has been emptied."""
+
+    def __init__(self, entry_id: str, tracker: ApplianceTracker) -> None:
+        """Initialize (button.household_<appliance>_unloaded)."""
+        super().__init__(entry_id, tracker, "unloaded", "button")
+
+    async def async_press(self) -> None:
+        """Mark as emptied."""
+        user = (
+            await self.hass.auth.async_get_user(self._context.user_id)
+            if self._context and self._context.user_id
+            else None
+        )
+        self._tracker.unloaded(user.name if user else None)

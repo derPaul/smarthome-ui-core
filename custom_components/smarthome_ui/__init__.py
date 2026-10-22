@@ -27,6 +27,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from . import durations
+from .appliance import ApplianceManager
 from .const import (
     ATTR_AREA,
     ATTR_DATE,
@@ -78,6 +79,7 @@ class CoreRuntime:
     planners: PlannerManager
     waste: WasteManager
     watchers: Watchers
+    appliances: ApplianceManager
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -92,6 +94,7 @@ class CoreRuntime:
             *self.mowers.tasks(),
             *self.waste.tasks(),
             *self.watchers.tasks(),
+            *self.appliances.tasks(),
         ]
 
     @callback
@@ -265,8 +268,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     planners = PlannerManager(hass, store, engine)
     waste = WasteManager(hass, store)
     watchers = Watchers(hass, store)
+    appliances = ApplianceManager(hass, store)
     entry.runtime_data = CoreRuntime(
-        store, engine, DisplayManager(hass, store), mowers, vacuums, planners, waste, watchers
+        store,
+        engine,
+        DisplayManager(hass, store),
+        mowers,
+        vacuums,
+        planners,
+        waste,
+        watchers,
+        appliances,
     )
     _remove_single_device(hass, entry)
     await hass.async_add_executor_job(_install_blueprints, hass.config.path("blueprints"))
@@ -296,12 +308,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         )
 
     mowers.on_unusual = unusual
+
+    @callback
+    def appliance_notify(tracker: Any, key: str, message: str) -> None:
+        """Finished, error, reminder, solar power, fridge warnings (if push is on)."""
+        cfg = (store.data["notify"].get("sources") or {}).get(tracker.source) or {}
+        if not cfg.get("push"):
+            return
+        engine.send(
+            tracker.label,
+            message,
+            src=tracker.source,
+            url=cfg.get("url") or "/",
+            urgent=bool(cfg.get("urgent")) or key == "alarm",
+            tag=f"appliance|{tracker.id}|{key.split('|')[0]}",
+        )
+
+    appliances.on_notify = appliance_notify
     vacuums.on_unusual = unusual
     mowers.async_setup(list(entry.subentries.values()))
     vacuums.async_setup(list(entry.subentries.values()))
     planners.async_setup(list(entry.subentries.values()), mowers.trackers, vacuums.trackers)
     waste.async_setup()
     watchers.async_setup()
+    appliances.async_setup(list(entry.subentries.values()))
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     @callback
@@ -370,6 +400,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.planners.async_stop()
     entry.runtime_data.waste.async_stop()
     entry.runtime_data.watchers.async_stop()
+    entry.runtime_data.appliances.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -397,7 +428,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "mowers": runtime.robots()[0],
         "vacuums": runtime.robots()[1],
         "cleaning": store.data["cleaning"],
-        "features": ["task_defs", "waste", "watchers"],
+        "appliances": runtime.appliances.info(),
+        "features": ["task_defs", "waste", "watchers", "appliances"],
         "own_tasks": store.own_tasks,
         "waste": {
             "configured": runtime.waste.configured,
@@ -442,6 +474,7 @@ def ws_subscribe(
                     "mowers": runtime.robots()[0],
                     "vacuums": runtime.robots()[1],
                     "cleaning": runtime.store.data["cleaning"],
+                    "appliances": runtime.appliances.info(),
                 },
             )
         )
