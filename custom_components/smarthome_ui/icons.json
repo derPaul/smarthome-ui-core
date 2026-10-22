@@ -37,6 +37,9 @@
       },
       "security_last_night": {
         "default": "mdi:weather-night"
+      },
+      "security_persons_home": {
+        "default": "mdi:home-account"
       }
     },
     "switch": {
@@ -105,6 +108,18 @@
         "default": "mdi:tray-full",
         "state": {
           "off": "mdi:tray"
+        }
+      },
+      "security_all_asleep": {
+        "default": "mdi:sleep",
+        "state": {
+          "off": "mdi:sleep-off"
+        }
+      },
+      "security_asleep": {
+        "default": "mdi:sleep",
+        "state": {
+          "off": "mdi:account"
         }
       }
     },

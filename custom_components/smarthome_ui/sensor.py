@@ -53,7 +53,11 @@ async def async_setup_entry(
     async_add_entities([LastNotificationSensor(entry.entry_id, store)])
     security = entry.runtime_data.security
     async_add_entities(
-        [SecurityOpen(entry.entry_id, security), SecurityLastNight(entry.entry_id, security)]
+        [
+            SecurityOpen(entry.entry_id, security),
+            SecurityLastNight(entry.entry_id, security),
+            SecurityPersonsHome(entry.entry_id, security),
+        ]
     )
     manager = entry.runtime_data.displays
     entry.async_on_unload(
@@ -731,4 +735,26 @@ class SecurityLastNight(SecurityEntity, SensorEntity):
                 {"time": iso(e["t"]), "kind": e["cat"], "name": e["name"]}
                 for e in night["events"][-20:]
             ],
+        }
+
+
+class SecurityPersonsHome(SecurityEntity, SensorEntity):
+    """How many persons are home (names and who sleeps as attributes)."""
+
+    def __init__(self, entry_id: str, security: Any) -> None:
+        """Initialize (sensor.security_persons_home)."""
+        super().__init__(entry_id, security, "persons_home", "sensor")
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of persons at home."""
+        return sum(1 for p in self._security.presence() if p["home"])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return who is home and who sleeps."""
+        persons = self._security.presence()
+        return {
+            "home": [p["name"] for p in persons if p["home"]],
+            "asleep": [p["name"] for p in persons if p["asleep"]],
         }

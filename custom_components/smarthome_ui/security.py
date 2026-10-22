@@ -8,6 +8,9 @@ Checks (each can be switched off on the device "Sicherheit"), sent as notificati
 * **everybody left** – the last person left home and something is open or unlocked,
 * **good night** – at a set time, while somebody is home: open windows, unlocked doors, alarm off.
 
+**Presence**: who is home and who sleeps – at home, the phone charging for ``SLEEP_MINUTES`` and
+between ``SLEEP_FROM`` and ``SLEEP_TO`` (like the dashboard) – as entities for own automations.
+
 **Last night** (``sec.night``): between the start and end of the night (22:00–06:00 by default)
 Core counts person detections (cameras), animals, vehicles (if wanted), motion in the house and
 opened doors as they happen. At the end of the night it sends a summary if a person was detected
@@ -33,7 +36,7 @@ from homeassistant.core import (
     State,
     callback,
 )
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -71,6 +74,10 @@ NIGHT_CATS: dict[str, re.Pattern[str] | None] = {
     "motion": None,
     "doors": None,
 }
+SLEEP_FROM = (21, 30)
+SLEEP_TO = (9, 0)
+SLEEP_MINUTES = 10
+_PHONE_STATE = re.compile(r"(battery_state|is_charging)$")
 RAINY = ("rainy", "pouring", "lightning-rainy", "snowy-rainy", "hail")
 RAIN_AHEAD_HOURS = 2
 EVENTS_MAX = 200
@@ -129,6 +136,7 @@ class Security:
         self._rain_key: str | None = None
         self._listeners: list[CALLBACK_TYPE] = []
         self._timers: list[CALLBACK_TYPE] = []
+        self._presence: list[dict[str, Any]] = []
 
     # ---------------------------------------------------------------- settings
 
@@ -275,6 +283,10 @@ class Security:
         self._unsub.append(
             async_track_time_interval(self.hass, self._check_rain, timedelta(minutes=5))
         )
+        self._unsub.append(
+            async_track_time_interval(self.hass, self._update_presence, timedelta(minutes=1))
+        )
+        self._update_presence()
         self._start_night_if_needed()
 
     @callback
@@ -305,6 +317,7 @@ class Security:
             old, new = event.data["old_state"], event.data["new_state"]
             if eid.startswith("person."):
                 self._persons_changed()
+                self._update_presence()
                 return
             if eid in cats and new is not None and new.state == "on":
                 if old is None or old.state != "on":
@@ -406,6 +419,101 @@ class Security:
             self.notify(
                 "sec.openings", "Gute Nacht", text[0].upper() + text[1:], "security|goodnight"
             )
+
+    # ---------------------------------------------------------------- presence
+
+    def _phone(self, person: State) -> dict[str, Any] | None:
+        """Return whether the person's phone charges and since when (like the dashboard)."""
+        registry = er.async_get(self.hass)
+        ents: set[str] = set()
+        trackers = [*(person.attributes.get("device_trackers") or [])]
+        if source := person.attributes.get("source"):
+            trackers.append(source)
+        for tracker in trackers:
+            entry = registry.async_get(tracker)
+            if entry and entry.device_id:
+                ents.update(
+                    e.entity_id for e in er.async_entries_for_device(registry, entry.device_id)
+                )
+            obj = tracker.split(".", 1)[-1]
+            ents.update({f"sensor.{obj}_battery_state", f"binary_sensor.{obj}_is_charging"})
+        if not any(_PHONE_STATE.search(e) and self.hass.states.get(e) for e in ents):
+            first = str(person.attributes.get("friendly_name") or "").lower().split(" ")[0]
+            devices = dr.async_get(self.hass)
+            for entry in registry.entities.values():
+                if entry.platform != "mobile_app" or not entry.device_id or not first:
+                    continue
+                device = devices.async_get(entry.device_id)
+                if device and first in (device.name_by_user or device.name or "").lower():
+                    ents.update(
+                        e.entity_id for e in er.async_entries_for_device(registry, device.id)
+                    )
+                    break
+        states = [
+            s
+            for e in sorted(ents)
+            if _PHONE_STATE.search(e)
+            and (s := self.hass.states.get(e)) is not None
+            and s.state not in ("unknown", "unavailable")
+        ]
+        state = next((s for s in states if s.entity_id.endswith("battery_state")), None) or next(
+            iter(states), None
+        )
+        if state is None:
+            return None
+        raw = state.state.lower()
+        charging = (
+            raw == "on"
+            if state.domain == "binary_sensor"
+            else bool(re.match(r"^(charging|full|lädt|voll)$", raw))
+        )
+        return {"charging": charging, "since": int(state.last_changed.timestamp() * 1000)}
+
+    def persons(self) -> list[dict[str, Any]]:
+        """Return the persons: home, sleeping (phone charging at night)."""
+        local = dt_util.now()
+        minutes = local.hour * 60 + local.minute
+        night = (
+            minutes >= SLEEP_FROM[0] * 60 + SLEEP_FROM[1]
+            or minutes < SLEEP_TO[0] * 60 + SLEEP_TO[1]
+        )
+        out = []
+        for person in sorted(self.hass.states.async_all("person"), key=lambda s: s.entity_id):
+            home = person.state == "home"
+            phone = self._phone(person) if home else None
+            asleep = bool(
+                home
+                and night
+                and phone
+                and phone["charging"]
+                and now_ms() - phone["since"] >= SLEEP_MINUTES * 60_000
+            )
+            out.append(
+                {
+                    "entity": person.entity_id,
+                    "name": str(person.attributes.get("friendly_name") or person.entity_id),
+                    "home": home,
+                    "asleep": asleep,
+                    "since": phone["since"] if asleep and phone else None,
+                }
+            )
+        return out
+
+    @callback
+    def _update_presence(self, _now: Any = None) -> None:
+        presence = self.persons()
+        if presence != self._presence:
+            self._presence = presence
+            async_dispatcher_send(self.hass, SIGNAL_SECURITY)
+
+    def presence(self) -> list[dict[str, Any]]:
+        """Return the last computed presence."""
+        return self._presence or self.persons()
+
+    def all_asleep(self) -> bool:
+        """Return True if somebody is home and everybody at home sleeps."""
+        home = [p for p in self.presence() if p["home"]]
+        return bool(home) and all(p["asleep"] for p in home)
 
     # ---------------------------------------------------------------- last night
 
@@ -522,6 +630,8 @@ class Security:
             "open": self.open_now(),
             "unlocked": self.unlocked(),
             "home": self.home_count(),
+            "persons": self.presence(),
+            "all_asleep": self.all_asleep(),
             "checks": self.checks(),
             "night": self.night_summary(),
         }

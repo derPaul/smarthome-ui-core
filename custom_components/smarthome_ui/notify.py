@@ -284,6 +284,7 @@ class NotifyEngine:
             url=rule.get("url") or "/",
             urgent=bool(rule.get("urgent")),
             tag=key,
+            camera=rule.get("camera"),
         )
 
     # ---------------------------------------------------------------- reports from dashboards
@@ -471,6 +472,7 @@ class NotifyEngine:
         tag: str | None = None,
         force: bool = False,
         actions: list[dict[str, str]] | None = None,
+        camera: str | None = None,
     ) -> bool:
         """Send a notification to all targets (unless paused or in quiet hours)."""
         if not force and not self.config.get("enabled", True):
@@ -483,6 +485,7 @@ class NotifyEngine:
             "urgent": urgent,
             "tag": tag,
             "actions": actions,
+            "camera": camera if camera and str(camera).startswith("camera.") else None,
         }
         if not force and not urgent and in_quiet(self.config.get("quiet"), dt_util.now()):
             self._deferred.append(item)
@@ -508,6 +511,10 @@ class NotifyEngine:
             data["tag"] = item["tag"]
         if item.get("actions"):
             data["actions"] = item["actions"]
+        if camera := item.get("camera"):
+            # still image (Android, iOS) and live picture when the notification is opened (iOS)
+            data["image"] = f"/api/camera_proxy/{camera}"
+            data["entity_id"] = camera
         data.update(urgent_data(item["urgent"]))
         for target in targets:
             self.hass.async_create_task(

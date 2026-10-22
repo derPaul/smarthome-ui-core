@@ -264,6 +264,9 @@
       },
       "security_last_night": {
         "name": "Last night"
+      },
+      "security_persons_home": {
+        "name": "Persons at home"
       }
     },
     "binary_sensor": {
@@ -272,6 +275,12 @@
       },
       "appliance_to_unload": {
         "name": "To unload"
+      },
+      "security_all_asleep": {
+        "name": "Everybody asleep"
+      },
+      "security_asleep": {
+        "name": "{person} asleep"
       }
     },
     "button": {

@@ -158,3 +158,62 @@ async def test_settings_from_dashboard(hass: HomeAssistant, hass_ws_client) -> N
     assert res["success"]
     assert res["result"]["open"] == []  # only the front door counts now, and it is closed
     assert res["result"]["checks"]["rain"] is True
+
+
+async def test_presence_and_sleep(hass: HomeAssistant, freezer) -> None:
+    freezer.move_to(_local(2026, 6, 1, 22, 0))
+    hass.states.async_set(
+        "person.anna",
+        "home",
+        {"friendly_name": "Anna", "device_trackers": ["device_tracker.anna_phone"]},
+    )
+    hass.states.async_set("person.ben", "not_home", {"friendly_name": "Ben"})
+    hass.states.async_set("device_tracker.anna_phone", "home", {})
+    hass.states.async_set("sensor.anna_phone_battery_state", "Charging", {})
+    entry = await _setup(hass)
+    security = entry.runtime_data.security
+    assert hass.states.get("sensor.security_persons_home").state == "1"
+    # charging only just now: not asleep yet
+    assert hass.states.get("binary_sensor.security_anna_asleep").state == "off"
+    assert hass.states.get("binary_sensor.security_anna_asleep").name == "Security Anna asleep"
+
+    freezer.move_to(_local(2026, 6, 1, 22, 15))
+    security._update_presence()
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.security_anna_asleep").state == "on"
+    assert hass.states.get("binary_sensor.security_all_asleep").state == "on"
+    assert hass.states.get("binary_sensor.security_ben_asleep").state == "off"
+
+    # morning: no longer "asleep" even if the phone still charges
+    freezer.move_to(_local(2026, 6, 2, 9, 30))
+    security._update_presence()
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.security_all_asleep").state == "off"
+
+
+async def test_bell_rule_with_camera(hass: HomeAssistant, notify_calls) -> None:
+    hass.states.async_set("binary_sensor.klingel", "off", {})
+    entry = await _setup(hass)
+    entry.runtime_data.store.set_notify(
+        {
+            "sources": {"sec.bell": {"push": True}},
+            "rules": [
+                {
+                    "id": "bell|binary_sensor.klingel",
+                    "type": "state",
+                    "entity": "binary_sensor.klingel",
+                    "to": ["on"],
+                    "src": "sec.bell",
+                    "title": "Klingel",
+                    "message": "Es klingelt: Haustür",
+                    "camera": "camera.haustur",
+                }
+            ],
+        }
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.klingel", "on", {})
+    await hass.async_block_till_done()
+    data = notify_calls[-1].data["data"]
+    assert data["image"] == "/api/camera_proxy/camera.haustur"
+    assert data["entity_id"] == "camera.haustur"

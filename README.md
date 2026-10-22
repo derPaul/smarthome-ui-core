@@ -207,10 +207,15 @@ kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an
 | `switch.security_rain_warning` | Regenwarnung: offen und es regnet oder Regen kommt in den nächsten 2 Stunden |
 | `switch.security_leave_check` | wenn der Letzte das Haus verlässt: was noch offen bzw. nicht abgeschlossen ist |
 | `switch.security_good_night_check` / `time.security_good_night` | Gute-Nacht-Check zur eingestellten Uhrzeit (Standard aus, 22:30): offen, nicht abgeschlossen, Alarm nicht scharf |
+| `sensor.security_persons_home` | Personen zuhause (Attribute `home`, `asleep`) |
+| `binary_sensor.security_<person>_asleep` | Person schläft: zuhause, Handy lädt seit 10 Minuten, zwischen 21:30 und 9 Uhr |
+| `binary_sensor.security_all_asleep` | jemand ist zuhause und alle zuhause schlafen – z. B. für „Alarm auf Nacht“ |
 | `sensor.security_last_night` | erkannte Personen der letzten Nacht; Attribute: Anzahl je Art (Personen, Tiere, Fahrzeuge, Bewegung im Haus, Türen) und die Ereignisse |
 
 - **Fenster & Türen:** Fenster-, Tür- und Garagentor-Sensoren – ohne Gerätetüren (Kühlschrank, Spülmaschine …,
   Briefkasten). Was das Dashboard als Fenster & Türen eingestellt hat, gilt vorrangig.
+- **Klingel mit Bild:** Kommt die Klingel-Mitteilung vom Dashboard mit einer Kamera, hängt Core das Standbild an
+  (`image: /api/camera_proxy/camera.…`); auf dem iPhone zeigt die geöffnete Mitteilung das Livebild.
 - **Letzte Nacht** (Standard 22:00–06:00, Zeiten und Sensoren wie im Dashboard eingestellt): Core zählt live mit –
   Personen- und Tier-Erkennungen (z. B. Kameras), Fahrzeuge (nur wenn gewählt), Bewegung im Haus (ohne Kameras und
   Außenbereiche) und geöffnete Türen. Am Ende der Nacht kommt eine Zusammenfassung, wenn eine Person erkannt oder eine
