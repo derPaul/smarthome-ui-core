@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -14,14 +14,15 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry, durations
-from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM
+from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM, SIGNAL_WASTE
 from .displays import DisplayEntity, async_setup_display_entities
-from .entity import DEVICE_NOTIFY, CoreEntity, device_for_source
+from .entity import DEVICE_HOUSEHOLD, DEVICE_NOTIFY, CoreEntity, device_for_source
 from .mower import MowerTracker
 from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
 from .tasks import TaskState, task_states
 from .vacuum import VacuumTracker
+from .waste import WasteManager
 
 TASK_PREFIX = "task_"
 
@@ -79,6 +80,23 @@ async def async_setup_entry(
 
     add_rooms()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_VACUUM, add_rooms))
+    waste = entry.runtime_data.waste
+    async_add_entities([WasteNextSensor(entry.entry_id, waste)])
+    kinds: set[str] = set()
+
+    @callback
+    def add_kinds() -> None:
+        new = [
+            WasteKindSensor(entry.entry_id, waste, k["name"])
+            for day in waste.days
+            for k in day["kinds"]
+            if k["name"] not in kinds and not kinds.add(k["name"])
+        ]
+        if new:
+            async_add_entities(new)
+
+    add_kinds()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_WASTE, add_kinds))
     entry.async_on_unload(
         async_setup_planner_entities(
             hass,
@@ -370,3 +388,98 @@ class PlannerStatus(PlannerEntity, SensorEntity):
             "unreachable": [self._planner.area_name(a) for a in self._planner.unreachable],
             "start_at": dt_util.utc_from_timestamp(start / 1000).isoformat() if start else None,
         }
+
+
+class WasteNextSensor(CoreEntity, SensorEntity):
+    """The next waste collection (date) with what is picked up."""
+
+    _attr_device_class = SensorDeviceClass.DATE
+    _attr_translation_key = "waste_next"
+
+    def __init__(self, entry_id: str, waste: WasteManager) -> None:
+        """Initialize (sensor.household_waste_next)."""
+        super().__init__(entry_id, "waste_next", DEVICE_HOUSEHOLD, "sensor", "waste_next")
+        self._waste = waste
+
+    @property
+    def native_value(self) -> date | None:
+        """Return the next pickup day."""
+        return self._waste.days[0]["date"] if self._waste.days else None
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the first kind."""
+        return (
+            self._waste.days[0]["kinds"][0]["icon"] if self._waste.days else "mdi:trash-can-outline"
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the kinds, days until and whether it is time to put it out."""
+        if not self._waste.days:
+            return {}
+        entry = self._waste.days[0]
+        current = self._waste.current()
+        return {
+            "kinds": [k["name"] for k in entry["kinds"]],
+            "days_until": (entry["date"] - dt_util.now().date()).days,
+            "reminder": current is not None,
+            "put_out": self._waste.done(entry["date"]),
+            "upcoming": [
+                {"date": d["date"].isoformat(), "kinds": [k["name"] for k in d["kinds"]]}
+                for d in self._waste.days[:6]
+            ],
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the calendars were read or something was put out."""
+        for signal in (SIGNAL_WASTE, SIGNAL_TASKS):
+            self.async_on_remove(
+                async_dispatcher_connect(self.hass, signal, self.async_write_ha_state)
+            )
+
+
+class WasteKindSensor(CoreEntity, SensorEntity):
+    """When one kind of waste is picked up next."""
+
+    _attr_device_class = SensorDeviceClass.DATE
+    _attr_translation_key = "waste_kind"
+
+    def __init__(self, entry_id: str, waste: WasteManager, kind: str) -> None:
+        """Initialize (sensor.household_waste_<kind>)."""
+        slug = slugify(kind)
+        super().__init__(entry_id, f"waste_{slug}", DEVICE_HOUSEHOLD, "sensor", f"waste_{slug}")
+        self._waste = waste
+        self._kind = kind
+        self._attr_translation_placeholders = {"kind": kind}
+
+    def _next(self) -> dict[str, Any] | None:
+        for entry in self._waste.days:
+            for kind in entry["kinds"]:
+                if kind["name"] == self._kind:
+                    return {**kind, "date": entry["date"]}
+        return None
+
+    @property
+    def native_value(self) -> date | None:
+        """Return the next pickup day of this kind."""
+        nxt = self._next()
+        return nxt["date"] if nxt else None
+
+    @property
+    def icon(self) -> str:
+        """Return the kind's icon."""
+        nxt = self._next()
+        return nxt["icon"] if nxt else "mdi:trash-can-outline"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the days until the pickup."""
+        nxt = self._next()
+        return {"days_until": (nxt["date"] - dt_util.now().date()).days} if nxt else {}
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the calendars were read."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_WASTE, self.async_write_ha_state)
+        )

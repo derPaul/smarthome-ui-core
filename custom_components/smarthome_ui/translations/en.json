@@ -135,6 +135,12 @@
           "mopping": "Mopping",
           "unreachable": "Due only on another floor"
         }
+      },
+      "waste_next": {
+        "name": "Next waste collection"
+      },
+      "waste_kind": {
+        "name": "Collection {kind}"
       }
     },
     "binary_sensor": {
@@ -148,6 +154,9 @@
       },
       "planner_skip": {
         "name": "Skip today"
+      },
+      "waste_put_out": {
+        "name": "Waste put out"
       }
     },
     "select": {

@@ -65,6 +65,9 @@
       },
       "planner_skip": {
         "default": "mdi:debug-step-over"
+      },
+      "waste_put_out": {
+        "default": "mdi:trash-can-outline"
       }
     },
     "select": {

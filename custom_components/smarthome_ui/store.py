@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 
+from . import chores
 from .const import (
     DATA_KEYS,
     DONE_LOG_MAX,
@@ -54,6 +55,15 @@ def _default() -> dict[str, Any]:
         "planner": {},
         # last durations per robot and area (minutes): {robot_id: {area: [..]}}
         "durations": {},
+        # task definitions from the dashboard (Core computes the due dates)
+        "task_defs": {"tasks": [], "rooms": [], "configured": False},
+        # waste collection: {calendars, names, remind: {d, t}, configured}
+        "waste": {
+            "calendars": [],
+            "names": {},
+            "remind": {"d": 1, "t": "12:00"},
+            "configured": False,
+        },
         # household: own cleaning interval per area (days, 0 = not tracked)
         "cleaning": {"intervals": {}, "configured": False},
     }
@@ -199,6 +209,26 @@ class CoreStore:
         self.save(SIGNAL_DATA)
 
     # ---------------------------------------------------------------- tasks and notifications
+
+    @property
+    def own_tasks(self) -> bool:
+        """Return True if Core computes the tasks from the definitions (dashboard sync ignored)."""
+        return bool(self.data["task_defs"].get("configured"))
+
+    @callback
+    def set_task_defs(self, tasks: list[dict[str, Any]], rooms: list[dict[str, Any]]) -> None:
+        """Take the task definitions from the dashboard and compute the tasks."""
+        self.data["task_defs"] = {"tasks": tasks, "rooms": rooms, "configured": True}
+        self.recompute_tasks(force=True)
+
+    @callback
+    def recompute_tasks(self, force: bool = False) -> None:
+        """Compute the tasks from the definitions (only if Core owns them)."""
+        if not self.own_tasks:
+            return
+        tasks = chores.compute(self.data, now_ms())
+        if force or tasks != self.data["tasks"]:
+            self.set_tasks(tasks)
 
     @callback
     def set_tasks(self, tasks: list[dict[str, Any]]) -> None:

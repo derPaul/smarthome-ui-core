@@ -139,7 +139,9 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         e.entity_id for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
     )
     assert ids == [
+        "button.household_waste_put_out",
         "sensor.garden_hecke_schneiden",
+        "sensor.household_waste_next",
         "sensor.notifications_last_sent",
         "switch.notifications",
         "todo.garden",

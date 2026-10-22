@@ -67,6 +67,36 @@ Home Assistant ist jederzeit möglich.
 
 Weitere Bereiche (z. B. Sicherheit) kommen als eigene Geräte dazu, sobald sie Entitäten haben.
 
+## Aufgaben, Müllabfuhr und Wächter
+
+**Aufgaben:** Welche Aufgaben es gibt (Wartung, Gartenkalender, Putz-Räume) und wie oft sie dran sind, legt das
+Dashboard fest – es schickt die Definitionen nach jeder Änderung an Core. **Fällig rechnet Core selbst** (Intervall
+oder feste Monate, Erledigt-Einträge, Saugroboter-Zeiten), also auch ohne offenes Dashboard. Die früheren Helfer
+„Wartung …“ und die Automation „Smarthome: Wartung fällig“ braucht es damit nicht mehr; das Dashboard bietet in der
+Wartungs-Kachel „Alte Push-Helfer entfernen“ an.
+
+**Müllabfuhr:** Core liest die Abfallkalender selbst (gewählte oder alle, die nach Müll klingen) und erkennt die
+Sorten (Restmüll, Bio, Papier, Gelbe Tonne, Grünschnitt …):
+
+| Entität | |
+|---|---|
+| `sensor.household_waste_next` | nächste Abholung (Datum), Attribute `kinds`, `days_until`, `reminder`, `put_out`, `upcoming` |
+| `sensor.household_waste_<sorte>` | nächste Abholung je Sorte, z. B. `sensor.household_waste_biotonne` |
+| `button.household_waste_put_out` | rausgestellt |
+
+Zur Erinnerungszeit (Standard: Vortag 12 Uhr) steht „Morgen: Restmüll rausstellen“ in `todo.household` und kommt als
+Mitteilung (Quelle „Müllabfuhr“) – bis „rausgestellt“ (Knopf, To-do oder Dashboard).
+
+**Wächter** (werden zu Aufgaben in den To-do-Listen; abhaken blendet sie aus, bis das Problem wieder auftritt):
+
+- **Batterien** unter 15 % (Handys ausgenommen) → „Batterie wechseln: Fenster Bad (9 %)“ (Quelle „Batterien“),
+- **Pflanzen** (`plant.*`) mit zu wenig Feuchte bzw. Dünger → „Monstera gießen“ / „… düngen“ (Quelle „Pflanzen“),
+- **Frost**: die stündliche Vorhersage geht in den nächsten 18 Stunden auf 1 °C oder darunter → „Pflanzen vor Frost
+  schützen“ und am späten Nachmittag eine Mitteilung „Frost heute Nacht (−2 °C)“ (Quelle „Frostwarnung“).
+
+**Saugroboter-Station:** Wassermangel, Schmutzwasser voll, Staubbeutel und weitere Problem-Sensoren der Station
+werden als Mitteilung gemeldet (Quelle „Saugroboter“).
+
 ## Haushalt & Garten
 
 Das Dashboard überträgt, welche Aufgaben es gibt und wann sie fällig sind (Putzen je Raum, Wartung,

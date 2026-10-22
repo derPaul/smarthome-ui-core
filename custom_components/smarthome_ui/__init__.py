@@ -23,6 +23,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from . import durations
@@ -31,6 +32,7 @@ from .const import (
     ATTR_DATE,
     ATTR_MESSAGE,
     ATTR_TASK,
+    CHORES_INTERVAL,
     DOMAIN,
     SERVICE_AREA_MOWED,
     SERVICE_TASK_DONE,
@@ -48,6 +50,8 @@ from .planner import PlannerManager
 from .store import CoreStore
 from .tasks import find_task, task_states
 from .vacuum import VacuumManager
+from .waste import WasteManager
+from .watchers import Watchers
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -72,6 +76,8 @@ class CoreRuntime:
     mowers: MowerManager
     vacuums: VacuumManager
     planners: PlannerManager
+    waste: WasteManager
+    watchers: Watchers
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -81,7 +87,12 @@ class CoreRuntime:
 
     def tasks(self) -> list[dict[str, Any]]:
         """Return the tasks from the dashboard and from the integration (areas to mow)."""
-        return [*self.store.data["tasks"], *self.mowers.tasks()]
+        return [
+            *self.store.data["tasks"],
+            *self.mowers.tasks(),
+            *self.waste.tasks(),
+            *self.watchers.tasks(),
+        ]
 
     @callback
     def complete(self, key: str, who: str | None = None, label: str = "") -> None:
@@ -237,6 +248,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_display_update,
         ws_mower_settings,
         ws_cleaning_settings,
+        ws_task_defs,
+        ws_waste_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -250,13 +263,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     mowers = MowerManager(hass, store)
     vacuums = VacuumManager(hass, store)
     planners = PlannerManager(hass, store, engine)
+    waste = WasteManager(hass, store)
+    watchers = Watchers(hass, store)
     entry.runtime_data = CoreRuntime(
-        store, engine, DisplayManager(hass, store), mowers, vacuums, planners
+        store, engine, DisplayManager(hass, store), mowers, vacuums, planners, waste, watchers
     )
     _remove_single_device(hass, entry)
     await hass.async_add_executor_job(_install_blueprints, hass.config.path("blueprints"))
-    engine.extra_rules = lambda: [*mowers.rules(), *vacuums.rules()]
-    engine.extra_tasks = mowers.tasks
+    engine.extra_rules = lambda: [
+        *mowers.rules(),
+        *vacuums.rules(),
+        *waste.rules(),
+        *watchers.rules(),
+    ]
+    engine.extra_tasks = lambda: [*mowers.tasks(), *watchers.notify_tasks()]
 
     @callback
     def unusual(tracker: Any, area: str, result: dict[str, Any]) -> None:
@@ -280,6 +300,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     mowers.async_setup(list(entry.subentries.values()))
     vacuums.async_setup(list(entry.subentries.values()))
     planners.async_setup(list(entry.subentries.values()), mowers.trackers, vacuums.trackers)
+    waste.async_setup()
+    watchers.async_setup()
+
+    # tasks from the definitions: again after every change of the data and every quarter hour
+    @callback
+    def recompute(*_args: Any) -> None:
+        store.recompute_tasks()
+
+    recompute()
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_DATA, recompute))
+    entry.async_on_unload(async_track_time_interval(hass, recompute, CHORES_INTERVAL))
     await engine.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # a mower added, changed or removed → set up again
@@ -337,6 +368,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.mowers.async_stop()
     entry.runtime_data.vacuums.async_stop()
     entry.runtime_data.planners.async_stop()
+    entry.runtime_data.waste.async_stop()
+    entry.runtime_data.watchers.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -364,6 +397,14 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "mowers": runtime.robots()[0],
         "vacuums": runtime.robots()[1],
         "cleaning": store.data["cleaning"],
+        "features": ["task_defs", "waste", "watchers"],
+        "own_tasks": store.own_tasks,
+        "waste": {
+            "configured": runtime.waste.configured,
+            "days": [
+                {"date": d["date"].isoformat(), "kinds": d["kinds"]} for d in runtime.waste.days
+            ],
+        },
         "notify": {
             "enabled": store.data["notify"].get("enabled", True),
             "rules": len(store.data["notify"].get("rules") or []),
@@ -466,7 +507,8 @@ def ws_tasks_sync(
 ) -> None:
     """Store the task definitions with their due dates."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
-        runtime.store.set_tasks(msg["tasks"])
+        if not runtime.store.own_tasks:
+            runtime.store.set_tasks(msg["tasks"])
         connection.send_result(msg["id"])
 
 
@@ -601,3 +643,40 @@ def ws_cleaning_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.store.set_cleaning_intervals(msg["intervals"])
         connection.send_result(msg["id"], runtime.store.data["cleaning"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/tasks/defs",
+        vol.Required("tasks"): [dict],
+        vol.Required("rooms"): [dict],
+    }
+)
+@callback
+def ws_task_defs(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the task definitions (maintenance, garden calendar, cleaning rooms)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.store.set_task_defs(msg["tasks"], msg["rooms"])
+        connection.send_result(msg["id"], {"tasks": len(runtime.store.data["tasks"])})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/waste/settings",
+        vol.Optional("calendars"): [str],
+        vol.Optional("names"): {str: str},
+        vol.Optional("remind"): dict,
+    }
+)
+@callback
+def ws_waste_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the waste settings (calendars, own names, reminder time)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.waste.set_settings(
+            {k: msg[k] for k in ("calendars", "names", "remind") if k in msg}
+        )
+        connection.send_result(msg["id"])

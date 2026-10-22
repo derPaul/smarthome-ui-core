@@ -135,6 +135,12 @@
           "mopping": "Wischt",
           "unreachable": "Fällig nur auf einer anderen Etage"
         }
+      },
+      "waste_next": {
+        "name": "Nächste Müllabfuhr"
+      },
+      "waste_kind": {
+        "name": "Abfuhr {kind}"
       }
     },
     "binary_sensor": {
@@ -148,6 +154,9 @@
       },
       "planner_skip": {
         "name": "Heute auslassen"
+      },
+      "waste_put_out": {
+        "name": "Müll rausgestellt"
       }
     },
     "select": {

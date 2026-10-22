@@ -57,6 +57,16 @@ CONSUMABLES = [
     (r"(sensor)", "Sensoren", 30, "reinigen"),
 ]
 _HOURS = {"s": 1 / 3600, "min": 1 / 60, "h": 1, "d": 24}
+# station sensors (binary, "on" = something to do)
+STATION = [
+    (
+        r"(water_shortage|wassermangel|water shortage|clean_water|frischwasser|"
+        r"water_box_empty|no_water)",
+        "Frischwasser nachfüllen",
+    ),
+    (r"(dirty_water|waste_water|schmutzwasser|abwasser|sewage)", "Schmutzwasser leeren"),
+    (r"(dust_bag|dustbag|staubbeutel|bag_full)", "Staubbeutel wechseln"),
+]
 _VAC = re.compile(r"(sweep|vacuum|saug)")
 _MOP = re.compile(r"(mop|wisch|wipe)")
 _MOP_LEVEL = re.compile(
@@ -471,6 +481,33 @@ class VacuumTracker:
                         "message": f"{self.name}: {text}",
                     }
                 )
+        for entry in self.entities():
+            if entry.domain != "binary_sensor":
+                continue
+            text = self._text(entry)
+            state = self.hass.states.get(entry.entity_id)
+            device_class = state.attributes.get("device_class") if state else None
+            need = next((t for p, t in STATION if re.search(p, text)), None)
+            if need is None and device_class != "problem":
+                continue
+            if need is None:
+                name = (
+                    state.attributes.get("friendly_name", entry.entity_id)
+                    if state
+                    else entry.entity_id
+                )
+                need = re.sub(rf"^{re.escape(self.name)}\s*", "", str(name), flags=re.IGNORECASE)
+            rules.append(
+                {
+                    **base,
+                    "id": f"vacuum|{self.id}|station|{entry.entity_id}",
+                    "type": "state",
+                    "entity": entry.entity_id,
+                    "to": ["on"],
+                    "for": 60,
+                    "message": f"{self.name}: {need}",
+                }
+            )
         for entry in self.entities():
             if entry.domain != "sensor":
                 continue
