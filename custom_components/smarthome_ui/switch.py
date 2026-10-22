@@ -12,7 +12,7 @@ from homeassistant.util import slugify
 
 from . import CoreConfigEntry
 from .alarm import OPTION_SWITCHES, AlarmEntity, AlarmOption
-from .const import SIGNAL_NOTIFY, SIGNAL_SECURITY
+from .const import SIGNAL_NOTIFY, SIGNAL_PRESENCE_SIM, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
 from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
@@ -34,12 +34,14 @@ async def async_setup_entry(
             ("rain", "rain_warning"),
             ("leave", "leave_check"),
             ("good_night", "good_night_check"),
+            ("open_long", "open_long_check"),
         )
     )
     alarm = entry.runtime_data.alarm
     async_add_entities(
         [AlarmLogicSwitch(entry.entry_id, alarm), GuestsSwitch(entry.entry_id, alarm)]
         + [AlarmOptionSwitch(entry.entry_id, alarm, *option) for option in OPTION_SWITCHES]
+        + [PresenceSimSwitch(entry.entry_id, entry.runtime_data.presence_sim)]
     )
     async_setup_doorbell_entities(
         entry.runtime_data.doorbells,
@@ -317,3 +319,45 @@ class AlarmOptionSwitch(AlarmOption, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Switch the setting off."""
         self._set(False)
+
+
+class PresenceSimSwitch(CoreEntity, SwitchEntity):
+    """Simulate presence: lights in the evening, covers at dusk and dawn."""
+
+    _attr_translation_key = "security_presence_sim"
+
+    def __init__(self, entry_id: str, sim: Any) -> None:
+        """Initialize (switch.security_presence_sim)."""
+        super().__init__(
+            entry_id, "security_presence_sim", DEVICE_SECURITY, "switch", "presence_sim"
+        )
+        self._sim = sim
+
+    @property
+    def available(self) -> bool:
+        """Return True once lights or covers are chosen (in the dashboard)."""
+        return self._sim.configured
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the simulation is on."""
+        return self._sim.enabled
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return what it does right now (off / waiting / ready / running)."""
+        return {"state": self._sim.state(), "lights_on": list(self._sim.info()["lights_on"])}
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the simulation on."""
+        self._sim.set_enabled(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the simulation off (lights it switched on go off)."""
+        self._sim.set_enabled(False)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_PRESENCE_SIM, self.async_write_ha_state)
+        )

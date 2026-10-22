@@ -80,6 +80,12 @@ def _default() -> dict[str, Any]:
         "doorbells": {},
         # alarm logic: settings from the dashboard and its state (guests, night walk, reason)
         "alarm": {},
+        # mailbox: chosen sensors, deliveries and emptyings (ms)
+        "mailbox": {},
+        # presence simulation: settings from the dashboard
+        "presence_sim": {},
+        # grocery spending: "last month" sensor and the kept months
+        "grocery": {},
     }
 
 

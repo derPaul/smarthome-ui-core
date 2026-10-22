@@ -38,6 +38,7 @@ async def async_setup_entry(
         [
             WastePutOut(entry.entry_id, entry.runtime_data),
             NightwalkOpen(entry.entry_id, entry.runtime_data.alarm),
+            MailEmptied(entry.entry_id, entry.runtime_data.mailbox),
         ]
     )
     entry.async_on_unload(
@@ -184,3 +185,23 @@ class NightwalkOpen(CoreEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Open the window."""
         self._alarm.open_nightwalk()
+
+
+class MailEmptied(CoreEntity, ButtonEntity):
+    """The mailbox was emptied (without a door sensor, or emptied otherwise)."""
+
+    _attr_translation_key = "mail_emptied"
+
+    def __init__(self, entry_id: str, mailbox: Any) -> None:
+        """Initialize (button.household_mail_emptied)."""
+        super().__init__(entry_id, "mail_emptied", DEVICE_HOUSEHOLD, "button", "mail_emptied")
+        self._mailbox = mailbox
+
+    @property
+    def available(self) -> bool:
+        """Return True if a mailbox sensor is there."""
+        return self._mailbox.flap is not None
+
+    async def async_press(self) -> None:
+        """Emptied now."""
+        self._mailbox.emptied()

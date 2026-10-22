@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.const import UnitOfTime
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -11,8 +13,8 @@ from homeassistant.util import slugify
 
 from . import CoreConfigEntry
 from .alarm import OPTION_NUMBERS, AlarmLogic, AlarmOption
-from .const import SIGNAL_TASKS
-from .entity import DEVICE_HOUSEHOLD, CoreEntity
+from .const import SIGNAL_SECURITY, SIGNAL_TASKS
+from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
 from .store import CoreStore
 
 
@@ -39,6 +41,7 @@ async def async_setup_entry(
 
     sync()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_TASKS, sync))
+    async_add_entities([OpenMinutes(entry.entry_id, entry.runtime_data.security)])
     alarm = entry.runtime_data.alarm
     async_add_entities(AlarmOptionNumber(entry.entry_id, alarm, *o) for o in OPTION_NUMBERS)
 
@@ -88,6 +91,40 @@ class CleanInterval(CoreEntity, NumberEntity):
         """Update when tasks or settings change."""
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_TASKS, self.async_write_ha_state)
+        )
+
+
+class OpenMinutes(CoreEntity, NumberEntity):
+    """After how many minutes an open window or door is reported."""
+
+    _attr_translation_key = "security_open_minutes"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_min_value = 1
+    _attr_native_max_value = 120
+    _attr_native_step = 1
+    _attr_mode = NumberMode.BOX
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+
+    def __init__(self, entry_id: str, security: Any) -> None:
+        """Initialize (number.security_open_minutes)."""
+        super().__init__(
+            entry_id, "security_open_minutes", DEVICE_SECURITY, "number", "open_minutes"
+        )
+        self._security = security
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the minutes."""
+        return float(self._security.checks()["open_minutes"])
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the minutes."""
+        self._security.set_check("open_minutes", int(value))
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_SECURITY, self.async_write_ha_state)
         )
 
 

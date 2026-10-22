@@ -322,6 +322,9 @@
       },
       "security_asleep": {
         "name": "{person} schläft"
+      },
+      "mail_waiting": {
+        "name": "Post im Briefkasten"
       }
     },
     "button": {
@@ -354,6 +357,9 @@
       },
       "security_nightwalk_open": {
         "name": "Nachtweg öffnen"
+      },
+      "mail_emptied": {
+        "name": "Briefkasten geleert"
       }
     },
     "select": {
@@ -471,6 +477,12 @@
       },
       "security_guests_push": {
         "name": "Push beim Scharfschalten mit Gästen"
+      },
+      "security_presence_sim": {
+        "name": "Anwesenheit simulieren"
+      },
+      "security_open_long_check": {
+        "name": "Lange offene Fenster melden"
       }
     },
     "number": {
@@ -488,6 +500,9 @@
       },
       "security_guests_away": {
         "name": "Gäste aus nach"
+      },
+      "security_open_minutes": {
+        "name": "Offene Fenster melden nach"
       }
     },
     "time": {

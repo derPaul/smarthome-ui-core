@@ -49,11 +49,14 @@ from .const import (
 )
 from .displays import DisplayManager
 from .doorbell import DoorbellManager
+from .grocery import Grocery
+from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
 from .notify import NotifyEngine
 from .planner import PlannerManager
 from .plants import PlantManager
+from .presence_sim import PresenceSim
 from .security import Security
 from .store import CoreStore
 from .tasks import find_task, task_states
@@ -93,6 +96,9 @@ class CoreRuntime:
     security: Security
     doorbells: DoorbellManager
     alarm: AlarmLogic
+    mailbox: Mailbox
+    presence_sim: PresenceSim
+    grocery: Grocery
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -271,6 +277,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_plant_settings,
         ws_security_settings,
         ws_alarm_settings,
+        ws_mailbox_settings,
+        ws_presence_sim_settings,
+        ws_grocery_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -347,6 +356,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         security,
         doorbells,
         alarm,
+        Mailbox(hass, store, security_notify),
+        PresenceSim(hass, store, lambda: alarm.panel or _first_panel(hass)),
+        Grocery(hass, store),
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -397,7 +409,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
             src=tracker.source,
             url=cfg.get("url") or "/",
             urgent=bool(cfg.get("urgent")) or key == "alarm",
-            tag=f"appliance|{tracker.id}|{key.split('|')[0]}",
+            tag=f"appliance|{tracker.id}|{key if key.startswith('supply|') else key.split('|')[0]}",
         )
 
     appliances.on_notify = appliance_notify
@@ -413,6 +425,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     security.async_setup()
     doorbells.async_setup(list(entry.subentries.values()))
     alarm.async_setup()
+    entry.runtime_data.mailbox.async_setup()
+    entry.runtime_data.presence_sim.async_setup()
+    entry.runtime_data.grocery.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -504,6 +519,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.security.async_stop()
     entry.runtime_data.doorbells.async_stop()
     entry.runtime_data.alarm.async_stop()
+    entry.runtime_data.mailbox.async_stop()
+    entry.runtime_data.presence_sim.async_stop()
+    entry.runtime_data.grocery.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -538,6 +556,9 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "security": runtime.security.info(),
         "doorbells": runtime.doorbells.info(),
         "alarm": runtime.alarm.info(),
+        "mailbox": runtime.mailbox.info(),
+        "presence_sim": runtime.presence_sim.info(),
+        "grocery": runtime.grocery.info(),
         "features": [
             "task_defs",
             "waste",
@@ -548,6 +569,12 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "security",
             "doorbells",
             "alarm",
+            "open_long",
+            "appliance_supplies",
+            "vacuum_station",
+            "mailbox",
+            "presence_sim",
+            "grocery",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -600,6 +627,9 @@ def ws_subscribe(
                     "security": runtime.security.info(),
                     "doorbells": runtime.doorbells.info(),
                     "alarm": runtime.alarm.info(),
+                    "mailbox": runtime.mailbox.info(),
+                    "presence_sim": runtime.presence_sim.info(),
+                    "grocery": runtime.grocery.info(),
                 },
             )
         )
@@ -904,3 +934,69 @@ def ws_alarm_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.alarm.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
         connection.send_result(msg["id"], runtime.alarm.info())
+
+
+@callback
+def _first_panel(hass: HomeAssistant) -> str | None:
+    return next((s.entity_id for s in hass.states.async_all("alarm_control_panel")), None)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/mailbox/settings",
+        vol.Optional("flap"): vol.Any(None, str),
+        vol.Optional("door"): vol.Any(None, str),
+        vol.Optional("enabled"): bool,
+    }
+)
+@callback
+def ws_mailbox_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the mailbox sensors chosen in the dashboard."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.mailbox.set_settings({k: msg[k] for k in ("flap", "door", "enabled") if k in msg})
+        connection.send_result(msg["id"], runtime.mailbox.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/presence_sim/settings",
+        vol.Optional("enabled"): bool,
+        vol.Optional("lights"): [str],
+        vol.Optional("covers"): [str],
+        vol.Optional("start"): vol.In(["sunset", "time"]),
+        vol.Optional("from"): str,
+        vol.Optional("until"): str,
+        vol.Optional("min"): vol.Coerce(int),
+        vol.Optional("max"): vol.Coerce(int),
+        vol.Optional("parallel"): vol.Coerce(int),
+        vol.Optional("when"): vol.In(["away", "alarm", "always"]),
+        vol.Optional("covers_open"): str,
+    }
+)
+@callback
+def ws_presence_sim_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the presence simulation from the dashboard (it replaces the old automation)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.presence_sim.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
+        connection.send_result(msg["id"], runtime.presence_sim.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/grocery/settings",
+        vol.Required("entity"): vol.Any(None, str),
+        vol.Optional("months"): vol.Any(None, {str: vol.Coerce(float)}),
+    }
+)
+@callback
+def ws_grocery_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the "last month" grocery sensor (and the months the dashboard kept so far)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.grocery.set_settings(msg["entity"], msg.get("months"))
+        connection.send_result(msg["id"], runtime.grocery.info())

@@ -12,9 +12,9 @@ from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
 from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
-from .const import SIGNAL_SECURITY
+from .const import SIGNAL_DATA, SIGNAL_MAILBOX, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
-from .entity import DEVICE_SECURITY, CoreEntity
+from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
 
 
 async def async_setup_entry(
@@ -43,6 +43,7 @@ async def async_setup_entry(
             ),
         ]
     )
+    async_add_entities([MailWaiting(entry.entry_id, entry.runtime_data.mailbox)])
     async_setup_appliance_entities(
         entry.runtime_data.appliances,
         async_add_entities,
@@ -151,3 +152,45 @@ class PersonAsleep(_SecurityBinary):
             "home": me.get("home"),
             "since": dt_util.utc_from_timestamp(since / 1000).isoformat() if since else None,
         }
+
+
+class MailWaiting(CoreEntity, BinarySensorEntity):
+    """Post is in the mailbox (flap opened since it was emptied)."""
+
+    _attr_translation_key = "mail_waiting"
+
+    def __init__(self, entry_id: str, mailbox: Any) -> None:
+        """Initialize (binary_sensor.household_mail)."""
+        super().__init__(entry_id, "mail_waiting", DEVICE_HOUSEHOLD, "binary_sensor", "mail")
+        self._mailbox = mailbox
+
+    @property
+    def available(self) -> bool:
+        """Return True if a mailbox sensor is there."""
+        return self._mailbox.flap is not None
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while post is waiting."""
+        return bool(self._mailbox.waiting())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return deliveries, last delivery and when it was emptied."""
+        waiting = self._mailbox.waiting()
+        at, how = self._mailbox.last_empty()
+        iso = lambda ms: dt_util.utc_from_timestamp(ms / 1000).isoformat() if ms else None  # noqa: E731
+        return {
+            "deliveries": len(waiting),
+            "last_delivery": iso(waiting[-1] if waiting else 0),
+            "last_emptied": iso(at),
+            "emptied_by": how,
+            "open": [o["id"] for o in self._mailbox.open_now()],
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Update with the mailbox (and done records from the dashboard)."""
+        for signal in (SIGNAL_MAILBOX, SIGNAL_DATA):
+            self.async_on_remove(
+                async_dispatcher_connect(self.hass, signal, self.async_write_ha_state)
+            )

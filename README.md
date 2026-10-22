@@ -69,6 +69,9 @@ Weitere Bereiche (z. B. Sicherheit) kommen als eigene Geräte dazu, sobald sie E
 
 ## Aufgaben, Müllabfuhr und Wächter
 
+**Einkauf:** Den Wert des Sensors „Ausgaben letzter Monat“ (z. B. aus einer Kassenbon-Integration) merkt sich Core
+je Monat – so hat das Dashboard die Monatsübersicht auch ohne offenes Dashboard am Monatswechsel.
+
 **Aufgaben:** Welche Aufgaben es gibt (Wartung, Gartenkalender, Putz-Räume) und wie oft sie dran sind, legt das
 Dashboard fest – es schickt die Definitionen nach jeder Änderung an Core. **Fällig rechnet Core selbst** (Intervall
 oder feste Monate, Erledigt-Einträge, Saugroboter-Zeiten), also auch ohne offenes Dashboard. Die früheren Helfer
@@ -164,7 +167,8 @@ gereinigte Fläche und die Verschleißteile.
   im Dashboard gestarteter Lauf für seine Räume, eine Komplettreinigung für alle zugeordneten Räume.
   Raumnamen werden über „Staubsauger-Segmente Bereichen zuordnen“ bzw. den Namen den Bereichen zugeordnet.
 - **Entitäten am Sauger-Gerät:** je Raum `sensor.household_<raum>_last_vacuumed`.
-- **Mitteilungen** (Quelle „Saugroboter“, Push an): Fehler, Roboter- und Stationsfehler (z. B. Wasser, Beutel),
+- **Mitteilungen** (Quelle „Saugroboter“, Push an): Fehler, Roboter- und Stationsfehler, Station: Frischwasser
+  nachfüllen, Schmutzwasser leeren, Staubbeutel wechseln (Binärsensoren und Tank-Sensoren mit Zustand),
   Verschleißteile unter 10 % (Haupt-/Seitenbürste, Filter, Sieb, Sensoren).
 - **Putz-Intervalle je Raum** (gilt für Roboter und von Hand): `number.household_<raum>_clean_interval`
   (Tage, 0 = nicht verfolgen) am Gerät „Haushalt“; im Dashboard wie bisher über den Raum änderbar.
@@ -261,6 +265,8 @@ kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an
 | `sensor.security_open` | Anzahl offener Fenster & Türen (Attribute `open`, `unlocked`, `persons_home`) |
 | `switch.security_rain_warning` | Regenwarnung: offen und es regnet oder Regen kommt in den nächsten 2 Stunden |
 | `switch.security_leave_check` | wenn der Letzte das Haus verlässt: was noch offen bzw. nicht abgeschlossen ist |
+| `switch.security_open_long_check` / `number.security_open_minutes` | Fenster oder Tür seit 10 Minuten offen (Minuten einstellbar): „Bad ist seit 10 Minuten offen“ |
+| `switch.security_presence_sim` | Anwesenheit simulieren (siehe unten) – Attribut `state`: aus, wartet, bereit, läuft |
 | `switch.security_good_night_check` / `time.security_good_night` | Gute-Nacht-Check zur eingestellten Uhrzeit (Standard aus, 22:30): offen, nicht abgeschlossen, Alarm nicht scharf |
 | `sensor.security_persons_home` | Personen zuhause (Attribute `home`, `asleep`) |
 | `binary_sensor.security_<person>_asleep` | Person schläft: zuhause, Handy lädt seit 10 Minuten, zwischen 21:30 und 9 Uhr |
@@ -275,6 +281,26 @@ kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an
   Personen- und Tier-Erkennungen (z. B. Kameras), Fahrzeuge (nur wenn gewählt), Bewegung im Haus (ohne Kameras und
   Außenbereiche) und geöffnete Türen. Am Ende der Nacht kommt eine Zusammenfassung, wenn eine Person erkannt oder eine
   Tür geöffnet wurde, z. B. „1 Person erkannt (Einfahrt 02:14) · 1× Tür geöffnet (Haustür 02:14)“.
+
+- **Anwesenheit simulieren:** ersetzt die frühere Automation des Dashboards („Smarthome: Anwesenheit simulieren“).
+  Eingestellt wird im Dashboard (Sicherheit → Anwesenheit simulieren): Lichter, Rollos, Beginn (Sonnenuntergang
+  oder Uhrzeit), Ende, wie lange ein Licht an bleibt, wie viele gleichzeitig und wann (niemand zuhause, Alarm scharf
+  oder immer). Alle 5 Minuten schaltet Core im Abendfenster zufällig ein Licht für eine zufällige Dauer ein; zum
+  Ende gehen seine Lichter aus. Rollos schließen kurz nach Sonnenuntergang und öffnen morgens, jeweils zufällig
+  verzögert. Beim Übernehmen schaltet Core die alte Automation aus.
+
+## Briefkasten
+
+Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **Entnahmetür**. Core erkennt sie am Namen
+(„Briefkasten“, „Einwurf“, „Entnahme“ …) oder nimmt die im Dashboard gewählten.
+
+- Klappe geöffnet = Post ist da (Öffnungen innerhalb einer Minute zählen als ein Einwurf).
+- Tür geöffnet = geleert – ein kurzes Zucken (unter 2 s) oder ein Wackeln bis 90 s nach einem Einwurf zählt nicht.
+  Ohne Tür-Sensor: Knopf „Briefkasten geleert“ (oder „Geleert“ im Dashboard).
+- `binary_sensor.household_mail` – Post im Briefkasten (Attribute Einwürfe, letzter Einwurf, zuletzt geleert),
+  `button.household_mail_emptied`.
+- Mitteilungen (Quelle „Briefkasten“, Push an): „Post ist da“ beim ersten Einwurf nach dem Leeren,
+  „Briefkasten: Klappe/Tür steht offen“ nach 3 Minuten.
 
 ## Haushaltsgeräte
 
@@ -294,7 +320,8 @@ Energiezähler – beim Kühlschrank Temperaturen (Kühl- und Gefrierteil), Tür
 - **Mitteilungen** (Quellen „Geschirrspüler“, „Waschmaschine & Trockner“, „Kühlschrank“, „Weitere Geräte“ mit Push an):
   fertig, Störung, Erinnerung ans Ausräumen (Standard nach 30 Minuten, 0 = nie), Sonnenstrom übrig, während das Gerät
   per Startvorwahl wartet (Sensor mit PV-Leistung oder Überschuss und Mindestwert, Standard 1500 W). Kühlschrank: Tür
-  länger offen (Standard 3 Minuten), Kühlteil ab 8 °C bzw. Gefrierteil über −15 °C für 15 Minuten, Alarm.
+  länger offen (Standard 3 Minuten), Kühlteil ab 8 °C bzw. Gefrierteil über −15 °C für 15 Minuten, Alarm,
+  Wasserfilter (10 % oder weniger). Geschirrspüler: Spülmittel, Klarspüler oder Salz nachfüllen.
   Einstellbar unter *Smarthome UI Core → Haushaltsgerät → Zahnrad (ändern)*.
 
 Das Dashboard nimmt Geschirrspüler und Kühlschrank dann aus Core; „Ausgeräumt“ gilt überall gleich.
@@ -436,6 +463,9 @@ actions:
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
 | `smarthome_ui/alarm/settings` | Alarm-Logik übernehmen (`panel`, `rules`, `actions`, `guests`, `nightwalk`, einmalig `guests_on`, `nightwalk_until`) |
 | `smarthome_ui/security/settings` | Fenster & Türen (`openings`) und Nacht (`night`: `start`, `end`, Sensorlisten je Art) |
+| `smarthome_ui/mailbox/settings` | Briefkasten-Sensoren (`flap`, `door`, `enabled`) |
+| `smarthome_ui/presence_sim/settings` | Anwesenheitssimulation (`enabled`, `lights`, `covers`, `start`, `from`, `until`, `min`, `max`, `parallel`, `when`, `covers_open`) |
+| `smarthome_ui/grocery/settings` | Einkauf: Sensor „letzter Monat“ (`entity`), einmalig bisherige Monate (`months`) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

@@ -26,6 +26,8 @@ SIGNAL_PLANTS: Final = f"{DOMAIN}_plants"
 SIGNAL_SECURITY: Final = f"{DOMAIN}_security"
 SIGNAL_DOORBELL: Final = f"{DOMAIN}_doorbell"
 SIGNAL_ALARM: Final = f"{DOMAIN}_alarm"
+SIGNAL_MAILBOX: Final = f"{DOMAIN}_mailbox"
+SIGNAL_PRESENCE_SIM: Final = f"{DOMAIN}_presence_sim"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)

@@ -138,6 +138,15 @@
       },
       "security_guests_push": {
         "default": "mdi:account-alert-outline"
+      },
+      "security_presence_sim": {
+        "default": "mdi:home-lightbulb-outline",
+        "state": {
+          "off": "mdi:home-outline"
+        }
+      },
+      "security_open_long_check": {
+        "default": "mdi:window-open-variant"
       }
     },
     "todo": {
@@ -165,6 +174,12 @@
         "default": "mdi:sleep",
         "state": {
           "off": "mdi:account"
+        }
+      },
+      "mail_waiting": {
+        "default": "mdi:mailbox-outline",
+        "state": {
+          "on": "mdi:mailbox-up"
         }
       }
     },
@@ -198,6 +213,9 @@
       },
       "security_nightwalk_open": {
         "default": "mdi:stairs-down"
+      },
+      "mail_emptied": {
+        "default": "mdi:mailbox-open-outline"
       }
     },
     "select": {
@@ -245,6 +263,9 @@
       },
       "security_guests_away": {
         "default": "mdi:account-clock-outline"
+      },
+      "security_open_minutes": {
+        "default": "mdi:timer-outline"
       }
     },
     "time": {

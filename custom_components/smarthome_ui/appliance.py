@@ -14,7 +14,7 @@ What comes of it:
   checked off, the door was opened or a new run starts – the dashboard's done record
   ``appl:device:<device id>`` is the same,
 * notifications: finished, error, reminder to unload, solar power while waiting for the start;
-  fridge door open, too warm, alarm.
+  fridge door open, too warm, alarm, water filter; dishwasher detergent / rinse aid / salt low.
 
 Per appliance: ``{"run": {start, program, kwh}, "last": {start, end, minutes, program, kwh},
 "unload": bool, "finished": ms}`` in ``appliances``.
@@ -146,6 +146,32 @@ _OFF += ("not_connected", "initial", "on", "")
 _FREEZE = re.compile(r"(freez|gefrier|tiefkühl|tiefkuehl|frost)")
 _ALARM = re.compile(r"(alarm|warn)")
 _ALARM_ON = re.compile(r"^(on|present|alarm|triggered|true)$")
+# dishwasher supplies: key, name, pattern, not; low = on / present / nearly empty, or <= 15 %
+SUPPLIES = [
+    (
+        "detergent",
+        "Spülmittel",
+        re.compile(
+            r"(detergent|spülmittel|spuelmittel|spulmittel|reinigungsmittel|"
+            r"(^|[^a-z])tabs?([^a-z]|$)|auto.?dos)"
+        ),
+        re.compile(r"(rinse|klarspül|klarspul|klarspuel)"),
+    ),
+    (
+        "rinse_aid",
+        "Klarspüler",
+        re.compile(r"(rinse_aid|rinse aid|klarspül|klarspul|klarspuel)"),
+        None,
+    ),
+    ("salt", "Salz", re.compile(r"(^|[^a-z])(salt|salz)"), None),
+]
+_SUPPLY_LOW = re.compile(
+    r"^(on|present|confirmed|nearly_empty|fast_leer|empty|leer|low|niedrig|nachfüllen|refill|true|"
+    r"problem)$"
+)
+_SUPPLY_LOW_IN = re.compile(r"(nearly.?empty|fast.?leer|nachfüll|refill)")
+_FILTER = re.compile(r"(water.?filter|wasserfilter|filter)")
+FILTER_LOW = 10  # % left: change the water filter
 
 
 def detect_kind(text: str) -> str:
@@ -476,6 +502,9 @@ class ApplianceTracker:
                 )
         if error:
             notes["error"] = f"{self.name}: Störung"
+        low = self._supplies_low() if self.kind == "dishwasher" else []
+        for key, label in low:
+            notes[f"supply|{key}"] = f"{self.name}: {label} nachfüllen"
         if waiting and (watts := _watts(self._state(self.options["solar_entity"]))) is not None:
             if watts >= float(self.options["solar_min"] or 0):
                 notes["solar"] = f"Sonnenstrom übrig – {self.name} jetzt starten?"
@@ -487,7 +516,35 @@ class ApplianceTracker:
             "start_at": self._start_at() if waiting else None,
             "door": self._open(self.door_entity),
         }
+        if self.kind == "dishwasher":
+            status["supplies"] = [key for key, _label in low]
         return status, notes, changed
+
+    def _supplies_low(self) -> list[tuple[str, str]]:
+        """Return the dishwasher supplies to refill (key, name)."""
+        out = []
+        for key, label, pattern, not_ in SUPPLIES:
+            state = self._valid(self._find(("sensor", "binary_sensor"), pattern, not_))
+            if state is None:
+                continue
+            value = state.state.lower()
+            if state.attributes.get("unit_of_measurement") == "%":
+                level = _num(value)
+                low = level is not None and level <= 15
+            else:
+                low = bool(_SUPPLY_LOW.match(value) or _SUPPLY_LOW_IN.search(value))
+            if low:
+                out.append((key, label))
+        return out
+
+    def _water_filter(self) -> float | None:
+        """Return what is left of the fridge's water filter (%; a binary sensor: on = 0)."""
+        entity = self._find(("sensor", "binary_sensor"), _FILTER)
+        if (state := self._valid(entity)) is None:
+            return None
+        if state.domain == "binary_sensor":
+            return 0 if state.state == "on" else 100
+        return _num(state.state)
 
     def _temps(self) -> tuple[float | None, float | None]:
         fridge = freezer = None
@@ -542,6 +599,9 @@ class ApplianceTracker:
             notes["door"] = f"{self.name}: Tür seit {mins} min offen"
         if alarm_on:
             notes["alarm"] = f"{self.name}: Alarm"
+        water_filter = self._water_filter()
+        if water_filter is not None and water_filter <= FILTER_LOW:
+            notes["filter"] = f"{self.name}: Wasserfilter wechseln"
         if fridge_t is None and freezer_t is None and not doors:
             state = "off"
         else:
@@ -559,6 +619,7 @@ class ApplianceTracker:
             "temp": fridge_t,
             "freezer_temp": freezer_t,
             "door": bool(open_since),
+            "water_filter": water_filter,
         }
         return status, notes, False
 

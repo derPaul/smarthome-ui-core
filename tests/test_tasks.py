@@ -139,13 +139,16 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         e.entity_id for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
     )
     assert ids == [
+        "binary_sensor.household_mail",
         "binary_sensor.security_all_asleep",
+        "button.household_mail_emptied",
         "button.household_waste_put_out",
         "button.security_nightwalk_open",
         "number.security_guests_away",
         "number.security_nightwalk_ask_delay",
         "number.security_nightwalk_quiet",
         "number.security_nightwalk_window",
+        "number.security_open_minutes",
         "select.security_nightwalk_effect",
         "sensor.garden_hecke_schneiden",
         "sensor.household_waste_next",
@@ -166,6 +169,8 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "switch.security_guests_push",
         "switch.security_leave_check",
         "switch.security_nightwalk",
+        "switch.security_open_long_check",
+        "switch.security_presence_sim",
         "switch.security_rain_warning",
         "time.security_good_night",
         "todo.garden",

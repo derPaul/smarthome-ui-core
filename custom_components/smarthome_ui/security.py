@@ -6,7 +6,9 @@ Checks (each can be switched off on the device "Sicherheit"), sent as notificati
 * **rain** – something is open and it rains or rain is coming within ``RAIN_AHEAD_HOURS``
   (weather state and hourly forecast): "Regen ab 15 Uhr – noch offen: Bad, Küche",
 * **everybody left** – the last person left home and something is open or unlocked,
-* **good night** – at a set time, while somebody is home: open windows, unlocked doors, alarm off.
+* **good night** – at a set time, while somebody is home: open windows, unlocked doors, alarm off,
+* **open long** – a window or door is open for ``open_minutes`` (10 by default): "Bad ist seit
+  10 Minuten offen".
 
 **Presence**: who is home and who sleeps – at home, the phone charging for ``SLEEP_MINUTES`` and
 between ``SLEEP_FROM`` and ``SLEEP_TO`` (like the dashboard) – as entities for own automations.
@@ -38,7 +40,11 @@ from homeassistant.core import (
 )
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_time_change,
+    async_track_time_interval,
+)
 from homeassistant.util import dt as dt_util
 
 from .const import SIGNAL_SECURITY
@@ -91,7 +97,14 @@ DEFAULTS: dict[str, Any] = {
         "vehicles": None,
         "motion": None,
     },
-    "checks": {"rain": True, "leave": True, "good_night": False, "good_night_at": "22:30"},
+    "checks": {
+        "rain": True,
+        "leave": True,
+        "good_night": False,
+        "good_night_at": "22:30",
+        "open_long": True,
+        "open_minutes": 10,
+    },
 }
 
 
@@ -137,6 +150,7 @@ class Security:
         self._listeners: list[CALLBACK_TYPE] = []
         self._timers: list[CALLBACK_TYPE] = []
         self._presence: list[dict[str, Any]] = []
+        self._open_timers: dict[str, CALLBACK_TYPE] = {}
 
     # ---------------------------------------------------------------- settings
 
@@ -161,6 +175,8 @@ class Security:
         async_dispatcher_send(self.hass, SIGNAL_SECURITY)
         if key == "good_night_at":
             self._schedule()
+        if key in ("open_long", "open_minutes"):
+            self._watch_open()
 
     @callback
     def set_settings(self, settings: dict[str, Any]) -> None:
@@ -292,8 +308,9 @@ class Security:
     @callback
     def async_stop(self) -> None:
         """Stop."""
-        for unsub in [*self._unsub, *self._listeners, *self._timers]:
+        for unsub in [*self._unsub, *self._listeners, *self._timers, *self._open_timers.values()]:
             unsub()
+        self._open_timers.clear()
         self._unsub.clear()
         self._listeners = []
         self._timers = []
@@ -326,10 +343,13 @@ class Security:
                 async_dispatcher_send(self.hass, SIGNAL_SECURITY)
                 if new is not None and new.state == "on":
                     self._check_rain()
+                if old is None or new is None or old.state != new.state:
+                    self._watch_open(eid)
 
         self._listeners = [
             self.hass.bus.async_listen(EVENT_STATE_CHANGED, changed, event_filter=relevant)
         ]
+        self._watch_open()
 
     @callback
     def _schedule(self) -> None:
@@ -396,6 +416,39 @@ class Security:
             f"{head} – noch offen: {names([self._name(e) for e in opened])}",
             "security|rain",
         )
+
+    @callback
+    def _watch_open(self, entity_id: str | None = None) -> None:
+        """(Re)start the "open for a while" timer of one opening (or of all)."""
+        targets = [entity_id] if entity_id else [*self._open_timers, *self.openings()]
+        checks = self.checks()
+        minutes = float(checks["open_minutes"] or 10)
+        openings = set(self.openings())
+        for eid in dict.fromkeys(targets):
+            if unsub := self._open_timers.pop(eid, None):
+                unsub()
+            state = self.hass.states.get(eid)
+            if not checks["open_long"] or state is None or state.state != "on":
+                continue
+            if eid not in openings:
+                continue
+            left = minutes * 60 - (dt_util.utcnow() - state.last_changed).total_seconds()
+            if left <= 0:
+                continue  # was open before (restart): no late notification
+
+            @callback
+            def still_open(_now: Any, eid: str = eid, since: datetime = state.last_changed) -> None:
+                self._open_timers.pop(eid, None)
+                now = self.hass.states.get(eid)
+                if now is not None and now.state == "on" and now.last_changed == since:
+                    self.notify(
+                        "sec.openings",
+                        "Fenster & Türen",
+                        f"{self._name(eid)} ist seit {round(minutes)} Minuten offen",
+                        f"open|{eid}",
+                    )
+
+            self._open_timers[eid] = async_call_later(self.hass, left, still_open)
 
     @callback
     def _persons_changed(self) -> None:

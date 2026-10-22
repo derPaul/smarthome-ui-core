@@ -67,6 +67,27 @@ STATION = [
     (r"(dirty_water|waste_water|schmutzwasser|abwasser|sewage)", "Schmutzwasser leeren"),
     (r"(dust_bag|dustbag|staubbeutel|bag_full)", "Staubbeutel wechseln"),
 ]
+# station sensors with a state (tank "empty" / "full", "problem"): key, bad value, what to do
+_TANK_BAD = r"|problem|error|fehler|alarm|warning|warnung|abnormal|fault)"
+STATION_SENSORS = [
+    (
+        r"(clean_water|frischwasser|water_tank|wassertank|water_box)",
+        r"^(empty|leer|low|niedrig|insufficient|lack|shortage|not_enough|kein wasser|"
+        r"nachfüllen|refill" + _TANK_BAD,
+        "Frischwasser nachfüllen",
+    ),
+    (
+        r"(dirty_water|waste_water|schmutzwasser|abwasser|sewage)",
+        r"^(full|voll|leeren|empty_it|high" + _TANK_BAD,
+        "Schmutzwasser leeren",
+    ),
+    (
+        r"(dust_bag|dustbag|staubbeutel)",
+        r"^(full|voll|wechseln|replace" + _TANK_BAD,
+        "Staubbeutel wechseln",
+    ),
+]
+_DIRTY = re.compile(r"(dirty|schmutz|waste|abwasser|sewage)")
 _VAC = re.compile(r"(sweep|vacuum|saug)")
 _MOP = re.compile(r"(mop|wisch|wipe)")
 _MOP_LEVEL = re.compile(
@@ -503,6 +524,26 @@ class VacuumTracker:
                     "message": f"{self.name}: {need}",
                 }
             )
+        for entry in self.entities():
+            if entry.domain != "sensor":
+                continue
+            text = self._text(entry)
+            for i, (key, bad, need) in enumerate(STATION_SENSORS):
+                if not re.search(key, text) or (i == 0 and _DIRTY.search(text)):
+                    continue
+                rules.append(
+                    {
+                        **base,
+                        "id": f"vacuum|{self.id}|tank|{entry.entity_id}",
+                        "type": "template",
+                        "template": (
+                            f"{{{{ states('{entry.entity_id}') | lower is search('{bad}') }}}}"
+                        ),
+                        "for": 60,
+                        "message": f"{self.name}: {need}",
+                    }
+                )
+                break
         for entry in self.entities():
             if entry.domain != "sensor":
                 continue
