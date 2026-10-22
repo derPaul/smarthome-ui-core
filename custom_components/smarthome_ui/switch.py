@@ -11,7 +11,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
-from .const import SIGNAL_ALARM, SIGNAL_NOTIFY, SIGNAL_SECURITY
+from .alarm import OPTION_SWITCHES, AlarmEntity, AlarmOption
+from .const import SIGNAL_NOTIFY, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
 from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
@@ -38,6 +39,7 @@ async def async_setup_entry(
     alarm = entry.runtime_data.alarm
     async_add_entities(
         [AlarmLogicSwitch(entry.entry_id, alarm), GuestsSwitch(entry.entry_id, alarm)]
+        + [AlarmOptionSwitch(entry.entry_id, alarm, *option) for option in OPTION_SWITCHES]
     )
     async_setup_doorbell_entities(
         entry.runtime_data.doorbells,
@@ -249,28 +251,7 @@ class DoorbellNotify(DoorbellEntity, SwitchEntity):
         self._tracker.set_muted(True)
 
 
-class _AlarmEntity(CoreEntity):
-    """An alarm entity of the device "Sicherheit" (available once the alarm is in Core)."""
-
-    def __init__(self, entry_id: str, alarm: Any, key: str, domain: str) -> None:
-        """Initialize (<domain>.security_<key>)."""
-        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, domain, key)
-        self._alarm = alarm
-        self._attr_translation_key = f"security_{key}"
-
-    @property
-    def available(self) -> bool:
-        """Return True once the dashboard handed the alarm over."""
-        return self._alarm.configured
-
-    async def async_added_to_hass(self) -> None:
-        """Update when the alarm state changes."""
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_ALARM, self.async_write_ha_state)
-        )
-
-
-class AlarmLogicSwitch(_AlarmEntity, SwitchEntity):
+class AlarmLogicSwitch(AlarmEntity, SwitchEntity):
     """Core runs the alarm logic (off: Core triggers and reacts to nothing)."""
 
     def __init__(self, entry_id: str, alarm: Any) -> None:
@@ -291,7 +272,7 @@ class AlarmLogicSwitch(_AlarmEntity, SwitchEntity):
         self._alarm.set_enabled(False)
 
 
-class GuestsSwitch(_AlarmEntity, SwitchEntity):
+class GuestsSwitch(AlarmEntity, SwitchEntity):
     """Guests are there: the chosen motion sensors are silent in the guest modes."""
 
     def __init__(self, entry_id: str, alarm: Any) -> None:
@@ -315,3 +296,24 @@ class GuestsSwitch(_AlarmEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """No guests."""
         self._alarm.set_guests(False)
+
+
+class AlarmOptionSwitch(AlarmOption, SwitchEntity):
+    """An alarm setting on / off: night walk, critical push, push at entry delay / end, lights."""
+
+    def __init__(self, entry_id: str, alarm: Any, section: str, key: str, name: str) -> None:
+        """Initialize (switch.security_<name>)."""
+        super().__init__(entry_id, alarm, section, key, name, "switch")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the setting is on."""
+        return bool(self._value)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the setting on."""
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the setting off."""
+        self._set(False)

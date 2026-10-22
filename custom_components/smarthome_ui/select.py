@@ -1,4 +1,4 @@
-"""Selects: page, theme, season, sounds and performance per display; mowing frequency per area."""
+"""Selects: settings per display; mowing frequency per area; night walk effect."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
+from .alarm import NIGHTWALK_EFFECTS, AlarmLogic, AlarmOption
 from .const import SIGNAL_MOWER
 from .displays import SELECT_KEYS, DisplayEntity, async_setup_display_entities
 from .entity import attach_device
@@ -33,6 +34,7 @@ async def async_setup_entry(
             ],
         )
     )
+    async_add_entities([NightwalkEffect(entry.entry_id, entry.runtime_data.alarm)])
     mowers = entry.runtime_data.mowers
     known: set[tuple[str, str]] = set()
 
@@ -109,3 +111,22 @@ class MowFrequencySelect(SelectEntity):
     def _changed(self, mower_id: str) -> None:
         if mower_id == self._tracker.id:
             self.async_write_ha_state()
+
+
+class NightwalkEffect(AlarmOption, SelectEntity):
+    """What motion downstairs during the night walk does: ask by push, or allow silently."""
+
+    _attr_options = NIGHTWALK_EFFECTS
+
+    def __init__(self, entry_id: str, alarm: AlarmLogic) -> None:
+        """Initialize (select.security_nightwalk_effect)."""
+        super().__init__(entry_id, alarm, "nightwalk", "effect", "nightwalk_effect", "select")
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the effect."""
+        return self._value if self._value in NIGHTWALK_EFFECTS else None
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the effect."""
+        self._set(option)

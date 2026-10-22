@@ -1,4 +1,4 @@
-"""Numbers: cleaning interval per room (days) on the household device."""
+"""Numbers: cleaning interval per room (days) on the household device; alarm times."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
 
 from . import CoreConfigEntry
+from .alarm import OPTION_NUMBERS, AlarmLogic, AlarmOption
 from .const import SIGNAL_TASKS
 from .entity import DEVICE_HOUSEHOLD, CoreEntity
 from .store import CoreStore
@@ -38,6 +39,8 @@ async def async_setup_entry(
 
     sync()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_TASKS, sync))
+    alarm = entry.runtime_data.alarm
+    async_add_entities(AlarmOptionNumber(entry.entry_id, alarm, *o) for o in OPTION_NUMBERS)
 
 
 class CleanInterval(CoreEntity, NumberEntity):
@@ -86,3 +89,38 @@ class CleanInterval(CoreEntity, NumberEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_TASKS, self.async_write_ha_state)
         )
+
+
+class AlarmOptionNumber(AlarmOption, NumberEntity):
+    """An alarm time: night walk window / quiet time / question delay, guest away time."""
+
+    _attr_mode = NumberMode.BOX
+
+    def __init__(
+        self,
+        entry_id: str,
+        alarm: AlarmLogic,
+        section: str,
+        key: str,
+        name: str,
+        low: float,
+        high: float,
+        step: float,
+        unit: str,
+    ) -> None:
+        """Initialize (number.security_<name>)."""
+        super().__init__(entry_id, alarm, section, key, name, "number")
+        self._attr_native_min_value = low
+        self._attr_native_max_value = high
+        self._attr_native_step = step
+        self._attr_native_unit_of_measurement = unit
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the setting."""
+        value = self._value
+        return float(value) if value is not None else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Change the setting."""
+        self._set(int(value) if value == int(value) else value)

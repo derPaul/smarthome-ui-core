@@ -411,6 +411,13 @@
           "rare": "Seltener",
           "pause": "Pause"
         }
+      },
+      "security_nightwalk_effect": {
+        "name": "Nachtweg: Bewegung unten",
+        "state": {
+          "ask": "Per Push nachfragen",
+          "allow": "Still erlauben"
+        }
       }
     },
     "switch": {
@@ -446,11 +453,41 @@
       },
       "security_guests": {
         "name": "Gäste da"
+      },
+      "security_nightwalk": {
+        "name": "Nachtweg"
+      },
+      "security_alarm_critical": {
+        "name": "Alarm-Push als kritisch"
+      },
+      "security_alarm_pending": {
+        "name": "Push bei Eingangsverzögerung"
+      },
+      "security_alarm_clear": {
+        "name": "Push bei Alarm-Ende"
+      },
+      "security_alarm_lights": {
+        "name": "Bei Alarm alle Lichter an"
+      },
+      "security_guests_push": {
+        "name": "Push beim Scharfschalten mit Gästen"
       }
     },
     "number": {
       "clean_interval": {
         "name": "Putzen {area}"
+      },
+      "security_nightwalk_window": {
+        "name": "Nachtweg-Fenster"
+      },
+      "security_nightwalk_quiet": {
+        "name": "Nachtweg: vorher ruhig"
+      },
+      "security_nightwalk_ask_delay": {
+        "name": "Nachtweg: Alarm ohne Antwort nach"
+      },
+      "security_guests_away": {
+        "name": "Gäste aus nach"
       }
     },
     "time": {

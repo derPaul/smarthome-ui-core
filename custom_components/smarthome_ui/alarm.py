@@ -19,7 +19,9 @@ Settings come from the dashboard (``alarm/settings``), in the shape it edits the
   trigger the alarm after ``ask_delay`` seconds without answer.
 
 Entities (device "Sicherheit"): "Alarm-Logik" (switch, off = Core does not trigger), "Gäste da"
-(switch), "Nachtweg bis" (sensor), "Nachtweg öffnen" (button), "Alarm-Grund" (sensor).
+(switch), "Nachtweg bis" (sensor), "Nachtweg öffnen" (button), "Alarm-Grund" (sensor). The single
+values (night walk on / effect / minutes, guest away time, which pushes) are also config entities;
+the lists (sensors, modes) stay in the dashboard's dialog.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from datetime import timedelta
 import logging
 from typing import Any
 
-from homeassistant.const import EVENT_STATE_CHANGED
+from homeassistant.const import EVENT_STATE_CHANGED, EntityCategory, UnitOfTime
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -38,11 +40,12 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, SIGNAL_ALARM
+from .const import DOMAIN, SIGNAL_ALARM, SIGNAL_DATA
+from .entity import DEVICE_SECURITY, CoreEntity
 from .store import CoreStore, now_ms
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +63,23 @@ OLD_AUTOMATIONS = (
     "smarthome_alarm_benachrichtigen",
 )
 GUEST_MODES_DEFAULT = ["armed_home", "armed_away", "armed_night", "armed_vacation"]
+NIGHTWALK_EFFECTS = ["ask", "allow"]
+# config entities for the single values: (section, key, entity key)
+OPTION_SWITCHES = (
+    ("nightwalk", "enabled", "nightwalk"),
+    ("actions", "critical", "alarm_critical"),
+    ("actions", "pending", "alarm_pending"),
+    ("actions", "clear", "alarm_clear"),
+    ("actions", "lights", "alarm_lights"),
+    ("guests", "push_arm", "guests_push"),
+)
+# (section, key, entity key, min, max, step, unit)
+OPTION_NUMBERS = (
+    ("nightwalk", "window", "nightwalk_window", 1, 30, 1, UnitOfTime.MINUTES),
+    ("nightwalk", "quiet", "nightwalk_quiet", 0, 60, 1, UnitOfTime.MINUTES),
+    ("nightwalk", "ask_delay", "nightwalk_ask_delay", 10, 300, 5, UnitOfTime.SECONDS),
+    ("guests", "away", "guests_away", 5, 240, 5, UnitOfTime.MINUTES),
+)
 
 
 class AlarmLogic:
@@ -143,21 +163,32 @@ class AlarmLogic:
             self.data["nightwalk_until"] = int(settings["nightwalk_until"])
         self.data["configured"] = True
         self.data.setdefault("enabled", True)
-        self.store.save()
         if self.enabled:
             self._old_automations(False)
         self._listen()
         self._check_guests()
-        async_dispatcher_send(self.hass, SIGNAL_ALARM)
+        self._save()
 
     @callback
     def set_enabled(self, enabled: bool) -> None:
         """Run the alarm logic in Core or not (the dashboard's automations would be needed then)."""
         self.data["enabled"] = enabled
-        self.store.save()
         # never both and never none: the old automations run while Core does not
         self._old_automations(not enabled)
-        async_dispatcher_send(self.hass, SIGNAL_ALARM)
+        self._save()
+
+    @callback
+    def set_option(self, section: str, key: str, value: Any) -> None:
+        """Change one setting (from the config entities), e.g. ``nightwalk`` / ``window``."""
+        self.data[section] = {**(self.data.get(section) or {}), key: value}
+        if section == "nightwalk" and key == "starts":
+            self._listen()
+        self._save()
+
+    @callback
+    def _save(self) -> None:
+        """Save and update the entities and the dashboards."""
+        self.store.save(SIGNAL_ALARM, SIGNAL_DATA)
 
     def old_automations(self) -> list[str]:
         """Return the entity IDs of the dashboard's former alarm automations."""
@@ -180,17 +211,15 @@ class AlarmLogic:
         """Guests there or not (by hand; the detection changes it again on the next change)."""
         if self.guests_on != on:
             self.data["guests_on"] = on
-            self.store.save()
-            async_dispatcher_send(self.hass, SIGNAL_ALARM)
+            self._save()
 
     @callback
     def open_nightwalk(self, reason: str = "von Hand") -> None:
         """Open the night walk window now."""
         minutes = float(self.nightwalk()["window"] or 3)
         self.data["nightwalk_until"] = now_ms() + int(minutes * 60_000)
-        self.store.save()
+        self._save()
         self._log(f"Nachtweg geöffnet ({reason})")
-        async_dispatcher_send(self.hass, SIGNAL_ALARM)
 
     # ---------------------------------------------------------------- setup
 
@@ -299,8 +328,7 @@ class AlarmLogic:
 
     async def _async_trigger(self, entity_id: str | None, name: str) -> None:
         self.data["reason"] = {"entity": entity_id, "name": name, "t": now_ms()}
-        self.store.save()
-        async_dispatcher_send(self.hass, SIGNAL_ALARM)
+        self._save()
         try:
             await self.hass.services.async_call(
                 "alarm_control_panel",
@@ -554,3 +582,46 @@ class AlarmLogic:
             if self.configured
             else None,
         }
+
+
+class AlarmEntity(CoreEntity):
+    """An alarm entity of the device "Sicherheit" (available once the alarm is in Core)."""
+
+    def __init__(self, entry_id: str, alarm: AlarmLogic, key: str, domain: str) -> None:
+        """Initialize (<domain>.security_<key>)."""
+        super().__init__(entry_id, f"security_{key}", DEVICE_SECURITY, domain, key)
+        self._alarm = alarm
+        self._attr_translation_key = f"security_{key}"
+
+    @property
+    def available(self) -> bool:
+        """Return True once the dashboard handed the alarm over."""
+        return self._alarm.configured
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the alarm state changes."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_ALARM, self.async_write_ha_state)
+        )
+
+
+class AlarmOption(AlarmEntity):
+    """One single alarm setting as config entity (the dialog in the dashboard shows the same)."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self, entry_id: str, alarm: AlarmLogic, section: str, key: str, name: str, domain: str
+    ) -> None:
+        """Initialize (<domain>.security_<name>)."""
+        super().__init__(entry_id, alarm, name, domain)
+        self._section = section
+        self._key = key
+
+    @property
+    def _value(self) -> Any:
+        return getattr(self._alarm, self._section)()[self._key]
+
+    @callback
+    def _set(self, value: Any) -> None:
+        self._alarm.set_option(self._section, self._key, value)

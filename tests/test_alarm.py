@@ -266,3 +266,49 @@ async def test_old_automations_switched(hass: HomeAssistant, notify_calls) -> No
     )
     await hass.async_block_till_done()
     assert on[-1].data["entity_id"] == ["automation.alarm_ausloser"]
+
+
+async def test_option_entities(hass: HomeAssistant, notify_calls) -> None:
+    entry, _trigger = await _setup(hass, "armed_night")
+    alarm = entry.runtime_data.alarm
+    assert hass.states.get("switch.security_nightwalk").state == "off"
+    assert hass.states.get("number.security_nightwalk_window").state == "3.0"
+    assert hass.states.get("select.security_nightwalk_effect").state == "allow"
+    assert hass.states.get("number.security_guests_away").state == "30.0"
+
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": "switch.security_nightwalk"}, blocking=True
+    )
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": "number.security_nightwalk_window", "value": 7},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.security_nightwalk_effect", "option": "ask"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": "switch.security_alarm_critical"}, blocking=True
+    )
+    walk = alarm.nightwalk()
+    assert walk["enabled"] is True
+    assert walk["window"] == 7
+    assert walk["effect"] == "ask"
+    assert walk["starts"] == [UP]  # lists are kept
+    assert alarm.actions()["critical"] is False
+    assert alarm.info()["settings"]["nightwalk"]["window"] == 7
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.security_nightwalk").state == "on"
+
+
+async def test_options_unavailable_before_handover(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain="smarthome_ui", data={}, title="Smarthome UI Core")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("number.security_nightwalk_window").state == "unavailable"
+    assert hass.states.get("select.security_nightwalk_effect").state == "unavailable"

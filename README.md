@@ -219,6 +219,23 @@ Eingestellt wird weiter im Dashboard (*Sicherheit → Alarmanlage → Zahnrad*);
 | `button.security_nightwalk_open` | Nachtweg jetzt öffnen |
 | `sensor.security_alarm_reason` | welcher Sensor zuletzt ausgelöst hat |
 
+Einstellungen als Konfigurations-Entitäten (gleicher Stand wie im Dashboard-Dialog, erst nach der Übergabe
+verfügbar). Die Listen – welche Sensoren, welche Modi – bleiben im Dialog.
+
+| Einstellung | |
+|---|---|
+| `switch.security_nightwalk` | Nachtweg an/aus |
+| `select.security_nightwalk_effect` | Bewegung unten im Nachtweg: per Push nachfragen (`ask`) oder still erlauben (`allow`) |
+| `number.security_nightwalk_window` | wie lange der Nachtweg offen ist (1–30 Min.) |
+| `number.security_nightwalk_quiet` | so lange muss unten vorher Ruhe sein (0–60 Min.) |
+| `number.security_nightwalk_ask_delay` | Alarm, wenn die Rückfrage so lange unbeantwortet bleibt (10–300 s) |
+| `number.security_guests_away` | „Gäste da“ geht so lange nach dem letzten Gast aus (5–240 Min.) |
+| `switch.security_alarm_critical` | Alarm-Push als kritische Mitteilung |
+| `switch.security_alarm_pending` | Push bei Eingangsverzögerung |
+| `switch.security_alarm_clear` | Push, wenn der Alarm beendet ist |
+| `switch.security_alarm_lights` | bei Alarm alle Lichter an |
+| `switch.security_guests_push` | Push beim Scharfschalten mit Gästen |
+
 Bei der Übergabe (Dashboard: „An Core übergeben“ bzw. Speichern) übernimmt Core auch den aktuellen Stand von
 „Gäste da“ und „Nachtweg bis“ und schaltet die alten Automationen aus.
 

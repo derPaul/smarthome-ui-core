@@ -411,6 +411,13 @@
           "rare": "Less often",
           "pause": "Pause"
         }
+      },
+      "security_nightwalk_effect": {
+        "name": "Night walk: motion downstairs",
+        "state": {
+          "ask": "Ask by push",
+          "allow": "Allow silently"
+        }
       }
     },
     "switch": {
@@ -446,11 +453,41 @@
       },
       "security_guests": {
         "name": "Guests present"
+      },
+      "security_nightwalk": {
+        "name": "Night walk"
+      },
+      "security_alarm_critical": {
+        "name": "Alarm push as critical"
+      },
+      "security_alarm_pending": {
+        "name": "Push at entry delay"
+      },
+      "security_alarm_clear": {
+        "name": "Push when alarm ended"
+      },
+      "security_alarm_lights": {
+        "name": "All lights on at alarm"
+      },
+      "security_guests_push": {
+        "name": "Push when armed with guests"
       }
     },
     "number": {
       "clean_interval": {
         "name": "Cleaning {area}"
+      },
+      "security_nightwalk_window": {
+        "name": "Night walk window"
+      },
+      "security_nightwalk_quiet": {
+        "name": "Night walk: quiet before"
+      },
+      "security_nightwalk_ask_delay": {
+        "name": "Night walk: alarm without answer after"
+      },
+      "security_guests_away": {
+        "name": "Guests off after"
       }
     },
     "time": {
