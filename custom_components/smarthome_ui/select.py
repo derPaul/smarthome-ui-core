@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import slugify
@@ -12,6 +11,7 @@ from homeassistant.util import slugify
 from . import CoreConfigEntry
 from .const import SIGNAL_MOWER
 from .displays import SELECT_KEYS, DisplayEntity, async_setup_display_entities
+from .entity import attach_device
 from .mower import FREQ_OPTIONS, MowerTracker
 
 
@@ -90,8 +90,7 @@ class MowFrequencySelect(SelectEntity):
         self._attr_unique_id = f"{entry_id}_mower_{tracker.id}_{slugify(area)}_frequency"
         self._attr_translation_placeholders = {"area": area}
         self.entity_id = f"select.garden_{slugify(area)}_frequency"
-        if identifiers := tracker.device_identifiers():
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+        attach_device(self, tracker.hass, tracker.device_id)
 
     @property
     def current_option(self) -> str:

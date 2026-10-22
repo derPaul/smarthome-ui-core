@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import Entity
 
@@ -11,6 +13,17 @@ DEVICE_NOTIFY = "notifications"
 DEVICE_HOUSEHOLD = "household"
 DEVICE_GARDEN = "garden"
 DEVICES = (DEVICE_NOTIFY, DEVICE_HOUSEHOLD, DEVICE_GARDEN)
+
+
+def attach_device(entity: Entity, hass: HomeAssistant, device_id: str | None) -> None:
+    """Put an entity on an existing device of another integration (mower, plant, dishwasher …).
+
+    Home Assistant matches the identifiers of a ``DeviceInfo`` only within the own config entry,
+    so a ``DeviceInfo`` with the other device's identifiers would create a second, empty device
+    named after this integration. Setting ``device_entry`` attaches to the device itself.
+    """
+    if device_id and (device := dr.async_get(hass).async_get(device_id)) is not None:
+        entity.device_entry = device
 
 
 def device_for_source(src: str | None) -> str:

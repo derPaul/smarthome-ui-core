@@ -38,7 +38,6 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -47,6 +46,7 @@ from homeassistant.util import slugify
 
 from . import durations
 from .const import SIGNAL_APPLIANCE, SIGNAL_DATA, SIGNAL_TASKS, TICK_INTERVAL
+from .entity import attach_device
 from .mower import CONF_DEVICE
 from .store import CoreStore, now_ms
 
@@ -722,8 +722,7 @@ class ApplianceEntity(Entity):
         self._attr_unique_id = f"{entry_id}_appliance_{tracker.id}_{key}"
         self._attr_translation_key = f"appliance_{key}"
         self.entity_id = f"{domain}.household_{slugify(tracker.name)}_{key}"
-        if identifiers := tracker.device_identifiers():
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+        attach_device(self, tracker.hass, tracker.device_id)
 
     async def async_added_to_hass(self) -> None:
         """Update when the appliance changes."""

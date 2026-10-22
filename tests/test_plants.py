@@ -181,3 +181,30 @@ async def test_fertilize_by_calendar(hass: HomeAssistant, freezer) -> None:
     # outside the months: nothing
     freezer.move_to("2026-11-10 08:00:00")
     assert ficus.feed_due() is None
+
+
+async def test_entities_on_plant_device_and_duplicates_removed(hass: HomeAssistant) -> None:
+    """Our entities go onto the plant's own device; empty copies named after Core are removed."""
+    _plant(hass, "Monstera", "Wohnzimmer", 30)
+    entry = MockConfigEntry(domain="smarthome_ui", data={}, title="Smarthome UI Core")
+    entry.add_to_hass(hass)
+    devices = dr.async_get(hass)
+    # what newer Home Assistant versions created for our entities so far
+    copy = devices.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={("plant", "copy_of_monstera")}
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert devices.async_get(copy.id) is None
+    plant_device = devices.async_get_device(identifiers={("plant", "monstera")})
+    for entity_id in (
+        "sensor.household_monstera_last_watered",
+        "sensor.household_monstera_next_watering",
+        "button.household_monstera_watered",
+    ):
+        assert er.async_get(hass).async_get(entity_id).device_id == plant_device.id
+    assert not [d for d in devices.devices.values() if d.name == "Smarthome UI Core"]
+    assert hass.states.get("sensor.household_monstera_last_watered").name == (
+        "Monstera Last watered"
+    )

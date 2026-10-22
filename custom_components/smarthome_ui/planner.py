@@ -28,7 +28,6 @@ from typing import Any
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -42,6 +41,7 @@ from .const import (
     SIGNAL_PLANNER,
     SIGNAL_VACUUM,
 )
+from .entity import attach_device
 from .mower import MowerTracker, area_name
 from .notify import NotifyEngine, in_quiet
 from .store import CoreStore, now_ms
@@ -658,8 +658,7 @@ class PlannerEntity(Entity):
         prefix = "garden" if planner.kind == KIND_MOWER else "household"
         self._attr_unique_id = f"{entry_id}_planner_{planner.id}{key}"
         self.entity_id = f"{domain}.{prefix}_{obj}"
-        if identifiers := planner.tracker.device_identifiers():
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+        attach_device(self, planner.tracker.hass, planner.tracker.device_id)
 
     async def async_added_to_hass(self) -> None:
         """Update when the planner changes."""

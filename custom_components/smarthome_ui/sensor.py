@@ -8,7 +8,6 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util, slugify
@@ -17,7 +16,13 @@ from . import CoreConfigEntry, durations
 from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .const import SIGNAL_MOWER, SIGNAL_SENT, SIGNAL_TASKS, SIGNAL_VACUUM, SIGNAL_WASTE
 from .displays import DisplayEntity, async_setup_display_entities
-from .entity import DEVICE_HOUSEHOLD, DEVICE_NOTIFY, CoreEntity, device_for_source
+from .entity import (
+    DEVICE_HOUSEHOLD,
+    DEVICE_NOTIFY,
+    CoreEntity,
+    attach_device,
+    device_for_source,
+)
 from .maintenance import Part, PartEntity, async_setup_part_entities, days_left
 from .mower import MowerTracker
 from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
@@ -285,8 +290,7 @@ class MowAreaSensor(SensorEntity):
         self._attr_unique_id = f"{entry_id}_mower_{tracker.id}_{slugify(area)}"
         self._attr_translation_placeholders = {"area": area}
         self.entity_id = f"sensor.garden_{slugify(area)}_last_mowed"
-        if identifiers := tracker.device_identifiers():
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+        attach_device(self, tracker.hass, tracker.device_id)
 
     @property
     def native_value(self) -> datetime | None:
@@ -348,8 +352,7 @@ class VacuumRoomSensor(SensorEntity):
         self._attr_unique_id = f"{entry_id}_vacuum_{tracker.id}_{area_id}"
         self._attr_translation_placeholders = {"area": name}
         self.entity_id = f"sensor.household_{slugify(name) or area_id}_last_vacuumed"
-        if identifiers := tracker.device_identifiers():
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+        attach_device(self, tracker.hass, tracker.device_id)
 
     @property
     def native_value(self) -> datetime | None:

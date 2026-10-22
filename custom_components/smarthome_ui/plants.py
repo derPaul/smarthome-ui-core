@@ -33,7 +33,6 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
@@ -41,6 +40,7 @@ from homeassistant.util import dt as dt_util, slugify
 
 from .chores import start_of_day
 from .const import SIGNAL_DATA, SIGNAL_PLANTS, SIGNAL_TASKS, WATCH_INTERVAL
+from .entity import attach_device
 from .store import CoreStore, now_ms
 
 HOUR_MS = 3_600_000
@@ -142,11 +142,6 @@ class PlantTracker:
     def source(self) -> str:
         """Return the notification source (and so the to-do list)."""
         return "gd.plants" if self.outdoor else "hh.plants"
-
-    def device_info(self) -> DeviceInfo | None:
-        """Return the device our entities belong to."""
-        device = dr.async_get(self.hass).async_get(self.device_id) if self.device_id else None
-        return DeviceInfo(identifiers=set(device.identifiers)) if device else None
 
     def _device_entities(self) -> list[er.RegistryEntry]:
         if not self.device_id:
@@ -634,9 +629,8 @@ class PlantEntity(Entity):
         self._attr_unique_id = f"{entry_id}_plant_{plant.entity_id}_{key}"
         self._attr_translation_key = f"plant_{key}"
         self.entity_id = f"{domain}.{prefix}_{slug}_{key}"
-        if info := plant.device_info():
-            self._attr_device_info = info
-        else:  # no device: the plant's name goes into the entity name
+        attach_device(self, plant.hass, plant.device_id)
+        if self.device_entry is None:  # no device: the plant's name goes into the entity name
             label = {"last_watered": "zuletzt gegossen", "next_watering": "nächstes Gießen"}
             self._attr_name = f"{plant.name} {label.get(key, 'gegossen')}"
 

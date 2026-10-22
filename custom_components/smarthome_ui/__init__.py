@@ -296,6 +296,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
     _remove_single_device(hass, entry)
+    _remove_duplicate_devices(hass, entry)
     await hass.async_add_executor_job(_install_blueprints, hass.config.path("blueprints"))
     engine.extra_rules = lambda: [
         *mowers.rules(),
@@ -398,6 +399,18 @@ def _remove_single_device(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
     devices = dr.async_get(hass)
     if old := devices.async_get_device(identifiers={(DOMAIN, entry.entry_id)}):
         devices.async_remove_device(old.id)
+
+
+@callback
+def _remove_duplicate_devices(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
+    """Remove the empty copies of other integrations' devices that newer Home Assistant versions
+    created for our entities (named "Smarthome UI Core"); the entities go to the real device."""
+    devices = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        if set(device.config_entries) != {entry.entry_id}:
+            continue
+        if device.identifiers and all(domain != DOMAIN for domain, _ in device.identifiers):
+            devices.async_remove_device(device.id)
 
 
 async def async_remove_config_entry_device(

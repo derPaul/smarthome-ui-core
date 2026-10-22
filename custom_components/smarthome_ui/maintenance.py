@@ -30,6 +30,7 @@ from homeassistant.util import dt as dt_util, slugify
 
 from .chores import add_every, interval_days, start_of_day
 from .const import DOMAIN, SIGNAL_DATA
+from .entity import attach_device
 from .store import CoreStore, now_ms
 
 SUBENTRY_PART = "part"
@@ -189,14 +190,10 @@ class Part:
         base = self.last(action) or self.since
         return start_of_day(add_every(base, {"n": months, "unit": "m"}))
 
-    def device_info(self) -> DeviceInfo | None:
-        """Return the device our entities belong to (the linked one or our own)."""
-        if self.device_id:
-            device = dr.async_get(self.hass).async_get(self.device_id)
-            if device is not None:
-                return DeviceInfo(identifiers=set(device.identifiers))
-        if self.own_device:
-            return DeviceInfo(identifiers={self.own_device})
+    def linked_device(self) -> str | None:
+        """Return the linked device of another integration (if it still exists)."""
+        if self.device_id and dr.async_get(self.hass).async_get(self.device_id) is not None:
+            return self.device_id
         return None
 
     def tasks(self) -> list[dict[str, Any]]:
@@ -376,8 +373,10 @@ class PartEntity(Entity):
         self._action = action
         self._attr_unique_id = f"{entry_id}_part_{part.id}_{key}"
         self.entity_id = f"{domain}.household_{slugify(part.name)}_{key}"
-        if info := part.device_info():
-            self._attr_device_info = info
+        if linked := part.linked_device():
+            attach_device(self, part.hass, linked)
+        elif part.own_device:
+            self._attr_device_info = DeviceInfo(identifiers={part.own_device})
 
     async def async_added_to_hass(self) -> None:
         """Update when something is checked off (and once a day via the sensor's day)."""
