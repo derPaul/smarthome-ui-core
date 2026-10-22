@@ -41,6 +41,7 @@ from .appliance import (
     detect_kind,
 )
 from .const import DOMAIN
+from .doorbell import SUBENTRY_DOORBELL
 from .maintenance import (
     CONF_AREA,
     CONF_KIND as PART_KIND,
@@ -78,6 +79,7 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_VACUUM: VacuumSubentryFlow,
             SUBENTRY_APPLIANCE: ApplianceSubentryFlow,
             SUBENTRY_PART: PartSubentryFlow,
+            SUBENTRY_DOORBELL: DoorbellSubentryFlow,
         }
 
 
@@ -410,3 +412,70 @@ class PartSubentryFlow(ConfigSubentryFlow):
         kind = cur.get(PART_KIND) or "other"
         schema = {**self._base_schema(cur, subentry.title), **self._interval_schema(kind, cur)}
         return self.async_show_form(step_id="reconfigure", data_schema=vol.Schema(schema))
+
+
+class DoorbellSubentryFlow(MowerSubentryFlow):
+    """Add or change a doorbell: device, optionally name, camera and lock."""
+
+    _type = SUBENTRY_DOORBELL
+    _default = "Klingel"
+
+    def _schema(self, device: str | None = None, name: str | None = None) -> vol.Schema:
+        cur = getattr(self, "_current", {})
+        return vol.Schema(
+            {
+                vol.Required(CONF_DEVICE, default=device or vol.UNDEFINED): DeviceSelector(
+                    DeviceSelectorConfig(
+                        entity=[
+                            EntityFilterSelectorConfig(domain="event"),
+                            EntityFilterSelectorConfig(domain="binary_sensor"),
+                        ]
+                    )
+                ),
+                vol.Optional("name", description={"suggested_value": name}): TextSelector(),
+                vol.Optional("camera", description={"suggested_value": cur.get("camera")}): (
+                    EntitySelector(EntitySelectorConfig(domain="camera"))
+                ),
+                vol.Optional("lock", description={"suggested_value": cur.get("lock")}): (
+                    EntitySelector(EntitySelectorConfig(domain="lock"))
+                ),
+            }
+        )
+
+    @staticmethod
+    def _data(user_input: dict[str, Any]) -> dict[str, Any]:
+        return {
+            CONF_DEVICE: user_input[CONF_DEVICE],
+            "camera": user_input.get("camera") or None,
+            "lock": user_input.get("lock") or None,
+        }
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Add a doorbell."""
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE]):
+                return self.async_abort(reason="already_configured")
+            return self.async_create_entry(
+                title=self._title(user_input), data=self._data(user_input)
+            )
+        return self.async_show_form(step_id="user", data_schema=self._schema())
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change device, name, camera or lock."""
+        subentry = self._get_reconfigure_subentry()
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE], subentry.subentry_id):
+                return self.async_abort(reason="already_configured")
+            return self.async_update_and_abort(
+                self._get_entry(),
+                subentry,
+                title=self._title(user_input),
+                data=self._data(user_input),
+            )
+        self._current = dict(subentry.data)
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self._schema(subentry.data.get(CONF_DEVICE), subentry.title),
+        )

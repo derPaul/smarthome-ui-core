@@ -164,6 +164,38 @@
       "abort": {
         "reconfigure_successful": "Wartungsteil geändert."
       }
+    },
+    "doorbell": {
+      "entry_type": "Klingel",
+      "initiate_flow": {
+        "user": "Klingel hinzufügen",
+        "reconfigure": "Klingel ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Klingel hinzufügen",
+          "description": "Gerät der Klingel wählen. Klingelt es, meldet Smarthome UI Core das mit dem Kamerabild (dringlich, wenn niemand zuhause ist) – auch ohne offenes Dashboard.",
+          "data": {
+            "device_id": "Klingel",
+            "name": "Name (optional)",
+            "camera": "Kamera (optional, sonst die des Geräts)",
+            "lock": "Schloss (optional, sonst das im selben Bereich)"
+          }
+        },
+        "reconfigure": {
+          "title": "Klingel ändern",
+          "data": {
+            "device_id": "Klingel",
+            "name": "Name (optional)",
+            "camera": "Kamera (optional, sonst die des Geräts)",
+            "lock": "Schloss (optional, sonst das im selben Bereich)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "Diese Klingel ist schon hinzugefügt.",
+        "reconfigure_successful": "Klingel geändert."
+      }
     }
   },
   "device": {
@@ -267,6 +299,9 @@
       },
       "security_persons_home": {
         "name": "Personen zuhause"
+      },
+      "doorbell_last_ring": {
+        "name": "Zuletzt geklingelt"
       }
     },
     "binary_sensor": {
@@ -393,6 +428,9 @@
       },
       "security_good_night_check": {
         "name": "Gute-Nacht-Check"
+      },
+      "doorbell_notify": {
+        "name": "Klingel-Mitteilung"
       }
     },
     "number": {

@@ -13,6 +13,7 @@ from homeassistant.util import slugify
 from . import CoreConfigEntry
 from .const import SIGNAL_NOTIFY, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
+from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
@@ -33,6 +34,11 @@ async def async_setup_entry(
             ("leave", "leave_check"),
             ("good_night", "good_night_check"),
         )
+    )
+    async_setup_doorbell_entities(
+        entry.runtime_data.doorbells,
+        async_add_entities,
+        lambda t: [DoorbellNotify(entry.entry_id, t)],
     )
     manager = entry.runtime_data.displays
     entry.async_on_unload(
@@ -216,3 +222,24 @@ class SecurityCheck(CoreEntity, SwitchEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_SECURITY, self.async_write_ha_state)
         )
+
+
+class DoorbellNotify(DoorbellEntity, SwitchEntity):
+    """Ring notification of the doorbell on or off (e.g. while the baby sleeps)."""
+
+    def __init__(self, entry_id: str, tracker: DoorbellTracker) -> None:
+        """Initialize (switch.security_<doorbell>_notify)."""
+        super().__init__(entry_id, tracker, "notify", "switch")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if a ring is notified."""
+        return not self._tracker.muted
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Notify rings again."""
+        self._tracker.set_muted(False)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """No notification when it rings."""
+        self._tracker.set_muted(True)

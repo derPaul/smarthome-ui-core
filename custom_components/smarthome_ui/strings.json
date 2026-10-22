@@ -164,6 +164,38 @@
       "abort": {
         "reconfigure_successful": "Maintenance part changed."
       }
+    },
+    "doorbell": {
+      "entry_type": "Doorbell",
+      "initiate_flow": {
+        "user": "Add doorbell",
+        "reconfigure": "Change doorbell"
+      },
+      "step": {
+        "user": {
+          "title": "Add doorbell",
+          "description": "Pick the doorbell's device. When it rings, Smarthome UI Core notifies with the camera picture (urgent if nobody is home) – even without an open dashboard.",
+          "data": {
+            "device_id": "Doorbell",
+            "name": "Name (optional)",
+            "camera": "Camera (optional, else the one of the device)",
+            "lock": "Lock (optional, else the one in the same area)"
+          }
+        },
+        "reconfigure": {
+          "title": "Change doorbell",
+          "data": {
+            "device_id": "Doorbell",
+            "name": "Name (optional)",
+            "camera": "Camera (optional, else the one of the device)",
+            "lock": "Lock (optional, else the one in the same area)"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "This doorbell is already added.",
+        "reconfigure_successful": "Doorbell changed."
+      }
     }
   },
   "device": {
@@ -267,6 +299,9 @@
       },
       "security_persons_home": {
         "name": "Persons at home"
+      },
+      "doorbell_last_ring": {
+        "name": "Last ring"
       }
     },
     "binary_sensor": {
@@ -393,6 +428,9 @@
       },
       "security_good_night_check": {
         "name": "Good night check"
+      },
+      "doorbell_notify": {
+        "name": "Ring notification"
       }
     },
     "number": {

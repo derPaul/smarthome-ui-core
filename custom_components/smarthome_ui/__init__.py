@@ -47,6 +47,7 @@ from .const import (
     SIGNAL_TASKS,
 )
 from .displays import DisplayManager
+from .doorbell import DoorbellManager
 from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
 from .notify import NotifyEngine
@@ -89,6 +90,7 @@ class CoreRuntime:
     parts: PartManager
     plants: PlantManager
     security: Security
+    doorbells: DoorbellManager
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -299,6 +301,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
                 tag=tag,
             )
 
+    doorbells = DoorbellManager(hass, store)
+
+    @callback
+    def doorbell_rang(tracker: Any) -> None:
+        """Es klingelt – with the camera picture, urgent if nobody is home."""
+        cfg = (store.data["notify"].get("sources") or {}).get("sec.bell") or {}
+        if not cfg.get("push"):
+            return
+        nobody = not any(s.state == "home" for s in hass.states.async_all("person"))
+        engine.send(
+            "Klingel",
+            f"Es klingelt: {tracker.name}",
+            src="sec.bell",
+            url=cfg.get("url") or "/",
+            urgent=bool(cfg.get("urgent")) or nobody,
+            tag=f"doorbell|{tracker.id}",
+            camera=tracker.camera,
+        )
+
+    doorbells.on_ring = doorbell_rang
     security = Security(
         hass,
         store,
@@ -319,6 +341,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         parts,
         plants,
         security,
+        doorbells,
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -383,6 +406,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     parts.async_setup(entry)
     plants.async_setup()
     security.async_setup()
+    doorbells.async_setup(list(entry.subentries.values()))
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -472,6 +496,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.appliances.async_stop()
     entry.runtime_data.plants.async_stop()
     entry.runtime_data.security.async_stop()
+    entry.runtime_data.doorbells.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -504,6 +529,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "parts_migrated": list(store.data.get("parts_migrated") or []),
         "plants": runtime.plants.info(),
         "security": runtime.security.info(),
+        "doorbells": runtime.doorbells.info(),
         "features": [
             "task_defs",
             "waste",
@@ -512,6 +538,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "parts",
             "plants",
             "security",
+            "doorbells",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -562,6 +589,7 @@ def ws_subscribe(
                     "parts_migrated": list(runtime.store.data.get("parts_migrated") or []),
                     "plants": runtime.plants.info(),
                     "security": runtime.security.info(),
+                    "doorbells": runtime.doorbells.info(),
                 },
             )
         )

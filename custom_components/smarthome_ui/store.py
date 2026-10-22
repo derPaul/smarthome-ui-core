@@ -76,6 +76,8 @@ def _default() -> dict[str, Any]:
         "plant_rain": 0,
         # security: openings / night settings from the dashboard, checks, the night log
         "security": {},
+        # doorbells: {doorbell_id: {"rings": [ms], "mute": bool}}
+        "doorbells": {},
     }
 
 

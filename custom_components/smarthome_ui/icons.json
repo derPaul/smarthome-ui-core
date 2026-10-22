@@ -40,6 +40,9 @@
       },
       "security_persons_home": {
         "default": "mdi:home-account"
+      },
+      "doorbell_last_ring": {
+        "default": "mdi:doorbell"
       }
     },
     "switch": {
@@ -92,6 +95,12 @@
         "default": "mdi:weather-night",
         "state": {
           "off": "mdi:moon-waning-crescent"
+        }
+      },
+      "doorbell_notify": {
+        "default": "mdi:bell-ring-outline",
+        "state": {
+          "off": "mdi:bell-off-outline"
         }
       }
     },

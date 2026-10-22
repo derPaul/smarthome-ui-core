@@ -196,6 +196,18 @@ Pflanze:
 - **Düngen:** mit Dünger-Sensor wie bisher, wenn er „niedrig“ meldet. Ohne Sensor nach Kalender: alle *N* Wochen
   zwischen zwei Monaten (im Dashboard an der Pflanzen-Kachel einstellbar, WebSocket `smarthome_ui/plants/settings`).
 
+## Klingel
+
+**„Klingel hinzufügen“** (beliebig viele): Gerät der Klingel wählen (UniFi Protect, Reolink, Ring …), optional Name,
+Kamera und Schloss. Core findet am Gerät das Klingel-Ereignis (bzw. den Klingel-Sensor) und die Kamera (Hauptkanal,
+nicht die Paket-Kamera), das Schloss im selben Bereich.
+
+- Klingelt es, kommt „Es klingelt: Haustür“ mit dem Kamerabild (Quelle „Klingel“, Push an) – dringlich, wenn niemand
+  zuhause ist. Das Dashboard schickt für diese Klingeln keine eigene Regel mehr.
+- Entitäten am Klingel-Gerät: `sensor.security_<klingel>_last_ring` (zuletzt geklingelt, Attribut `today`) und
+  `switch.security_<klingel>_notify` („Klingel-Mitteilung“ – aus, z. B. wenn das Baby schläft).
+- Die Klingel-Kachel im Dashboard nimmt die Klingeln dann aus Core.
+
 ## Sicherheit
 
 Gerät **„Sicherheit“** mit Prüfungen für offene Fenster und Türen und einer Übersicht der letzten Nacht. Mitteilungen

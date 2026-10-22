@@ -23,6 +23,7 @@ from .const import (
     SIGNAL_WASTE,
 )
 from .displays import DisplayEntity, async_setup_display_entities
+from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import (
     DEVICE_HOUSEHOLD,
     DEVICE_NOTIFY,
@@ -144,6 +145,11 @@ async def async_setup_entry(
             async_add_entities,
             lambda p: [PlantLastWatered(entry.entry_id, p), PlantNextWatering(entry.entry_id, p)],
         )
+    )
+    async_setup_doorbell_entities(
+        entry.runtime_data.doorbells,
+        async_add_entities,
+        lambda t: [DoorbellLastRing(entry.entry_id, t)],
     )
     async_setup_part_entities(
         entry.runtime_data.parts,
@@ -757,4 +763,32 @@ class SecurityPersonsHome(SecurityEntity, SensorEntity):
         return {
             "home": [p["name"] for p in persons if p["home"]],
             "asleep": [p["name"] for p in persons if p["asleep"]],
+        }
+
+
+class DoorbellLastRing(DoorbellEntity, SensorEntity):
+    """When the doorbell rang last (how often today, the last rings)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, tracker: DoorbellTracker) -> None:
+        """Initialize (sensor.security_<doorbell>_last_ring)."""
+        super().__init__(entry_id, tracker, "last_ring", "sensor")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the last ring."""
+        rings = self._tracker.rings()
+        return dt_util.utc_from_timestamp(rings[-1] / 1000) if rings else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the rings of today and the last ones."""
+        return {
+            "today": self._tracker.rings_today(),
+            "last_rings": [
+                dt_util.utc_from_timestamp(t / 1000).isoformat()
+                for t in self._tracker.rings()[-10:]
+            ],
+            "camera": self._tracker.camera,
         }
