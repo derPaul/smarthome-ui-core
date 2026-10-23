@@ -336,6 +336,14 @@ steht in Core. Das Dashboard bearbeitet sie in seinen Dialogen und übernimmt se
 ohne eigene Liste erkennt die Seite die Geräte automatisch. Seit Schritt 3 auch: Szenen, Kalender und Listen der
 Startseite, ignorierte Entitäten der Räume, Garten & Terrasse sowie Aufgaben und Zonen des Mähers.
 
+**Energie-Dashboard** (ab 0.27): Netzbezug, Einspeisung, PV, Batterie geladen/entladen, Leistungssensoren, Wasser,
+Gas und die einzelnen Geräte liest Core aus dem Energie-Dashboard von Home Assistant (und bei jeder Änderung neu). Das
+Dashboard nutzt sie für Verlauf, Rekorde, Kosten, Energiefluss und Verbraucher, solange dort nichts Eigenes eingestellt
+ist (`get` → `energy`).
+
+Seit 0.27 stehen auch die Listen von Haustechnik und Netzwerk in Core (Statusleiste, Energiezähler, Betriebszustände,
+Thermostate, Verbraucher, „WLAN & Schalter“, Geräte), dazu die Hausverbrauchs-Leistung als einzelner Wert.
+
 **Einzelne Entitäten ohne Gerät** stehen ebenfalls in Core und gelten auf allen Seiten: Wetter-Entität,
 Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos, ab 0.25 auch Klappe und Tür des Briefkastens und
 der Müll-Kalender. Werte, die eine neuere Version dazubringt, übernimmt Core beim nächsten Mal einmalig.

@@ -50,6 +50,7 @@ from .const import (
 )
 from .displays import DisplayManager
 from .doorbell import DoorbellManager
+from .energy import EnergyPrefs
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
@@ -110,6 +111,7 @@ class CoreRuntime:
     system: System
     catalog: Catalog
     lists: PageLists
+    energy: EnergyPrefs
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -408,6 +410,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         System(hass, store, security_notify),
         Catalog(hass, entry, lambda: entry.runtime_data.system.options()["unifi_auto"]),
         PageLists(hass, store),
+        EnergyPrefs(hass, store),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     technik.overlay = entry.runtime_data.catalog.technik_overlay
@@ -477,6 +480,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     doorbells.async_setup(list(entry.subentries.values()))
     alarm.async_setup()
     entry.runtime_data.mailbox.async_setup()
+    # the energy dashboard's meters (does not hold up the start)
+    hass.async_create_task(entry.runtime_data.energy.async_setup())
     entry.runtime_data.presence_sim.async_setup()
     entry.runtime_data.grocery.async_setup()
     entry.runtime_data.technik.async_setup()
@@ -640,6 +645,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
         "lists": runtime.lists.info(),
+        "energy": runtime.energy.info(),
         "onboarding": _onboarding(store),
         "features": [
             "task_defs",
@@ -663,6 +669,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "catalog",
             "lists",
             "onboarding",
+            "energy",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -725,6 +732,7 @@ def ws_subscribe(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
                     "lists": runtime.lists.info(),
+                    "energy": runtime.energy.info(),
                     "onboarding": _onboarding(runtime.store),
                 },
             )

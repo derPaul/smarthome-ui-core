@@ -464,6 +464,9 @@ async def test_values_added_later(hass: HomeAssistant, entry: MockConfigEntry) -
         "mailbox.flap": "binary_sensor.klappe",
     }
     assert lists.migrate("values", {"waste.calendar": "calendar.mull"}) == 0
+    # lists of the house technology page
+    assert lists.migrate("haustechnik", {"consumers.entities": [{"entity": "sensor.wp"}]}) == 1
+    assert lists.info()["pages"]["haustechnik"] == {"consumers.entities": [{"entity": "sensor.wp"}]}
 
 
 async def test_suggest_unlink_onboarding(

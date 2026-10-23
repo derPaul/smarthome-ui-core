@@ -45,6 +45,16 @@ PAGES = {
     ),
     "rooms": ("exclude",),
     "garden": ("devices.entities", "mower.tasks", "mower.zones"),
+    "haustechnik": (
+        "status",
+        "history.entities",
+        "heatpump.states",
+        "water.metrics",
+        "thermostats.entities",
+        "water_usage.consumers",
+        "consumers.entities",
+    ),
+    "netzwerk": ("status", "devices.entities", "clients.entities"),
 }
 VALUES = (
     "weather.entity",
@@ -55,6 +65,7 @@ VALUES = (
     "mailbox.flap",
     "mailbox.door",
     "waste.calendar",
+    "flow.house_power",
 )
 # the values of the first takeover (Core 0.24)
 _VALUES_024 = VALUES[:5]
