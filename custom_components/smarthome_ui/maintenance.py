@@ -30,7 +30,7 @@ from homeassistant.util import dt as dt_util, slugify
 
 from .chores import add_every, interval_days, start_of_day
 from .const import DOMAIN, SIGNAL_DATA
-from .entity import attach_device
+from .entity import attach_device, find_device
 from .store import CoreStore, now_ms
 
 SUBENTRY_PART = "part"
@@ -216,7 +216,7 @@ class Part:
         """Return what the dashboard needs."""
         device = self.device_id or None
         if device is None and self.own_device:
-            entry = dr.async_get(self.hass).async_get_device(identifiers={self.own_device})
+            entry = find_device(self.hass, *self.own_device)
             device = entry.id if entry else None
         return {
             "id": self.id,

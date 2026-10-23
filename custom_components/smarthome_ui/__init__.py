@@ -50,6 +50,7 @@ from .const import (
 )
 from .displays import DisplayManager
 from .doorbell import DoorbellManager
+from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
 from .lists import PAGES as LIST_PAGES, PageLists
@@ -527,7 +528,7 @@ def _remove_single_device(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
     if old_todo := entities.async_get_entity_id("todo", DOMAIN, f"{entry.entry_id}_due"):
         entities.async_remove(old_todo)
     devices = dr.async_get(hass)
-    if old := devices.async_get_device(identifiers={(DOMAIN, entry.entry_id)}):
+    if old := find_device(hass, DOMAIN, entry.entry_id):
         devices.async_remove_device(old.id)
 
 
@@ -537,9 +538,9 @@ def _remove_duplicate_devices(hass: HomeAssistant, entry: CoreConfigEntry) -> No
     created for our entities (named "Smarthome UI Core"); the entities go to the real device."""
     devices = dr.async_get(hass)
     for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
-        if set(device.config_entries) != {entry.entry_id}:
+        if entry_ids(device) != {entry.entry_id}:
             continue
-        if device.identifiers and all(domain != DOMAIN for domain, _ in device.identifiers):
+        if device.identifiers and not has_identifier(device, DOMAIN):
             devices.async_remove_device(device.id)
 
 
@@ -548,7 +549,8 @@ async def async_remove_config_entry_device(
 ) -> bool:
     """Allow deleting a display that is not open right now (it comes back when opened again)."""
     prefix = f"{entry.entry_id}_display_"
-    for domain, ident in device.identifiers:
+    for identifier in device.identifiers:
+        domain, ident = identifier[0], identifier[1]
         if domain == DOMAIN and ident.startswith(prefix):
             display_id = ident.removeprefix(prefix)
             manager = entry.runtime_data.displays

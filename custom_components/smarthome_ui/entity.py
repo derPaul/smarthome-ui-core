@@ -25,6 +25,37 @@ DEVICES = (
 )
 
 
+def all_devices(hass: HomeAssistant) -> list[dr.DeviceEntry]:
+    """Return every device (newer Home Assistant: iterate the registry, not its mapping)."""
+    registry = dr.async_get(hass)
+    out = []
+    for item in registry.devices:
+        device = registry.async_get(item) if isinstance(item, str) else item
+        if device is not None:
+            out.append(device)
+    return out
+
+
+def has_identifier(device: dr.DeviceEntry, domain: str, ident: str | None = None) -> bool:
+    """Return True if the device has an identifier of the domain (and value).
+
+    Identifiers have two parts in older and three in newer Home Assistant versions.
+    """
+    return any(i[0] == domain and (ident is None or i[1] == ident) for i in device.identifiers)
+
+
+def find_device(hass: HomeAssistant, domain: str, ident: str) -> dr.DeviceEntry | None:
+    """Return the device with this identifier."""
+    return next((d for d in all_devices(hass) if has_identifier(d, domain, ident)), None)
+
+
+def entry_ids(device: dr.DeviceEntry) -> set[str]:
+    """Return the config entries of a device (newer Home Assistant: just one)."""
+    if (single := getattr(device, "config_entry_id", None)) is not None:
+        return {single}
+    return set(device.config_entries)
+
+
 def attach_device(entity: Entity, hass: HomeAssistant, device_id: str | None) -> None:
     """Put an entity on an existing device of another integration (mower, plant, dishwasher …).
 

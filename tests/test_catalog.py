@@ -285,3 +285,17 @@ async def test_page_lists(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_c
         {"id": 5, "type": "smarthome_ui/lists/migrate", "page": "security", "lists": {"locks": []}}
     )
     assert (await client.receive_json())["result"]["made"] == 0
+
+
+def test_identifiers_with_three_parts() -> None:
+    """Newer Home Assistant versions keep device identifiers with three parts."""
+    from types import SimpleNamespace
+
+    from custom_components.smarthome_ui.entity import entry_ids, has_identifier
+
+    new = SimpleNamespace(identifiers={("unifi", "ap1", "entry")}, config_entry_id="entry")
+    old = SimpleNamespace(identifiers={("unifi", "ap1")}, config_entries={"a", "b"})
+    assert has_identifier(new, "unifi") and has_identifier(new, "unifi", "ap1")
+    assert has_identifier(old, "unifi", "ap1") and not has_identifier(old, "zha")
+    assert entry_ids(new) == {"entry"}
+    assert entry_ids(old) == {"a", "b"}

@@ -23,6 +23,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+from .entity import all_devices, has_identifier
 from .mower import CONF_DEVICE
 
 SUBENTRY_DEVICE = "device"
@@ -245,7 +246,7 @@ class Catalog:
         ids = {device_id}
         if (dev := devices.async_get(device_id)) and dev.via_device_id:
             ids.add(dev.via_device_id)
-        ids |= {d.id for d in devices.devices.values() if d.via_device_id == device_id}
+        ids |= {d.id for d in all_devices(self.hass) if d.via_device_id == device_id}
         registry = er.async_get(self.hass)
         out: list[er.RegistryEntry] = []
         for did in ids:
@@ -335,10 +336,8 @@ class Catalog:
         if not any(d["role"] == "server" for d in out) and (server := self._server_auto()):
             out.append(server)
         if self.unifi_auto():
-            for device in devices.devices.values():
-                if device.id in linked or not any(
-                    domain == "unifi" for domain, _ in device.identifiers
-                ):
+            for device in all_devices(self.hass):
+                if device.id in linked or not has_identifier(device, "unifi"):
                     continue
                 # an unknown model is still watched (as network device), just not shown as tile
                 role = unifi_role(device.model) or "network"
@@ -371,13 +370,8 @@ class Catalog:
 
     def _server_auto(self) -> dict[str, Any] | None:
         """Return Home Assistant itself: the System Monitor device, the update and the backup."""
-        devices = dr.async_get(self.hass)
         monitor = next(
-            (
-                d
-                for d in devices.devices.values()
-                if any(i[0] == "systemmonitor" for i in d.identifiers)
-            ),
+            (d for d in all_devices(self.hass) if has_identifier(d, "systemmonitor")),
             None,
         )
         entities = {

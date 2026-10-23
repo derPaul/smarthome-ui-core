@@ -33,6 +33,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from . import durations
 from .const import SIGNAL_TASKS, SIGNAL_VACUUM, VAC_MIN_MINUTES
+from .entity import all_devices
 from .store import CoreStore, now_ms
 
 SUBENTRY_VACUUM = "vacuum"
@@ -220,8 +221,7 @@ class VacuumTracker:
 
     def device_ids(self) -> list[str]:
         """Return the vacuum device and devices linked to it (e.g. the station)."""
-        devices = dr.async_get(self.hass)
-        linked = [d.id for d in devices.devices.values() if d.via_device_id == self.device_id]
+        linked = [d.id for d in all_devices(self.hass) if d.via_device_id == self.device_id]
         return [self.device_id, *linked]
 
     def entities(self) -> list[er.RegistryEntry]:
