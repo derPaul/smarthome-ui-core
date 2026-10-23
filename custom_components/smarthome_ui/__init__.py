@@ -52,6 +52,7 @@ from .displays import DisplayManager
 from .doorbell import DoorbellManager
 from .forecast import Forecasts
 from .grocery import Grocery
+from .lists import PAGES as LIST_PAGES, PageLists
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
@@ -107,6 +108,7 @@ class CoreRuntime:
     forecasts: Forecasts
     system: System
     catalog: Catalog
+    lists: PageLists
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -292,6 +294,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_system_settings,
         ws_catalog_link,
         ws_catalog_migrate,
+        ws_lists_set,
+        ws_lists_migrate,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -398,6 +402,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Forecasts(hass, store, technik),
         System(hass, store, security_notify),
         Catalog(hass, entry, lambda: entry.runtime_data.system.options()["unifi_auto"]),
+        PageLists(hass, store),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     technik.overlay = entry.runtime_data.catalog.technik_overlay
@@ -618,6 +623,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "forecast": runtime.forecasts.info(),
         "system": runtime.system.info(),
         "catalog": runtime.catalog.info(store.data["catalog_migrated"]),
+        "lists": runtime.lists.info(),
         "features": [
             "task_defs",
             "waste",
@@ -638,6 +644,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "forecast",
             "system",
             "catalog",
+            "lists",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -697,6 +704,7 @@ def ws_subscribe(
                     "forecast": runtime.forecasts.info(),
                     "system": runtime.system.info(),
                     "catalog": runtime.catalog.info(runtime.store.data["catalog_migrated"]),
+                    "lists": runtime.lists.info(),
                 },
             )
         )
@@ -1163,3 +1171,42 @@ def ws_catalog_migrate(
             runtime.store.save(SIGNAL_DATA)
             made = runtime.catalog.migrate(msg["items"])
         connection.send_result(msg["id"], {"made": made})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/lists/set",
+        vol.Required("page"): vol.In(list(LIST_PAGES)),
+        vol.Required("path"): str,
+        vol.Required("items"): vol.Any(None, list),
+    }
+)
+@callback
+def ws_lists_set(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Set one list of a page (cameras, windows, locks …; None = automatic)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        try:
+            runtime.lists.set(msg["page"], msg["path"], msg["items"])
+        except ValueError as err:
+            connection.send_error(msg["id"], "invalid", str(err))
+            return
+        connection.send_result(msg["id"], runtime.lists.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/lists/migrate",
+        vol.Required("page"): vol.In(list(LIST_PAGES)),
+        vol.Required("lists"): dict,
+    }
+)
+@callback
+def ws_lists_migrate(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take over a page's lists once."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        made = runtime.lists.migrate(msg["page"], msg["lists"])
+        connection.send_result(msg["id"], {"made": made, **runtime.lists.info()})

@@ -30,7 +30,17 @@ CONF_ROLE = "role"
 CONF_ENTITIES = "entities"
 CONF_CAPACITY = "capacity"
 
-ROLES = ["inverter", "battery", "heatpump", "water", "internet", "gateway", "switch", "ap"]
+ROLES = [
+    "inverter",
+    "battery",
+    "heatpump",
+    "water",
+    "internet",
+    "gateway",
+    "switch",
+    "ap",
+    "server",
+]
 ROLE_LABELS = {
     "inverter": "Wechselrichter",
     "battery": "Batterie",
@@ -41,8 +51,9 @@ ROLE_LABELS = {
     "switch": "Switch",
     "ap": "Accesspoint",
     "network": "Netzwerkgerät",
+    "server": "Home-Assistant-Server",
 }
-SINGLE_ROLES = ("inverter", "battery", "heatpump", "water", "internet")
+SINGLE_ROLES = ("inverter", "battery", "heatpump", "water", "internet", "server")
 
 
 @dataclass(frozen=True)
@@ -181,6 +192,21 @@ KEYS: dict[str, dict[str, Key]] = {
     "switch": dict(_NET),
     "ap": dict(_NET),
     "network": dict(_NET),
+    # Home Assistant itself: System Monitor (or the host's own integration)
+    "server": {
+        "cpu": Key(
+            ("sensor",), r"(processor_use|prozessornutzung|processor usage|cpu.?usage|cpu.?load)"
+        ),
+        "memory": Key(
+            ("sensor",), r"(memory_use_percent|arbeitsspeicher.*(auslastung|nutzung)|memory usage)"
+        ),
+        "disk": Key(
+            ("sensor",), r"(disk_use_percent|disk usage|datenträger|festplatte|speicherplatz)"
+        ),
+        "cpu_temp": Key(
+            ("sensor",), r"(processor_temperature|(processor|prozessor|cpu).?(temp|temperatur))"
+        ),
+    },
 }
 _UNIFI_GATEWAY = re.compile(r"^(udm|uxg|usg|ucg|udr|uck|ux|dream|gateway|cloud gateway)", re.I)
 _UNIFI_SWITCH = re.compile(r"^(usw|us-|us8|us16|us24|us48|usl|switch|flex)", re.I)
@@ -301,9 +327,13 @@ class Catalog:
                 continue
             linked.add(device_id)
             entities = {**self.detect(role, device_id), **(sub.data.get(CONF_ENTITIES) or {})}
+            if role == "server":
+                entities = {**self._server_extras(), **entities}
             out.append(
                 self._item(sub.subentry_id, role, device_id, sub.title, entities, "link", sub.data)
             )
+        if not any(d["role"] == "server" for d in out) and (server := self._server_auto()):
+            out.append(server)
         if self.unifi_auto():
             for device in devices.devices.values():
                 if device.id in linked or not any(
@@ -321,6 +351,50 @@ class Catalog:
                         )
                     )
         return out
+
+    def _server_extras(self) -> dict[str, str]:
+        """Return the Home Assistant update and the last backup (not on a device of their own)."""
+        out: dict[str, str] = {}
+        if self.hass.states.get("update.home_assistant_core_update") is not None:
+            out["core_update"] = "update.home_assistant_core_update"
+        backup = next(
+            (
+                s.entity_id
+                for s in self.hass.states.async_all("sensor")
+                if s.entity_id.startswith("sensor.backup_last_successful")
+            ),
+            None,
+        )
+        if backup:
+            out["backup"] = backup
+        return out
+
+    def _server_auto(self) -> dict[str, Any] | None:
+        """Return Home Assistant itself: the System Monitor device, the update and the backup."""
+        devices = dr.async_get(self.hass)
+        monitor = next(
+            (
+                d
+                for d in devices.devices.values()
+                if any(i[0] == "systemmonitor" for i in d.identifiers)
+            ),
+            None,
+        )
+        entities = {
+            **(self.detect("server", monitor.id) if monitor else {}),
+            **self._server_extras(),
+        }
+        if not entities:
+            return None
+        return {
+            "id": "server_auto",
+            "role": "server",
+            "device_id": monitor.id if monitor else None,
+            "name": "Home Assistant",
+            "entities": entities,
+            "prefix": None,
+            "source": "auto",
+        }
 
     def _item(
         self,

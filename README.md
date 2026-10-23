@@ -316,6 +316,13 @@ automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
   (je Rolle eine Zuordnung).
 - Das Dashboard zeigt, was im Katalog steht; die Prüfungen von Haustechnik und System & Netzwerk nutzen denselben
   Katalog.
+- **Home-Assistant-Server** (Rolle `server`): CPU, Arbeitsspeicher, Speicherplatz und Temperatur findet Core am
+  System-Monitor-Gerät, dazu das Home-Assistant-Update und das letzte Backup – auch ohne Zuordnung.
+
+**Listen der Seiten** (Schritt 2): Welche Kameras, Fenster & Türen, Bewegungsmelder, Schlösser, Chimes und Sensoren
+für „Letzte Nacht“ die Sicherheits-Seite zeigt, welche Dienste die Status-Seite überwacht und was ignoriert wird,
+steht in Core. Das Dashboard bearbeitet sie in seinen Dialogen und übernimmt seine bisherigen Listen einmalig;
+ohne eigene Liste erkennt die Seite die Geräte automatisch.
 
 ## Haustechnik
 
@@ -545,6 +552,8 @@ actions:
 | `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
 | `smarthome_ui/catalog/link` | Gerät einer Rolle zuordnen (`device_id`, `role`, optional `name`) |
 | `smarthome_ui/catalog/migrate` | einmalig: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`) |
+| `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
+| `smarthome_ui/lists/migrate` | einmalig: Listen einer Seite übernehmen (`page`, `lists`) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

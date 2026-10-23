@@ -205,3 +205,83 @@ async def test_unifi_auto_and_link_from_dashboard(
     entry = hass.config_entries.async_get_entry(entry.entry_id)
     devices = entry.runtime_data.catalog.devices()
     assert [(d["role"], d["name"], d["source"]) for d in devices] == [("gateway", "Keller", "link")]
+
+
+async def test_server_auto(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    other = MockConfigEntry(domain="systemmonitor")
+    other.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=other.entry_id, identifiers={("systemmonitor", "pi")}, name="System Monitor"
+    )
+    reg = er.async_get(hass)
+    for uid, obj, tkey in (
+        ("cpu", "system_monitor_processor_use", "processor_use"),
+        ("mem", "system_monitor_memory_use_percent", "memory_use_percent"),
+    ):
+        reg.async_get_or_create(
+            "sensor",
+            "systemmonitor",
+            uid,
+            device_id=device.id,
+            suggested_object_id=obj,
+            config_entry=other,
+            translation_key=tkey,
+        )
+        hass.states.async_set(f"sensor.{obj}", "10", {})
+    hass.states.async_set("update.home_assistant_core_update", "off", {})
+    hass.states.async_set(
+        "sensor.backup_last_successful_automatic_backup", "2026-10-20T03:00:00+00:00", {}
+    )
+    server = entry.runtime_data.catalog.first("server")
+    assert server["source"] == "auto"
+    assert server["entities"] == {
+        "cpu": "sensor.system_monitor_processor_use",
+        "memory": "sensor.system_monitor_memory_use_percent",
+        "core_update": "update.home_assistant_core_update",
+        "backup": "sensor.backup_last_successful_automatic_backup",
+    }
+
+
+async def test_page_lists(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "smarthome_ui/lists/migrate",
+            "page": "security",
+            "lists": {"locks": [{"entity": "lock.haustur"}], "unknown": [1]},
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["made"] == 1 and res["pages"]["security"] == {"locks": [{"entity": "lock.haustur"}]}
+    await client.send_json(
+        {
+            "id": 2,
+            "type": "smarthome_ui/lists/set",
+            "page": "security",
+            "path": "cameras.entities",
+            "items": [{"entity": "camera.einfahrt", "motion": "binary_sensor.einfahrt_person"}],
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["pages"]["security"]["cameras.entities"][0]["entity"] == "camera.einfahrt"
+    await client.send_json(
+        {
+            "id": 3,
+            "type": "smarthome_ui/lists/set",
+            "page": "security",
+            "path": "locks",
+            "items": None,
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert "locks" not in res["pages"]["security"]  # automatic again
+    await client.send_json(
+        {"id": 4, "type": "smarthome_ui/lists/set", "page": "security", "path": "nope", "items": []}
+    )
+    assert (await client.receive_json())["success"] is False
+    # migrated only once
+    await client.send_json(
+        {"id": 5, "type": "smarthome_ui/lists/migrate", "page": "security", "lists": {"locks": []}}
+    )
+    assert (await client.receive_json())["result"]["made"] == 0
