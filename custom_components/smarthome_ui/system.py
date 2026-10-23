@@ -84,6 +84,7 @@ class System:
         self._primed = False
         self.problems: dict[str, dict[str, str]] = {}
         self._uptime: dict[str, float] = {}  # device entity: boot time (s since epoch)
+        self.catalog: Any = None
 
     @property
     def data(self) -> dict[str, Any]:
@@ -133,12 +134,23 @@ class System:
         return out
 
     def network_devices(self) -> list[dict[str, Any]]:
-        """Return the watched network devices: from the dashboard, plus UniFi (if switched on)."""
-        own = [d for d in self.data.get("devices") or [] if d.get("entity")]
-        if not self.options()["unifi_auto"]:
-            return own
-        known = {d["entity"] for d in own}
-        return own + [d for d in self.unifi_devices() if d["entity"] not in known]
+        """Return the watched network devices: the catalog's (linked, UniFi if switched on), then
+        the dashboard's former ones that are not in it."""
+        if self.catalog is not None:
+            listed = self.catalog.network_devices()
+        else:
+            listed = self.unifi_devices() if self.options()["unifi_auto"] else []
+        known = {d["entity"] for d in listed}
+        own = [
+            d
+            for d in self.data.get("devices") or []
+            if d.get("entity") and d["entity"] not in known
+        ]
+        return listed + own
+
+    def internet(self) -> str | None:
+        """Return the internet connection entity (router in the catalog, else the dashboard's)."""
+        return (self.catalog.internet() if self.catalog else None) or self.data.get("internet")
 
     # ---------------------------------------------------------------- setup
 
@@ -271,13 +283,13 @@ class System:
 
         def add(key: str, src: str, title: str, message: str) -> None:
             out[key] = {"src": src, "title": title, "message": message}
-            entity = key.split("|")[1] if key.startswith("dev|") else self.data.get("internet")
+            entity = key.split("|")[1] if key.startswith("dev|") else self.internet()
             if key == "internet" or key.startswith("dev|"):
                 state = self.hass.states.get(entity or "")
                 if state is not None:  # offline since (for "wieder da")
                     out[key]["since"] = state.last_changed.timestamp()
 
-        internet = self.hass.states.get(self.data.get("internet") or "")
+        internet = self.hass.states.get(self.internet() or "")
         if (
             internet is not None
             and not _online(internet)

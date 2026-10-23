@@ -30,6 +30,7 @@ from homeassistant.util import dt as dt_util
 from . import durations
 from .alarm import AlarmLogic
 from .appliance import ApplianceManager
+from .catalog import ROLES as CATALOG_ROLES, Catalog
 from .const import (
     ATTR_AREA,
     ATTR_DATE,
@@ -105,6 +106,7 @@ class CoreRuntime:
     technik: Technik
     forecasts: Forecasts
     system: System
+    catalog: Catalog
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -288,6 +290,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_grocery_settings,
         ws_technik_settings,
         ws_system_settings,
+        ws_catalog_link,
+        ws_catalog_migrate,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -393,7 +397,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         technik,
         Forecasts(hass, store, technik),
         System(hass, store, security_notify),
+        Catalog(hass, entry, lambda: entry.runtime_data.system.options()["unifi_auto"]),
     )
+    entry.runtime_data.system.catalog = entry.runtime_data.catalog
+    technik.overlay = entry.runtime_data.catalog.technik_overlay
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
     _remove_single_device(hass, entry)
@@ -610,6 +617,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "technik": runtime.technik.info(),
         "forecast": runtime.forecasts.info(),
         "system": runtime.system.info(),
+        "catalog": runtime.catalog.info(store.data["catalog_migrated"]),
         "features": [
             "task_defs",
             "waste",
@@ -629,6 +637,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "technik",
             "forecast",
             "system",
+            "catalog",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -687,6 +696,7 @@ def ws_subscribe(
                     "technik": runtime.technik.info(),
                     "forecast": runtime.forecasts.info(),
                     "system": runtime.system.info(),
+                    "catalog": runtime.catalog.info(runtime.store.data["catalog_migrated"]),
                 },
             )
         )
@@ -1115,3 +1125,41 @@ def ws_system_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.system.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
         connection.send_result(msg["id"], runtime.system.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/catalog/link",
+        vol.Required("device_id"): str,
+        vol.Required("role"): vol.In(CATALOG_ROLES),
+        vol.Optional("name"): vol.Any(None, str),
+    }
+)
+@callback
+def ws_catalog_link(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Give a device a role (from the dashboard's "Gerät zuordnen")."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        sub = runtime.catalog.link(msg["device_id"], msg["role"], msg.get("name"))
+        connection.send_result(msg["id"], {"subentry_id": sub})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/catalog/migrate",
+        vol.Required("items"): [dict],
+    }
+)
+@callback
+def ws_catalog_migrate(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take over the dashboard's device settings once (one device subentry per device)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        made = 0
+        if not runtime.store.data["catalog_migrated"]:
+            runtime.store.data["catalog_migrated"] = True
+            runtime.store.save(SIGNAL_DATA)
+            made = runtime.catalog.migrate(msg["items"])
+        connection.send_result(msg["id"], {"made": made})

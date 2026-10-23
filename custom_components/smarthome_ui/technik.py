@@ -131,6 +131,7 @@ class Technik:
         self._starts: list[int] = []
         self.hints: dict[str, dict[str, Any]] = {}
         self.on_settings: Callable[[], None] | None = None
+        self.overlay: Callable[[], dict[str, Any]] | None = None
 
     # ---------------------------------------------------------------- settings
 
@@ -143,6 +144,12 @@ class Technik:
         """Return the settings with defaults."""
         out = {**DEFAULTS, **{k: v for k, v in self.data.items() if k in DEFAULTS}}
         out["checks"] = {**DEFAULTS["checks"], **(self.data.get("checks") or {})}
+        # devices linked in Core (catalog) win over what the dashboard sent
+        for key, value in (self.overlay() if self.overlay else {}).items():
+            if key in ("battery", "reach", "syr"):
+                out[key] = {**(out.get(key) or {}), **value}
+            else:
+                out[key] = value
         return out
 
     @callback

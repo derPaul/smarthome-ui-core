@@ -302,6 +302,21 @@ Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **En
 - Mitteilungen (Quelle „Briefkasten“, Push an): „Post ist da“ beim ersten Einwurf nach dem Leeren,
   „Briefkasten: Klappe/Tür steht offen“ nach 3 Minuten.
 
+## Geräte zuordnen (Geräte-Katalog)
+
+Welches Gerät der Wechselrichter, die Batterie, die Wärmepumpe, der Enthärter, der Internet-Router, das Gateway,
+ein Switch oder ein Accesspoint ist, steht in Core – nicht mehr im Dashboard. **„Gerät zuordnen“** (beliebig oft):
+Gerät wählen, Rolle wählen, optional Name. Core findet am Gerät (und an Geräten, die darüber verbunden sind) die
+Entitäten der Rolle selbst – wie das Dashboard bisher; im zweiten Schritt lässt sich jede einzeln ändern (leer =
+automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
+
+- Geräte der **UniFi-Integration** kommen ohne Zuordnung dazu (Rolle aus dem Modell: Gateway, Switch, Accesspoint),
+  solange „UniFi-Geräte automatisch“ an ist.
+- Beim ersten Start mit Dashboard 1.270 übernimmt Core einmalig, welche Geräte das Dashboard bisher verwendet hat
+  (je Rolle eine Zuordnung).
+- Das Dashboard zeigt, was im Katalog steht; die Prüfungen von Haustechnik und System & Netzwerk nutzen denselben
+  Katalog.
+
 ## Haustechnik
 
 Gerät **„Haustechnik“**. Welche Sensoren gemeint sind (Wärmepumpe, Wechselrichter, Heizungsdruck, Enthärter,
@@ -528,6 +543,8 @@ actions:
 | `smarthome_ui/grocery/settings` | Einkauf: Sensor „letzter Monat“ (`entity`), einmalig bisherige Monate (`months`) |
 | `smarthome_ui/technik/settings` | Haustechnik-Sensoren und Schwellen (`heatpump_error`, `inverter_error`, `inverter_error_ok`, `reach`, `pressure`, `pressure_min`, `pressure_critical`, `pressure_drop`, `salt`, `salt_max`, `syr`, `flow`, `valve`, `water_minutes`, `compressor`, `cycles_per_hour`, `power`) |
 | `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
+| `smarthome_ui/catalog/link` | Gerät einer Rolle zuordnen (`device_id`, `role`, optional `name`) |
+| `smarthome_ui/catalog/migrate` | einmalig: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

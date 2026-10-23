@@ -40,6 +40,16 @@ from .appliance import (
     SUBENTRY_APPLIANCE,
     detect_kind,
 )
+from .catalog import (
+    CONF_CAPACITY,
+    CONF_ENTITIES,
+    CONF_ROLE,
+    KEYS,
+    ROLE_LABELS,
+    ROLES,
+    SUBENTRY_DEVICE,
+    Catalog,
+)
 from .const import DOMAIN
 from .doorbell import SUBENTRY_DOORBELL
 from .maintenance import (
@@ -80,6 +90,7 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_APPLIANCE: ApplianceSubentryFlow,
             SUBENTRY_PART: PartSubentryFlow,
             SUBENTRY_DOORBELL: DoorbellSubentryFlow,
+            SUBENTRY_DEVICE: DeviceSubentryFlow,
         }
 
 
@@ -478,4 +489,132 @@ class DoorbellSubentryFlow(MowerSubentryFlow):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self._schema(subentry.data.get(CONF_DEVICE), subentry.title),
+        )
+
+
+class DeviceSubentryFlow(ConfigSubentryFlow):
+    """Give a device a role (inverter, battery, heat pump, gateway …) – then adjust its entities."""
+
+    def _schema(self, cur: dict[str, Any] | None = None, name: str | None = None) -> vol.Schema:
+        cur = cur or {}
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_DEVICE, default=cur.get(CONF_DEVICE) or vol.UNDEFINED
+                ): DeviceSelector(DeviceSelectorConfig()),
+                vol.Required(
+                    CONF_ROLE, default=cur.get(CONF_ROLE) or vol.UNDEFINED
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=ROLES, translation_key=CONF_ROLE, mode=SelectSelectorMode.DROPDOWN
+                    )
+                ),
+                vol.Optional("name", description={"suggested_value": name}): TextSelector(),
+            }
+        )
+
+    def _catalog(self) -> Catalog:
+        return Catalog(self.hass, self._get_entry(), lambda: False)
+
+    def _entities_schema(self) -> vol.Schema:
+        catalog = self._catalog()
+        device_id, role = self._data[CONF_DEVICE], self._data[CONF_ROLE]
+        detected = catalog.detect(role, device_id)
+        own = self._data.get(CONF_ENTITIES) or {}
+        include = [e.entity_id for e in catalog.device_entities(device_id)]
+        fields: dict[Any, Any] = {}
+        for key, spec in KEYS[role].items():
+            value = own.get(key) or detected.get(key)
+            fields[vol.Optional(key, description={"suggested_value": value})] = EntitySelector(
+                EntitySelectorConfig(domain=list(spec.domains), include_entities=include)
+            )
+        if role == "battery":
+            fields[
+                vol.Optional(
+                    CONF_CAPACITY, description={"suggested_value": self._data.get(CONF_CAPACITY)}
+                )
+            ] = NumberSelector(
+                NumberSelectorConfig(
+                    min=0.5,
+                    max=200,
+                    step=0.1,
+                    unit_of_measurement="kWh",
+                    mode=NumberSelectorMode.BOX,
+                )
+            )
+        return vol.Schema(fields)
+
+    def _title(self, name: str | None) -> str:
+        if name := (name or "").strip():
+            return name
+        device = dr.async_get(self.hass).async_get(self._data[CONF_DEVICE])
+        return (
+            (device.name_by_user or device.name) if device else ROLE_LABELS[self._data[CONF_ROLE]]
+        )
+
+    def _finish_data(self, user_input: dict[str, Any]) -> dict[str, Any]:
+        detected = self._catalog().detect(self._data[CONF_ROLE], self._data[CONF_DEVICE])
+        own = {
+            k: v
+            for k, v in user_input.items()
+            if k in KEYS[self._data[CONF_ROLE]] and v and detected.get(k) != v
+        }
+        data = {
+            CONF_DEVICE: self._data[CONF_DEVICE],
+            CONF_ROLE: self._data[CONF_ROLE],
+            CONF_ENTITIES: own,
+        }
+        if user_input.get(CONF_CAPACITY):
+            data[CONF_CAPACITY] = float(user_input[CONF_CAPACITY])
+        return data
+
+    def _taken(self, device_id: str, own: str | None = None) -> bool:
+        return any(
+            sub.subentry_type == SUBENTRY_DEVICE
+            and sub.data.get(CONF_DEVICE) == device_id
+            and sub.subentry_id != own
+            for sub in self._get_entry().subentries.values()
+        )
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Pick the device and its role."""
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE]):
+                return self.async_abort(reason="already_configured")
+            self._data = dict(user_input)
+            self._name = user_input.get("name")
+            return await self.async_step_entities()
+        return self.async_show_form(step_id="user", data_schema=self._schema())
+
+    async def async_step_entities(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Check (and change) which entity is what – found automatically."""
+        if user_input is not None:
+            data = self._finish_data(user_input)
+            if getattr(self, "_subentry", None) is not None:
+                return self.async_update_and_abort(
+                    self._get_entry(), self._subentry, title=self._title(self._name), data=data
+                )
+            return self.async_create_entry(title=self._title(self._name), data=data)
+        return self.async_show_form(
+            step_id="entities",
+            data_schema=self._entities_schema(),
+            description_placeholders={"role": ROLE_LABELS[self._data[CONF_ROLE]]},
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change device, role or name – then the entities."""
+        self._subentry = self._get_reconfigure_subentry()
+        if user_input is not None:
+            if self._taken(user_input[CONF_DEVICE], self._subentry.subentry_id):
+                return self.async_abort(reason="already_configured")
+            self._data = {**self._subentry.data, **user_input}
+            self._name = user_input.get("name")
+            return await self.async_step_entities()
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self._schema(dict(self._subentry.data), self._subentry.title),
         )

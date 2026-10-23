@@ -196,6 +196,80 @@
         "already_configured": "Diese Klingel ist schon hinzugefügt.",
         "reconfigure_successful": "Klingel geändert."
       }
+    },
+    "device": {
+      "entry_type": "Gerät",
+      "initiate_flow": {
+        "user": "Gerät zuordnen",
+        "reconfigure": "Gerät ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Gerät zuordnen",
+          "description": "Gerät wählen und sagen, was es ist (Wechselrichter, Batterie, Wärmepumpe, Gateway …). Das Dashboard und die Prüfungen von Smarthome UI Core nehmen es dann von hier.",
+          "data": {
+            "device_id": "Gerät",
+            "role": "Rolle",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Gerät ändern",
+          "data": {
+            "device_id": "Gerät",
+            "role": "Rolle",
+            "name": "Name (optional)"
+          }
+        },
+        "entities": {
+          "title": "Entitäten ({role})",
+          "description": "Gefunden am Gerät – nur ändern, wenn etwas nicht stimmt. Leer = automatisch.",
+          "data": {
+            "pv_power": "PV-Leistung",
+            "error": "Fehler / Status",
+            "daily_energy": "Ertrag heute",
+            "soc": "Ladestand",
+            "power": "Leistung",
+            "state": "Zustand",
+            "capacity_entity": "Kapazität (Sensor)",
+            "max_discharge": "Max. Entladeleistung",
+            "climate": "Heizkreis",
+            "mode_select": "Betriebsart",
+            "pressure": "Heizungsdruck",
+            "compressor": "Verdichter",
+            "heat_mode": "Heizbetrieb",
+            "summer_mode": "Sommerbetrieb",
+            "dhw": "Warmwasser Ist",
+            "dhw_target": "Warmwasser Soll",
+            "salt": "Salzmenge",
+            "salt_select": "Salzmenge (Auswahl)",
+            "flow": "Durchfluss",
+            "alarm": "Alarm",
+            "warn": "Warnung",
+            "notif": "Hinweis",
+            "connected": "Verbindung",
+            "download": "Download",
+            "upload": "Upload",
+            "external_ip": "Externe IP",
+            "uptime": "Laufzeit",
+            "latency": "Latenz",
+            "cpu": "CPU",
+            "memory": "Speicher",
+            "temperature": "Temperatur",
+            "clients": "Geräte",
+            "restart": "Neustart",
+            "update": "Update",
+            "wan_rx": "WAN empfangen",
+            "wan_tx": "WAN gesendet",
+            "wan_ip": "WAN-IP",
+            "capacity": "Nutzbare Kapazität"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "Dieses Gerät ist schon zugeordnet.",
+        "reconfigure_successful": "Gerät geändert."
+      }
     }
   },
   "device": {
@@ -686,6 +760,18 @@
         "water_filter": "Wasserfilter",
         "smoke_detector": "Rauchmelder",
         "other": "Sonstiges"
+      }
+    },
+    "role": {
+      "options": {
+        "inverter": "Wechselrichter",
+        "battery": "Batterie",
+        "heatpump": "Wärmepumpe",
+        "water": "Enthärter / Wasser",
+        "internet": "Internet-Router",
+        "gateway": "Gateway",
+        "switch": "Switch",
+        "ap": "Accesspoint"
       }
     }
   }

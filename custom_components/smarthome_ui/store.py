@@ -92,6 +92,8 @@ def _default() -> dict[str, Any]:
         "forecast": {},
         # system and network: what the dashboard watches (internet, devices, status, services)
         "system": {},
+        # the dashboard's device settings were taken over into the catalog (device subentries)
+        "catalog_migrated": False,
     }
 
 

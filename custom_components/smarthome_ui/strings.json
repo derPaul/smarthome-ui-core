@@ -196,6 +196,80 @@
         "already_configured": "This doorbell is already added.",
         "reconfigure_successful": "Doorbell changed."
       }
+    },
+    "device": {
+      "entry_type": "Device",
+      "initiate_flow": {
+        "user": "Assign device",
+        "reconfigure": "Change device"
+      },
+      "step": {
+        "user": {
+          "title": "Assign device",
+          "description": "Pick the device and say what it is (inverter, battery, heat pump, gateway …). The dashboard and Smarthome UI Core's checks take it from here.",
+          "data": {
+            "device_id": "Device",
+            "role": "Role",
+            "name": "Name (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Change device",
+          "data": {
+            "device_id": "Device",
+            "role": "Role",
+            "name": "Name (optional)"
+          }
+        },
+        "entities": {
+          "title": "Entities ({role})",
+          "description": "Found on the device – only change what is wrong. Empty = automatic.",
+          "data": {
+            "pv_power": "PV power",
+            "error": "Error / status",
+            "daily_energy": "Yield today",
+            "soc": "State of charge",
+            "power": "Power",
+            "state": "State",
+            "capacity_entity": "Capacity (sensor)",
+            "max_discharge": "Max. discharge power",
+            "climate": "Heating circuit",
+            "mode_select": "Operating mode",
+            "pressure": "Heating pressure",
+            "compressor": "Compressor",
+            "heat_mode": "Heating mode",
+            "summer_mode": "Summer mode",
+            "dhw": "Hot water actual",
+            "dhw_target": "Hot water target",
+            "salt": "Salt",
+            "salt_select": "Salt (select)",
+            "flow": "Flow",
+            "alarm": "Alarm",
+            "warn": "Warning",
+            "notif": "Note",
+            "connected": "Connection",
+            "download": "Download",
+            "upload": "Upload",
+            "external_ip": "External IP",
+            "uptime": "Uptime",
+            "latency": "Latency",
+            "cpu": "CPU",
+            "memory": "Memory",
+            "temperature": "Temperature",
+            "clients": "Clients",
+            "restart": "Restart",
+            "update": "Update",
+            "wan_rx": "WAN received",
+            "wan_tx": "WAN sent",
+            "wan_ip": "WAN IP",
+            "capacity": "Usable capacity"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "This device is already assigned.",
+        "reconfigure_successful": "Device changed."
+      }
     }
   },
   "device": {
@@ -686,6 +760,18 @@
         "water_filter": "Water filter",
         "smoke_detector": "Smoke detector",
         "other": "Other"
+      }
+    },
+    "role": {
+      "options": {
+        "inverter": "Inverter",
+        "battery": "Battery",
+        "heatpump": "Heat pump",
+        "water": "Water softener",
+        "internet": "Internet router",
+        "gateway": "Gateway",
+        "switch": "Switch",
+        "ap": "Access point"
       }
     }
   }
