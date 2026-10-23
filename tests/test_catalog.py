@@ -424,9 +424,21 @@ async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_
         {"id": 3, "type": "smarthome_ui/lists/value", "path": "weather.entity", "value": None}
     )
     assert "weather.entity" not in (await client.receive_json())["result"]["values"]
+    # values added later (mailbox, waste) are taken over once more – the old ones stay
     await client.send_json(
         {
             "id": 4,
+            "type": "smarthome_ui/lists/migrate",
+            "page": "values",
+            "lists": {"weather.entity": "weather.other", "mailbox.flap": "binary_sensor.klappe"},
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["made"] == 0  # all values were taken over with the first call already
+    assert "mailbox.flap" in res["value_done"]
+    await client.send_json(
+        {
+            "id": 5,
             "type": "smarthome_ui/lists/migrate",
             "page": "home",
             "lists": {"scenes": [{"entity": "scene.abend"}]},
@@ -435,6 +447,23 @@ async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_
     assert (await client.receive_json())["result"]["pages"]["home"] == {
         "scenes": [{"entity": "scene.abend"}]
     }
+
+
+async def test_values_added_later(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    lists = entry.runtime_data.lists
+    # taken over with Core 0.24: only the first five values
+    lists.data["migrated"] = ["values"]
+    lists.data["values"] = {"weather.entity": "weather.home"}
+    assert "mailbox.flap" not in lists.value_done()
+    made = lists.migrate(
+        "values", {"weather.entity": "weather.other", "mailbox.flap": "binary_sensor.klappe"}
+    )
+    assert made == 1
+    assert lists.data["values"] == {
+        "weather.entity": "weather.home",
+        "mailbox.flap": "binary_sensor.klappe",
+    }
+    assert lists.migrate("values", {"waste.calendar": "calendar.mull"}) == 0
 
 
 def test_identifiers_with_three_parts() -> None:

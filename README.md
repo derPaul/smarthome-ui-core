@@ -333,7 +333,8 @@ ohne eigene Liste erkennt die Seite die Geräte automatisch. Seit Schritt 3 auch
 Startseite, ignorierte Entitäten der Räume, Garten & Terrasse sowie Aufgaben und Zonen des Mähers.
 
 **Einzelne Entitäten ohne Gerät** stehen ebenfalls in Core und gelten auf allen Seiten: Wetter-Entität,
-Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos.
+Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos, ab 0.25 auch Klappe und Tür des Briefkastens und
+der Müll-Kalender. Werte, die eine neuere Version dazubringt, übernimmt Core beim nächsten Mal einmalig.
 
 ## Haustechnik
 

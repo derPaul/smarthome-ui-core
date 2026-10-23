@@ -6,10 +6,11 @@ an item is ``{"entity": ..., ...}`` (extra fields like a name or a motion sensor
 ``None`` means "automatic" (the page finds them itself).
 
 Besides the lists a few single entities that belong to no device are kept here (``values``): the
-weather entity, the music player, the cinema's volume and scenes. They hold for every page.
+weather entity, the music player, the cinema's volume and scenes, the mailbox sensors and the waste
+calendar. They hold for every page.
 
 The dashboard's own lists are taken over once per page (``lists/migrate``), its single values once
-(page ``values``).
+per value (page ``values``; values added later are taken over on the next call).
 """
 
 from __future__ import annotations
@@ -51,7 +52,12 @@ VALUES = (
     "cinema.volume",
     "cinema.scene",
     "cinema.scene_off",
+    "mailbox.flap",
+    "mailbox.door",
+    "waste.calendar",
 )
+# the values of the first takeover (Core 0.24)
+_VALUES_024 = VALUES[:5]
 
 
 class PageLists:
@@ -95,14 +101,25 @@ class PageLists:
     def migrate(self, page: str, lists: dict[str, Any]) -> int:
         """Take over a page's lists (or the single values) once."""
         done = self.data.setdefault("migrated", [])
-        if page == "values" and page not in done:
+        if page == "values":
+            taken = self.value_done()
+            if set(VALUES) <= set(taken):
+                return 0
             own = self.data.setdefault("values", {})
             made = 0
             for path, value in lists.items():
-                if path in VALUES and isinstance(value, str) and value and path not in own:
+                if (
+                    path in VALUES
+                    and path not in taken
+                    and isinstance(value, str)
+                    and value
+                    and path not in own
+                ):
                     own[path] = value
                     made += 1
-            done.append(page)
+            self.data["value_done"] = list(VALUES)
+            if page not in done:
+                done.append(page)
             self.store.save(SIGNAL_DATA)
             return made
         if page in done or page not in PAGES:
@@ -117,12 +134,19 @@ class PageLists:
         self.store.save(SIGNAL_DATA)
         return made
 
+    def value_done(self) -> list[str]:
+        """Return the values already taken over from the dashboard."""
+        if "value_done" in self.data:
+            return list(self.data["value_done"])
+        return list(_VALUES_024) if "values" in (self.data.get("migrated") or []) else []
+
     def info(self) -> dict[str, Any]:
         """Return the lists for the dashboard."""
         return {
             "pages": self.data.get("pages") or {},
             "values": self.data.get("values") or {},
             "value_paths": list(VALUES),
+            "value_done": self.value_done(),
             "migrated": list(self.data.get("migrated") or []),
             "paths": {k: list(v) for k, v in PAGES.items()},
         }
