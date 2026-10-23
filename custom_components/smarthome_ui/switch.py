@@ -18,6 +18,7 @@ from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_enti
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
+from .system import OPTIONS as SYSTEM_OPTIONS, SystemOption
 from .technik import TechnikOption
 
 
@@ -47,6 +48,7 @@ async def async_setup_entry(
             TechnikCheck(entry.entry_id, entry.runtime_data.technik, check)
             for check in ("pressure", "water", "cycling", "baseload")
         ]
+        + [SystemOption(entry.entry_id, entry.runtime_data.system, key) for key in SYSTEM_OPTIONS]
     )
     async_setup_doorbell_entities(
         entry.runtime_data.doorbells,

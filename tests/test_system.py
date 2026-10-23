@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 SOURCES = {
     k: {"push": True}
@@ -100,3 +101,58 @@ async def test_automation_errors(hass: HomeAssistant, hass_ws_client, notify_cal
         )
         await entry.runtime_data.system.async_evaluate()
     assert notify_calls[-1].data["message"] == "Automation „Licht“: Fehler beim letzten Lauf"
+
+
+async def test_access_points_back_online_restart_unifi(
+    hass: HomeAssistant, hass_ws_client, notify_calls, freezer
+) -> None:
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+    entry = await _setup(hass, hass_ws_client)
+    system = entry.runtime_data.system
+    # a UniFi access point that is not on the dashboard's page
+    unifi = MockConfigEntry(domain="unifi")
+    unifi.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=unifi.entry_id, identifiers={("unifi", "ap1")}, name="AP Flur"
+    )
+    reg = er.async_get(hass)
+    for uid, obj in (
+        ("device_state-ap1", "ap_flur_state"),
+        ("device_uptime-ap1", "ap_flur_uptime"),
+    ):
+        reg.async_get_or_create(
+            "sensor", "unifi", uid, device_id=device.id, suggested_object_id=obj, config_entry=unifi
+        )
+    boot = dt_util.utcnow() - timedelta(days=3)
+    hass.states.async_set("sensor.ap_flur_state", "connected", {})
+    hass.states.async_set("sensor.ap_flur_uptime", boot.isoformat(), {"device_class": "timestamp"})
+    names = {d["name"] for d in system.network_devices()}
+    assert names == {"Gateway", "AP Flur"}
+    await system.async_evaluate()
+
+    # upgrading is no alarm
+    hass.states.async_set("sensor.ap_flur_state", "upgrading", {})
+    freezer.tick(timedelta(minutes=6))
+    await system.async_evaluate()
+    assert notify_calls == []
+
+    # offline → message, back → "wieder da", restart (boot time moved) → "neu gestartet"
+    hass.states.async_set("sensor.ap_flur_state", "disconnected", {})
+    freezer.tick(timedelta(minutes=12))
+    await system.async_evaluate()
+    assert notify_calls[-1].data["message"] == "AP Flur: disconnected"
+    hass.states.async_set("sensor.ap_flur_state", "connected", {})
+    hass.states.async_set(
+        "sensor.ap_flur_uptime", dt_util.utcnow().isoformat(), {"device_class": "timestamp"}
+    )
+    await system.async_evaluate()
+    msgs = [c.data["message"] for c in notify_calls]
+    assert "AP Flur wieder da (12 min weg)" in msgs
+    assert "AP Flur neu gestartet" in msgs
+
+    # UniFi automatically off: only the dashboard's devices
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": "switch.system_unifi_auto"}, blocking=True
+    )
+    assert [d["name"] for d in system.network_devices()] == ["Gateway"]

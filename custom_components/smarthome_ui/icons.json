@@ -177,6 +177,15 @@
       },
       "technik_baseload_watch": {
         "default": "mdi:flash-alert-outline"
+      },
+      "system_back_online": {
+        "default": "mdi:lan-check"
+      },
+      "system_restarts": {
+        "default": "mdi:restart"
+      },
+      "system_unifi_auto": {
+        "default": "mdi:access-point-network"
       }
     },
     "todo": {

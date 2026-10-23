@@ -4,14 +4,18 @@ What is watched comes from the dashboard (``system/settings``), the way its Netz
 Haustechnik pages are configured. Core checks every minute and notifies:
 
 * **internet** (``net.internet``) – the connection entity is not online for 2 minutes,
-* **network devices** (``net.devices``) – gateway, switches … not online for 5 minutes,
+* **network devices** (``net.devices``) – gateway, switches, access points not online for
+  5 minutes (busy states like upgrading or provisioning do not count); with "UniFi automatisch"
+  every device of the UniFi integration as well; back online: "Gateway wieder da (12 min weg)";
+  restarted (its uptime starts again): "Gateway neu gestartet",
 * **services** (``sys.services``) – an integration of a service fails (setup error, retrying,
   migration error) or its bridge entity (Zigbee2MQTT …) is offline; status entities of the pages
   report an error or are not reachable for 10 minutes,
 * **power** (``sys.power``) – the Raspberry Pi reports under-voltage (``rpi_power``),
 * **automations** (``auto.errors``) – the last run of an automation ended with an error.
 
-Entity (device "System"): "Probleme" (sensor, the messages as attribute).
+Entities (device "System"): "Probleme" (sensor, the messages as attribute); switches "Wieder online
+melden", "Neustarts melden" and "UniFi-Geräte automatisch".
 """
 
 from __future__ import annotations
@@ -23,9 +27,11 @@ import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import EntityCategory
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -44,6 +50,10 @@ ENTRY_ERRORS = {
     ConfigEntryState.FAILED_UNLOAD: "Fehler beim Entladen",
 }
 MINUTES = {"internet": 2, "device": 5, "status": 10, "service": 5}
+# not offline, just busy (UniFi): no alarm
+BUSY = ("pending", "upgrading", "provisioning", "adopting", "firmware_mismatch", "deleting")
+OPTIONS = {"back_online": True, "restarts": True, "unifi_auto": True}
+RESTART_JUMP_S = 120
 _BENIGN = re.compile(
     r"(zu geringe dc|dc.?leistung.*gering|low dc|insufficient dc|schlaf|sleep|standby|nacht|night|"
     r"keine sonne|no sun)",
@@ -72,8 +82,8 @@ class System:
         self._unsub: list[CALLBACK_TYPE] = []
         self._sent: set[str] = set()
         self._primed = False
-        self._auto_seen: dict[str, str] = {}
         self.problems: dict[str, dict[str, str]] = {}
+        self._uptime: dict[str, float] = {}  # device entity: boot time (s since epoch)
 
     @property
     def data(self) -> dict[str, Any]:
@@ -89,6 +99,46 @@ class System:
         self.data["configured"] = True
         self.store.save(SIGNAL_SYSTEM, SIGNAL_DATA)
         self.hass.async_create_task(self.async_evaluate())
+
+    def options(self) -> dict[str, bool]:
+        """Return the switches (wieder online, Neustarts, UniFi automatisch)."""
+        return {**OPTIONS, **(self.data.get("options") or {})}
+
+    @callback
+    def set_option(self, key: str, value: bool) -> None:
+        """Switch an option on / off."""
+        self.data["options"] = {**self.options(), key: value}
+        self.store.save(SIGNAL_SYSTEM, SIGNAL_DATA)
+        self.hass.async_create_task(self.async_evaluate())
+
+    def unifi_devices(self) -> list[dict[str, Any]]:
+        """Return every device of the UniFi integration with its state (and uptime) sensor."""
+        registry, devices = er.async_get(self.hass), dr.async_get(self.hass)
+        found: dict[str, dict[str, Any]] = {}
+        for entry in registry.entities.values():
+            if entry.platform != "unifi" or entry.disabled_by or not entry.device_id:
+                continue
+            uid = str(entry.unique_id)
+            if uid.startswith("device_state-"):
+                found.setdefault(entry.device_id, {})["entity"] = entry.entity_id
+            elif uid.startswith("device_uptime-"):
+                found.setdefault(entry.device_id, {})["uptime"] = entry.entity_id
+        out = []
+        for device_id, item in found.items():
+            if "entity" not in item:
+                continue
+            device = devices.async_get(device_id)
+            name = (device.name_by_user or device.name) if device else None
+            out.append({"name": name, "kind": "unifi", **item})
+        return out
+
+    def network_devices(self) -> list[dict[str, Any]]:
+        """Return the watched network devices: from the dashboard, plus UniFi (if switched on)."""
+        own = [d for d in self.data.get("devices") or [] if d.get("entity")]
+        if not self.options()["unifi_auto"]:
+            return own
+        known = {d["entity"] for d in own}
+        return own + [d for d in self.unifi_devices() if d["entity"] not in known]
 
     # ---------------------------------------------------------------- setup
 
@@ -221,6 +271,11 @@ class System:
 
         def add(key: str, src: str, title: str, message: str) -> None:
             out[key] = {"src": src, "title": title, "message": message}
+            entity = key.split("|")[1] if key.startswith("dev|") else self.data.get("internet")
+            if key == "internet" or key.startswith("dev|"):
+                state = self.hass.states.get(entity or "")
+                if state is not None:  # offline since (for "wieder da")
+                    out[key]["since"] = state.last_changed.timestamp()
 
         internet = self.hass.states.get(self.data.get("internet") or "")
         if (
@@ -229,9 +284,11 @@ class System:
             and self._since(internet, MINUTES["internet"])
         ):
             add("internet", "net.internet", "Internet", "Internet: getrennt")
-        for dev in self.data.get("devices") or []:
+        for dev in self.network_devices():
             state = self.hass.states.get(dev.get("entity") or "")
-            if state is None or _online(state) or not self._since(state, MINUTES["device"]):
+            if state is None or _online(state) or state.state.lower() in BUSY:
+                continue
+            if not self._since(state, MINUTES["device"]):
                 continue
             name = dev.get("name") or state.attributes.get("friendly_name") or state.entity_id
             text = "nicht erreichbar" if state.state == "unavailable" else state.state
@@ -255,6 +312,56 @@ class System:
             )
         return out
 
+    def _boot_time(self, entity_id: str | None) -> float | None:
+        """Return when a device booted (s since epoch) from its uptime sensor."""
+        state = self.hass.states.get(entity_id or "")
+        if state is None or state.state in ("unknown", "unavailable", ""):
+            return None
+        if state.attributes.get("device_class") == "timestamp":
+            parsed = dt_util.parse_datetime(state.state)
+            return parsed.timestamp() if parsed else None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return None
+        factor = {"min": 60, "h": 3600, "d": 86400}.get(
+            state.attributes.get("unit_of_measurement") or "s", 1
+        )
+        return dt_util.utcnow().timestamp() - value * factor
+
+    @callback
+    def _check_restarts(self) -> None:
+        """A device's boot time moved forward: it restarted (even if it was only briefly away)."""
+        for dev in self.network_devices():
+            uptime = dev.get("uptime")
+            boot = self._boot_time(uptime)
+            if not uptime or boot is None:
+                continue
+            before = self._uptime.get(uptime)
+            self._uptime[uptime] = boot if before is None or boot > before else before
+            if before is not None and boot - before > RESTART_JUMP_S and self.options()["restarts"]:
+                state = self.hass.states.get(dev.get("entity") or "")
+                name = (
+                    dev.get("name")
+                    or (state.attributes.get("friendly_name") if state else None)
+                    or uptime
+                )
+                self.notify(
+                    "net.devices", "Netzwerk", f"{name} neu gestartet", f"system|restart|{uptime}"
+                )
+
+    @callback
+    def _back_online(self, key: str, problem: dict[str, Any]) -> None:
+        if not self.options()["back_online"] or problem["src"] not in (
+            "net.internet",
+            "net.devices",
+        ):
+            return
+        mins = round((dt_util.utcnow().timestamp() - problem.get("since", 0)) / 60)
+        name = problem["message"].split(":")[0]
+        text = "Internet wieder da" if key == "internet" else f"{name} wieder da"
+        self.notify(problem["src"], problem["title"], f"{text} ({mins} min weg)", f"system|{key}")
+
     async def async_evaluate(self, _now: Any = None) -> None:
         """Check everything and send what is new."""
         if not self.data.get("configured"):
@@ -265,6 +372,16 @@ class System:
                 if key not in self._sent:
                     tag = "system|" + "|".join(key.split("|")[:2])
                     self.notify(p["src"], p["title"], p["message"], tag)
+            for key in self._sent - set(problems):
+                if (old := self.problems.get(key)) is not None:
+                    self._back_online(key, old)
+        self._check_restarts()
+        for key, p in problems.items():
+            p["since"] = (
+                (self.problems.get(key) or {}).get("since")
+                or p.get("since")
+                or dt_util.utcnow().timestamp()
+            )
         self._sent = set(problems)
         self._primed = True
         if problems != self.problems:
@@ -281,6 +398,8 @@ class System:
                 {"key": k, "src": p["src"], "message": p["message"]}
                 for k, p in self.problems.items()
             ],
+            "options": self.options(),
+            "devices": len(self.network_devices()),
         }
 
 
@@ -306,6 +425,38 @@ class SystemProblems(CoreEntity, SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Update with the checks."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_SYSTEM, self.async_write_ha_state)
+        )
+
+
+class SystemOption(CoreEntity, SwitchEntity):
+    """An option of the system checks: back online, restarts, UniFi devices automatically."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, entry_id: str, system: System, key: str) -> None:
+        """Initialize (switch.system_<key>)."""
+        super().__init__(entry_id, f"system_{key}", DEVICE_SYSTEM, "switch", key)
+        self._system = system
+        self._key = key
+        self._attr_translation_key = f"system_{key}"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the option is on."""
+        return self._system.options()[self._key]
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the option on."""
+        self._system.set_option(self._key, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the option off."""
+        self._system.set_option(self._key, False)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the options change."""
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_SYSTEM, self.async_write_ha_state)
         )

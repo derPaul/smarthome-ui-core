@@ -522,6 +522,15 @@
       },
       "technik_baseload_watch": {
         "name": "Grundlast überwachen"
+      },
+      "system_back_online": {
+        "name": "Wieder online melden"
+      },
+      "system_restarts": {
+        "name": "Neustarts melden"
+      },
+      "system_unifi_auto": {
+        "name": "UniFi-Geräte automatisch"
       }
     },
     "number": {

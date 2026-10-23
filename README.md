@@ -351,7 +351,11 @@ Dashboard so, wie seine Seiten Netzwerk, Status und Haustechnik eingestellt sind
 offenes Dashboard:
 
 - **Internet** (Quelle „Internet“): Verbindungs-Entität 2 Minuten nicht online.
-- **Netzwerkgeräte** („Netzwerkgeräte“): Gateway, Switches … 5 Minuten nicht online.
+- **Netzwerkgeräte** („Netzwerkgeräte“): Gateway, Switches und Accesspoints 5 Minuten nicht online („upgrading“,
+  „provisioning“ und ähnliche Zustände zählen nicht). Mit **„UniFi-Geräte automatisch“** (Standard an) überwacht
+  Core zusätzlich jedes Gerät der UniFi-Integration, auch wenn es auf der Netzwerk-Seite nicht eingetragen ist.
+  **„Wieder online melden“**: „Gateway wieder da (12 min weg)“ bzw. „Internet wieder da“. **„Neustarts melden“**:
+  Springt die Laufzeit eines Netzwerkgeräts zurück, kommt „Gateway neu gestartet“ – auch wenn es nur kurz weg war.
 - **Dienste** („Dienste & Integrationen“): Integration eines Dienstes mit Fehler (Einrichtung fehlgeschlagen,
   Verbindung wird wiederholt, Migrationsfehler) oder Bridge offline (Zigbee2MQTT …); Statuszeilen der Seiten mit
   Fehlerzustand oder 10 Minuten nicht erreichbar.

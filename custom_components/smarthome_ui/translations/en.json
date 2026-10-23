@@ -522,6 +522,15 @@
       },
       "technik_baseload_watch": {
         "name": "Watch base load"
+      },
+      "system_back_online": {
+        "name": "Report back online"
+      },
+      "system_restarts": {
+        "name": "Report restarts"
+      },
+      "system_unifi_auto": {
+        "name": "All UniFi devices automatically"
       }
     },
     "number": {
