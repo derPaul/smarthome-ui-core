@@ -111,7 +111,7 @@ async def test_devices_per_area(hass: HomeAssistant, entry: MockConfigEntry, fre
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     names = sorted(d.name for d in dr.async_entries_for_config_entry(devices, entry.entry_id))
-    assert names == ["Garden", "Household", "Notifications", "Security"]
+    assert names == ["Garden", "House technology", "Household", "Notifications", "Security"]
 
     def device_of(entity_id: str) -> str:
         return devices.async_get(entities.async_get(entity_id).device_id).name
@@ -149,6 +149,8 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "number.security_nightwalk_quiet",
         "number.security_nightwalk_window",
         "number.security_open_minutes",
+        "number.technik_pressure_min",
+        "number.technik_water_minutes",
         "select.security_nightwalk_effect",
         "sensor.garden_hecke_schneiden",
         "sensor.household_waste_next",
@@ -158,6 +160,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "sensor.security_nightwalk_until",
         "sensor.security_open",
         "sensor.security_persons_home",
+        "sensor.technik_hints",
         "switch.notifications",
         "switch.security_alarm_clear",
         "switch.security_alarm_critical",
@@ -172,6 +175,10 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "switch.security_open_long_check",
         "switch.security_presence_sim",
         "switch.security_rain_warning",
+        "switch.technik_baseload_watch",
+        "switch.technik_cycling_watch",
+        "switch.technik_pressure_watch",
+        "switch.technik_water_watch",
         "time.security_good_night",
         "todo.garden",
         "todo.household",

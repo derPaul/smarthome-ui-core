@@ -16,6 +16,7 @@ from .alarm import OPTION_NUMBERS, AlarmLogic, AlarmOption
 from .const import SIGNAL_SECURITY, SIGNAL_TASKS
 from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
 from .store import CoreStore
+from .technik import TechnikOption
 
 
 async def async_setup_entry(
@@ -42,6 +43,13 @@ async def async_setup_entry(
     sync()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_TASKS, sync))
     async_add_entities([OpenMinutes(entry.entry_id, entry.runtime_data.security)])
+    technik = entry.runtime_data.technik
+    async_add_entities(
+        [
+            TechnikNumber(entry.entry_id, technik, "pressure_min", 0.5, 3, 0.1, "bar"),
+            TechnikNumber(entry.entry_id, technik, "water_minutes", 5, 240, 5, UnitOfTime.MINUTES),
+        ]
+    )
     alarm = entry.runtime_data.alarm
     async_add_entities(AlarmOptionNumber(entry.entry_id, alarm, *o) for o in OPTION_NUMBERS)
 
@@ -161,3 +169,36 @@ class AlarmOptionNumber(AlarmOption, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Change the setting."""
         self._set(int(value) if value == int(value) else value)
+
+
+class TechnikNumber(TechnikOption, NumberEntity):
+    """A threshold: heating pressure minimum (bar), minutes of flowing water."""
+
+    _attr_mode = NumberMode.BOX
+
+    def __init__(
+        self,
+        entry_id: str,
+        technik: Any,
+        key: str,
+        low: float,
+        high: float,
+        step: float,
+        unit: str,
+    ) -> None:
+        """Initialize (number.technik_<key>)."""
+        super().__init__(entry_id, technik, key, "number")
+        self._key = key
+        self._attr_native_min_value = low
+        self._attr_native_max_value = high
+        self._attr_native_step = step
+        self._attr_native_unit_of_measurement = unit
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the threshold."""
+        return float(self._technik.settings()[self._key])
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the threshold (the dashboard does not overwrite it then)."""
+        self._technik.set_option(self._key, value)

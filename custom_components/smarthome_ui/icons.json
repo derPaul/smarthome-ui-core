@@ -49,6 +49,9 @@
       },
       "security_alarm_reason": {
         "default": "mdi:alarm-light-outline"
+      },
+      "technik_hints": {
+        "default": "mdi:home-alert-outline"
       }
     },
     "switch": {
@@ -147,6 +150,18 @@
       },
       "security_open_long_check": {
         "default": "mdi:window-open-variant"
+      },
+      "technik_pressure_watch": {
+        "default": "mdi:gauge"
+      },
+      "technik_water_watch": {
+        "default": "mdi:water-alert-outline"
+      },
+      "technik_cycling_watch": {
+        "default": "mdi:heat-pump-outline"
+      },
+      "technik_baseload_watch": {
+        "default": "mdi:flash-alert-outline"
       }
     },
     "todo": {
@@ -265,6 +280,12 @@
         "default": "mdi:account-clock-outline"
       },
       "security_open_minutes": {
+        "default": "mdi:timer-outline"
+      },
+      "technik_pressure_min": {
+        "default": "mdi:gauge-low"
+      },
+      "technik_water_minutes": {
         "default": "mdi:timer-outline"
       }
     },

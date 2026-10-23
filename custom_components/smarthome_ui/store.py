@@ -86,6 +86,8 @@ def _default() -> dict[str, Any]:
         "presence_sim": {},
         # grocery spending: "last month" sensor and the kept months
         "grocery": {},
+        # house technology: sensors from the dashboard, own thresholds, pressure / base load samples
+        "technik": {},
     }
 
 

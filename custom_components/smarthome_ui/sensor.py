@@ -39,6 +39,7 @@ from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_en
 from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
 from .store import CoreStore
 from .tasks import TaskState, task_states
+from .technik import TechnikEntity
 from .vacuum import VacuumTracker
 from .waste import WasteManager
 
@@ -110,6 +111,7 @@ async def async_setup_entry(
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_VACUUM, add_rooms))
     waste = entry.runtime_data.waste
     async_add_entities([WasteNextSensor(entry.entry_id, waste)])
+    async_add_entities([TechnikHints(entry.entry_id, entry.runtime_data.technik)])
     kinds: set[str] = set()
 
     @callback
@@ -855,4 +857,27 @@ class AlarmReason(_AlarmSensor):
         return {
             "entity": rec.get("entity"),
             "time": dt_util.utc_from_timestamp(t / 1000).isoformat() if t else None,
+        }
+
+
+class TechnikHints(TechnikEntity, SensorEntity):
+    """How many house technology problems there are now (the messages as attribute)."""
+
+    def __init__(self, entry_id: str, technik: Any) -> None:
+        """Initialize (sensor.technik_hints)."""
+        super().__init__(entry_id, technik, "hints", "sensor")
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of problems."""
+        return len(self._technik.hints)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the messages, the pressure trend and the water valve."""
+        info = self._technik.info()
+        return {
+            "hints": [h["message"] for h in info["hints"]],
+            "pressure_trend": info["pressure_trend"],
+            "valve": info["valve"],
         }

@@ -60,6 +60,7 @@ from .presence_sim import PresenceSim
 from .security import Security
 from .store import CoreStore
 from .tasks import find_task, task_states
+from .technik import Technik
 from .vacuum import VacuumManager
 from .waste import WasteManager
 from .watchers import Watchers
@@ -99,6 +100,7 @@ class CoreRuntime:
     mailbox: Mailbox
     presence_sim: PresenceSim
     grocery: Grocery
+    technik: Technik
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -280,6 +282,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_mailbox_settings,
         ws_presence_sim_settings,
         ws_grocery_settings,
+        ws_technik_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -311,6 +314,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
                 url=cfg.get("url") or "/",
                 urgent=bool(cfg.get("urgent")),
                 tag=tag,
+            )
+
+    @callback
+    def technik_notify(
+        src: str,
+        title: str,
+        message: str,
+        tag: str,
+        urgent: bool = False,
+        actions: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """House technology: faults, pressure, water, base load (if push is on for src)."""
+        cfg = (store.data["notify"].get("sources") or {}).get(src) or {}
+        if cfg.get("push"):
+            engine.send(
+                title,
+                message,
+                src=src,
+                url=cfg.get("url") or "/",
+                urgent=urgent or bool(cfg.get("urgent")),
+                tag=tag,
+                actions=actions,
             )
 
     doorbells = DoorbellManager(hass, store)
@@ -359,6 +384,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Mailbox(hass, store, security_notify),
         PresenceSim(hass, store, lambda: alarm.panel or _first_panel(hass)),
         Grocery(hass, store),
+        Technik(hass, store, technik_notify),
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -428,6 +454,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.mailbox.async_setup()
     entry.runtime_data.presence_sim.async_setup()
     entry.runtime_data.grocery.async_setup()
+    entry.runtime_data.technik.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -522,6 +549,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.mailbox.async_stop()
     entry.runtime_data.presence_sim.async_stop()
     entry.runtime_data.grocery.async_stop()
+    entry.runtime_data.technik.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -559,6 +587,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "mailbox": runtime.mailbox.info(),
         "presence_sim": runtime.presence_sim.info(),
         "grocery": runtime.grocery.info(),
+        "technik": runtime.technik.info(),
         "features": [
             "task_defs",
             "waste",
@@ -575,6 +604,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "mailbox",
             "presence_sim",
             "grocery",
+            "technik",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -630,6 +660,7 @@ def ws_subscribe(
                     "mailbox": runtime.mailbox.info(),
                     "presence_sim": runtime.presence_sim.info(),
                     "grocery": runtime.grocery.info(),
+                    "technik": runtime.technik.info(),
                 },
             )
         )
@@ -1000,3 +1031,35 @@ def ws_grocery_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.grocery.set_settings(msg["entity"], msg.get("months"))
         connection.send_result(msg["id"], runtime.grocery.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/technik/settings",
+        vol.Optional("heatpump_error"): vol.Any(None, str),
+        vol.Optional("inverter_error"): vol.Any(None, str),
+        vol.Optional("inverter_error_ok"): vol.Any(None, [vol.Coerce(str)]),
+        vol.Optional("reach"): {str: vol.Any(None, str)},
+        vol.Optional("pressure"): vol.Any(None, str),
+        vol.Optional("pressure_min"): vol.Coerce(float),
+        vol.Optional("pressure_critical"): vol.Coerce(float),
+        vol.Optional("pressure_drop"): vol.Coerce(float),
+        vol.Optional("salt"): vol.Any(None, str),
+        vol.Optional("salt_max"): vol.Coerce(float),
+        vol.Optional("syr"): {str: vol.Any(None, str)},
+        vol.Optional("flow"): vol.Any(None, str),
+        vol.Optional("valve"): vol.Any(None, str),
+        vol.Optional("water_minutes"): vol.Coerce(float),
+        vol.Optional("compressor"): vol.Any(None, str),
+        vol.Optional("cycles_per_hour"): vol.Coerce(float),
+        vol.Optional("power"): dict,
+    }
+)
+@callback
+def ws_technik_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take the house technology sensors the dashboard found or was told."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.technik.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
+        connection.send_result(msg["id"], runtime.technik.info())

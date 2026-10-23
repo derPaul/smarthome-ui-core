@@ -18,6 +18,7 @@ from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_enti
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
+from .technik import TechnikOption
 
 
 async def async_setup_entry(
@@ -42,6 +43,10 @@ async def async_setup_entry(
         [AlarmLogicSwitch(entry.entry_id, alarm), GuestsSwitch(entry.entry_id, alarm)]
         + [AlarmOptionSwitch(entry.entry_id, alarm, *option) for option in OPTION_SWITCHES]
         + [PresenceSimSwitch(entry.entry_id, entry.runtime_data.presence_sim)]
+        + [
+            TechnikCheck(entry.entry_id, entry.runtime_data.technik, check)
+            for check in ("pressure", "water", "cycling", "baseload")
+        ]
     )
     async_setup_doorbell_entities(
         entry.runtime_data.doorbells,
@@ -361,3 +366,25 @@ class PresenceSimSwitch(CoreEntity, SwitchEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_PRESENCE_SIM, self.async_write_ha_state)
         )
+
+
+class TechnikCheck(TechnikOption, SwitchEntity):
+    """A house technology check on / off (pressure, water watch, cycling, base load)."""
+
+    def __init__(self, entry_id: str, technik: Any, check: str) -> None:
+        """Initialize (switch.technik_<check>_watch)."""
+        super().__init__(entry_id, technik, f"{check}_watch", "switch")
+        self._check = check
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the check is on."""
+        return bool(self._technik.settings()["checks"][self._check])
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the check on."""
+        self._technik.set_option(self._check, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the check off."""
+        self._technik.set_option(self._check, False)

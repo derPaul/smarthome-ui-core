@@ -302,6 +302,33 @@ Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **En
 - Mitteilungen (Quelle „Briefkasten“, Push an): „Post ist da“ beim ersten Einwurf nach dem Leeren,
   „Briefkasten: Klappe/Tür steht offen“ nach 3 Minuten.
 
+## Haustechnik
+
+Gerät **„Haustechnik“**. Welche Sensoren gemeint sind (Wärmepumpe, Wechselrichter, Heizungsdruck, Enthärter,
+Durchfluss, Verdichter, Hausverbrauch), schickt das Dashboard so, wie es sie auf der Haustechnik-Seite gefunden hat
+oder eingestellt sind. Core prüft jede Minute selbst – auch ohne offenes Dashboard. Mitteilungen kommen über die
+Quellen „Heizung & Wärmepumpe“, „Strom, PV & Batterie“ und „Wasser & Enthärter“ (Push an).
+
+- **Störungen:** Fehlerzustand der Wärmepumpe (dringlich) bzw. des Wechselrichters; Wechselrichter, Batterie oder
+  Heizkreis seit 10 Minuten nicht erreichbar.
+- **Heizungsdruck:** unter dem Mindestdruck (Standard 1,5 bar) „Heizungswasser nachfüllen“, unter 1 bar dringlich.
+  Fällt der tägliche Tiefstwert über drei Wochen um 0,08 bar pro Woche oder mehr: „Heizungsdruck fällt“ (Hinweis auf
+  eine undichte Stelle oder das Ausdehnungsgefäß).
+- **Enthärter:** Salz bei 20 % oder weniger, Alarme, Warnungen und Hinweise des Entkalkers (z. B. SYR).
+- **Wasser-Wächter:** Wasser fließt 40 Minuten ohne Pause (nachts zwischen 1 und 5 Uhr schon nach 10 Minuten,
+  dringlich). Gibt es ein Hauptventil (`valve.…` bzw. Schalter mit „Haupt“, „Absperr“, „Leck“ im Namen), hat die
+  Mitteilung den Knopf „Wasser absperren“.
+- **Takten:** Der Verdichter startet über 6 Stunden mehr als 4-mal pro Stunde.
+- **Grundlast:** Der niedrigste Hausverbrauch zwischen 0 und 5 Uhr liegt deutlich über dem üblichen (Mittel der
+  letzten Nächte).
+
+| Entität | |
+|---|---|
+| `sensor.technik_hints` | Anzahl aktueller Hinweise (Attribute `hints`, `pressure_trend`, `valve`) |
+| `switch.technik_pressure_watch` / `water_watch` / `cycling_watch` / `baseload_watch` | Prüfungen an/aus |
+| `number.technik_pressure_min` | Mindest-Heizungsdruck (bar) – eigener Wert hat Vorrang vor dem Dashboard |
+| `number.technik_water_minutes` | nach wie vielen Minuten fließendes Wasser gemeldet wird |
+
 ## Haushaltsgeräte
 
 **„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder
@@ -466,6 +493,7 @@ actions:
 | `smarthome_ui/mailbox/settings` | Briefkasten-Sensoren (`flap`, `door`, `enabled`) |
 | `smarthome_ui/presence_sim/settings` | Anwesenheitssimulation (`enabled`, `lights`, `covers`, `start`, `from`, `until`, `min`, `max`, `parallel`, `when`, `covers_open`) |
 | `smarthome_ui/grocery/settings` | Einkauf: Sensor „letzter Monat“ (`entity`), einmalig bisherige Monate (`months`) |
+| `smarthome_ui/technik/settings` | Haustechnik-Sensoren und Schwellen (`heatpump_error`, `inverter_error`, `inverter_error_ok`, `reach`, `pressure`, `pressure_min`, `pressure_critical`, `pressure_drop`, `salt`, `salt_max`, `syr`, `flow`, `valve`, `water_minutes`, `compressor`, `cycles_per_hour`, `power`) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

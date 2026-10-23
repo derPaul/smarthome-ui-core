@@ -210,6 +210,9 @@
     },
     "security": {
       "name": "Sicherheit"
+    },
+    "technik": {
+      "name": "Haustechnik"
     }
   },
   "entity": {
@@ -308,6 +311,9 @@
       },
       "security_alarm_reason": {
         "name": "Alarm-Grund"
+      },
+      "technik_hints": {
+        "name": "Hinweise"
       }
     },
     "binary_sensor": {
@@ -483,6 +489,18 @@
       },
       "security_open_long_check": {
         "name": "Lange offene Fenster melden"
+      },
+      "technik_pressure_watch": {
+        "name": "Heizungsdruck überwachen"
+      },
+      "technik_water_watch": {
+        "name": "Wasser-Wächter (Leck)"
+      },
+      "technik_cycling_watch": {
+        "name": "Takten der Wärmepumpe melden"
+      },
+      "technik_baseload_watch": {
+        "name": "Grundlast überwachen"
       }
     },
     "number": {
@@ -503,6 +521,12 @@
       },
       "security_open_minutes": {
         "name": "Offene Fenster melden nach"
+      },
+      "technik_pressure_min": {
+        "name": "Mindest-Heizungsdruck"
+      },
+      "technik_water_minutes": {
+        "name": "Fließendes Wasser melden nach"
       }
     },
     "time": {

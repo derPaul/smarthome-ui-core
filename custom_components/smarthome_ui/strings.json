@@ -210,6 +210,9 @@
     },
     "security": {
       "name": "Security"
+    },
+    "technik": {
+      "name": "House technology"
     }
   },
   "entity": {
@@ -308,6 +311,9 @@
       },
       "security_alarm_reason": {
         "name": "Alarm reason"
+      },
+      "technik_hints": {
+        "name": "Hints"
       }
     },
     "binary_sensor": {
@@ -483,6 +489,18 @@
       },
       "security_open_long_check": {
         "name": "Report windows open for long"
+      },
+      "technik_pressure_watch": {
+        "name": "Watch heating pressure"
+      },
+      "technik_water_watch": {
+        "name": "Water watch (leak)"
+      },
+      "technik_cycling_watch": {
+        "name": "Report heat pump cycling"
+      },
+      "technik_baseload_watch": {
+        "name": "Watch base load"
       }
     },
     "number": {
@@ -503,6 +521,12 @@
       },
       "security_open_minutes": {
         "name": "Report open windows after"
+      },
+      "technik_pressure_min": {
+        "name": "Minimum heating pressure"
+      },
+      "technik_water_minutes": {
+        "name": "Report flowing water after"
       }
     },
     "time": {
