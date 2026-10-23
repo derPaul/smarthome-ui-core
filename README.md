@@ -344,6 +344,20 @@ und Pause des Heizbetriebs, nicht im Sommerbetrieb) und den nächsten Warmwasser
 die Wärmepumpe im Lauf aufnimmt (Attribut `hp_runs` = Läufe bis leer). Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
 jedem Aufheizen (bis dahin Soll − 5 K).
 
+## System & Netzwerk
+
+Gerät **„System“** mit `sensor.system_problems` (Anzahl, Attribut `problems`). Was überwacht wird, schickt das
+Dashboard so, wie seine Seiten Netzwerk, Status und Haustechnik eingestellt sind. Core prüft jede Minute – auch ohne
+offenes Dashboard:
+
+- **Internet** (Quelle „Internet“): Verbindungs-Entität 2 Minuten nicht online.
+- **Netzwerkgeräte** („Netzwerkgeräte“): Gateway, Switches … 5 Minuten nicht online.
+- **Dienste** („Dienste & Integrationen“): Integration eines Dienstes mit Fehler (Einrichtung fehlgeschlagen,
+  Verbindung wird wiederholt, Migrationsfehler) oder Bridge offline (Zigbee2MQTT …); Statuszeilen der Seiten mit
+  Fehlerzustand oder 10 Minuten nicht erreichbar.
+- **Stromversorgung** („Stromversorgung (Raspberry Pi)“): Unterspannung (`rpi_power`).
+- **Automationen** („Fehler in Automationen“): Der letzte Lauf einer Automation endete mit einem Fehler.
+
 ## Haushaltsgeräte
 
 **„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder
@@ -509,6 +523,7 @@ actions:
 | `smarthome_ui/presence_sim/settings` | Anwesenheitssimulation (`enabled`, `lights`, `covers`, `start`, `from`, `until`, `min`, `max`, `parallel`, `when`, `covers_open`) |
 | `smarthome_ui/grocery/settings` | Einkauf: Sensor „letzter Monat“ (`entity`), einmalig bisherige Monate (`months`) |
 | `smarthome_ui/technik/settings` | Haustechnik-Sensoren und Schwellen (`heatpump_error`, `inverter_error`, `inverter_error_ok`, `reach`, `pressure`, `pressure_min`, `pressure_critical`, `pressure_drop`, `salt`, `salt_max`, `syr`, `flow`, `valve`, `water_minutes`, `compressor`, `cycles_per_hour`, `power`) |
+| `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

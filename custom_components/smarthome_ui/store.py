@@ -90,6 +90,8 @@ def _default() -> dict[str, Any]:
         "technik": {},
         # forecasts: battery power per hour (7 days), hot water start temperatures
         "forecast": {},
+        # system and network: what the dashboard watches (internet, devices, status, services)
+        "system": {},
     }
 
 

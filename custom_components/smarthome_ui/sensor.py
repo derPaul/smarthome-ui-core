@@ -39,6 +39,7 @@ from .mower import MowerTracker
 from .planner import STATUS, PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
 from .store import CoreStore
+from .system import SystemProblems
 from .tasks import TaskState, task_states
 from .technik import TechnikEntity
 from .vacuum import VacuumTracker
@@ -113,6 +114,7 @@ async def async_setup_entry(
     waste = entry.runtime_data.waste
     async_add_entities([WasteNextSensor(entry.entry_id, waste)])
     async_add_entities([TechnikHints(entry.entry_id, entry.runtime_data.technik)])
+    async_add_entities([SystemProblems(entry.entry_id, entry.runtime_data.system)])
     forecasts = entry.runtime_data.forecasts
     async_add_entities(
         ForecastSensor(entry.entry_id, entry.runtime_data.technik, forecasts, key)

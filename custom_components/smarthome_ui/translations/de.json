@@ -213,6 +213,9 @@
     },
     "technik": {
       "name": "Haustechnik"
+    },
+    "system": {
+      "name": "System"
     }
   },
   "entity": {
@@ -326,6 +329,9 @@
       },
       "technik_dhw_next": {
         "name": "Warmwasser heizt nach um"
+      },
+      "system_problems": {
+        "name": "Probleme"
       }
     },
     "binary_sensor": {

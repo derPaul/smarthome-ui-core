@@ -64,6 +64,9 @@
       },
       "technik_dhw_next": {
         "default": "mdi:water-boiler"
+      },
+      "system_problems": {
+        "default": "mdi:server-network"
       }
     },
     "switch": {

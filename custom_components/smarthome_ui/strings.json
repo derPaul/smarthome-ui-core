@@ -213,6 +213,9 @@
     },
     "technik": {
       "name": "House technology"
+    },
+    "system": {
+      "name": "System"
     }
   },
   "entity": {
@@ -326,6 +329,9 @@
       },
       "technik_dhw_next": {
         "name": "Hot water heats up at"
+      },
+      "system_problems": {
+        "name": "Problems"
       }
     },
     "binary_sensor": {

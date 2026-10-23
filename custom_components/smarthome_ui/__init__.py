@@ -60,6 +60,7 @@ from .plants import PlantManager
 from .presence_sim import PresenceSim
 from .security import Security
 from .store import CoreStore
+from .system import System
 from .tasks import find_task, task_states
 from .technik import Technik
 from .vacuum import VacuumManager
@@ -103,6 +104,7 @@ class CoreRuntime:
     grocery: Grocery
     technik: Technik
     forecasts: Forecasts
+    system: System
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -285,6 +287,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_presence_sim_settings,
         ws_grocery_settings,
         ws_technik_settings,
+        ws_system_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -389,6 +392,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Grocery(hass, store),
         technik,
         Forecasts(hass, store, technik),
+        System(hass, store, security_notify),
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -468,6 +472,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
 
     technik.on_settings = technik_settings
     forecasts.async_setup()
+    entry.runtime_data.system.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -564,6 +569,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.grocery.async_stop()
     entry.runtime_data.technik.async_stop()
     entry.runtime_data.forecasts.async_stop()
+    entry.runtime_data.system.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -603,6 +609,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "grocery": runtime.grocery.info(),
         "technik": runtime.technik.info(),
         "forecast": runtime.forecasts.info(),
+        "system": runtime.system.info(),
         "features": [
             "task_defs",
             "waste",
@@ -621,6 +628,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "grocery",
             "technik",
             "forecast",
+            "system",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -678,6 +686,7 @@ def ws_subscribe(
                     "grocery": runtime.grocery.info(),
                     "technik": runtime.technik.info(),
                     "forecast": runtime.forecasts.info(),
+                    "system": runtime.system.info(),
                 },
             )
         )
@@ -1086,3 +1095,23 @@ def ws_technik_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.technik.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
         connection.send_result(msg["id"], runtime.technik.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/system/settings",
+        vol.Optional("internet"): vol.Any(None, str),
+        vol.Optional("devices"): [dict],
+        vol.Optional("status"): [dict],
+        vol.Optional("services"): [dict],
+        vol.Optional("automations"): bool,
+    }
+)
+@callback
+def ws_system_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Take what the dashboard watches on its system and network pages."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.system.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
+        connection.send_result(msg["id"], runtime.system.info())

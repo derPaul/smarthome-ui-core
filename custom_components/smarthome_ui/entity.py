@@ -14,7 +14,15 @@ DEVICE_HOUSEHOLD = "household"
 DEVICE_GARDEN = "garden"
 DEVICE_SECURITY = "security"
 DEVICE_TECHNIK = "technik"
-DEVICES = (DEVICE_NOTIFY, DEVICE_HOUSEHOLD, DEVICE_GARDEN, DEVICE_SECURITY, DEVICE_TECHNIK)
+DEVICE_SYSTEM = "system"
+DEVICES = (
+    DEVICE_NOTIFY,
+    DEVICE_HOUSEHOLD,
+    DEVICE_GARDEN,
+    DEVICE_SECURITY,
+    DEVICE_TECHNIK,
+    DEVICE_SYSTEM,
+)
 
 
 def attach_device(entity: Entity, hass: HomeAssistant, device_id: str | None) -> None:

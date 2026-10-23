@@ -111,7 +111,14 @@ async def test_devices_per_area(hass: HomeAssistant, entry: MockConfigEntry, fre
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     names = sorted(d.name for d in dr.async_entries_for_config_entry(devices, entry.entry_id))
-    assert names == ["Garden", "House technology", "Household", "Notifications", "Security"]
+    assert names == [
+        "Garden",
+        "House technology",
+        "Household",
+        "Notifications",
+        "Security",
+        "System",
+    ]
 
     def device_of(entity_id: str) -> str:
         return devices.async_get(entities.async_get(entity_id).device_id).name
@@ -161,6 +168,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "sensor.security_nightwalk_until",
         "sensor.security_open",
         "sensor.security_persons_home",
+        "sensor.system_problems",
         "sensor.technik_battery_charge",
         "sensor.technik_battery_empty",
         "sensor.technik_dhw_next",
