@@ -561,3 +561,31 @@ async def test_setup_devices(hass: HomeAssistant, entry: MockConfigEntry, hass_w
     assert (await client.receive_json())["result"]["made"] == 0  # already there
     await client.send_json({"id": 4, "type": "smarthome_ui/devices/suggest"})
     assert (await client.receive_json())["result"]["mower"][0]["added"] is True
+
+
+async def test_outdoor_sensors(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    from homeassistant.helpers import area_registry as ar
+
+    garden = ar.async_get(hass).async_create("Garten")
+    dev = _device(
+        hass,
+        "zigbee",
+        "Fühler",
+        [
+            ("sensor", "fuehler_temp", "11.5", {"device_class": "temperature"}),
+            ("sensor", "fuehler_hum", "80", {"device_class": "humidity"}),
+        ],
+    )
+    dr.async_get(hass).async_update_device(dev, area_id=garden.id)
+    hass.states.async_set("sensor.wohnzimmer_temp", "21", {"device_class": "temperature"})
+    hass.states.async_set(
+        "sensor.aussen_taupunkt", "5", {"device_class": "temperature", "friendly_name": "Taupunkt"}
+    )
+    hass.states.async_set(
+        "sensor.wetter_luftdruck", "1013", {"device_class": "atmospheric_pressure"}
+    )
+    assert entry.runtime_data.catalog.outdoor() == {
+        "temperature": "sensor.fuehler_temp",
+        "humidity": "sensor.fuehler_hum",
+        "pressure": "sensor.wetter_luftdruck",
+    }

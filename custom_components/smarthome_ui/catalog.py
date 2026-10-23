@@ -24,7 +24,11 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
 
 from .entity import all_devices, has_identifier
 from .mower import CONF_DEVICE
@@ -300,6 +304,17 @@ SUGGEST_NAME = {
         r"melitta|saeco|gaggia|rancilio|lelit|rocket)",
         re.I,
     ),
+}
+# outdoor sensors without a weather station: in an outdoor area first, else by name
+_OUTDOOR_AREA = re.compile(r"(garten|garden|terrasse|balkon|außen|aussen|outdoor)", re.I)
+_OUTDOOR_NAME = re.compile(
+    r"(aussen|außen|outdoor|outside|garten|garden|terrasse|balkon|wetter|weather)", re.I
+)
+_OUTDOOR_NOT = re.compile(r"(dew|taupunkt|feels|gefühlt|apparent|boden|soil|pool|min|max)", re.I)
+OUTDOOR_CLASSES = {
+    "temperature": ("temperature",),
+    "humidity": ("humidity",),
+    "pressure": ("atmospheric_pressure", "pressure"),
 }
 _UNIFI_GATEWAY = re.compile(r"^(udm|uxg|usg|ucg|udr|uck|ux|dream|gateway|cloud gateway)", re.I)
 _UNIFI_SWITCH = re.compile(r"^(usw|us-|us8|us16|us24|us48|usl|switch|flex)", re.I)
@@ -802,11 +817,60 @@ class Catalog:
             self.hass.config_entries.async_remove_subentry(self.entry, sub.subentry_id)
         return len(subs)
 
+    def outdoor(self) -> dict[str, str]:
+        """Return outdoor temperature, humidity and pressure: weather station, else found ones."""
+        station = self.first("weather_station")
+        out = {
+            k: station["entities"][k]
+            for k in OUTDOOR_CLASSES
+            if station and k in station["entities"]
+        }
+        registry = er.async_get(self.hass)
+        devices = dr.async_get(self.hass)
+        areas = ar.async_get(self.hass)
+
+        def score(state: Any) -> int:
+            entry = registry.async_get(state.entity_id)
+            if entry is not None and (entry.hidden_by or entry.entity_category):
+                return -1
+            area_id = entry.area_id if entry else None
+            if entry is not None and not area_id and entry.device_id:
+                device = devices.async_get(entry.device_id)
+                area_id = device.area_id if device else None
+            area = areas.async_get_area(area_id) if area_id else None
+            if area and _OUTDOOR_AREA.search(f"{area.name} {area.id}"):
+                return 2
+            name = f"{state.entity_id} {state.attributes.get('friendly_name', '')}"
+            return 1 if _OUTDOOR_NAME.search(name) else 0
+
+        states = self.hass.states.async_all("sensor")
+        for key, classes in OUTDOOR_CLASSES.items():
+            if key in out:
+                continue
+            best: tuple[int, str] | None = None
+            for state in states:
+                if state.attributes.get("device_class") not in classes:
+                    continue
+                name = f"{state.entity_id} {state.attributes.get('friendly_name', '')}"
+                if _OUTDOOR_NOT.search(name):
+                    continue
+                try:
+                    float(state.state)
+                except ValueError:
+                    continue
+                points = score(state)
+                if points > 0 and (best is None or points > best[0]):
+                    best = (points, state.entity_id)
+            if best:
+                out[key] = best[1]
+        return out
+
     def info(self, migrated: bool, steps: list[int] | None = None) -> dict[str, Any]:
         """Return the catalog for the dashboard (steps: the takeovers done after the first)."""
         return {
             "migrated": migrated,
             "steps": [1, *(steps or [])] if migrated else list(steps or []),
             "devices": self.devices(),
+            "outdoor": self.outdoor(),
             "roles": ROLE_LABELS,
         }

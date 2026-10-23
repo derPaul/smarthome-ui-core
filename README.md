@@ -327,6 +327,8 @@ automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
 - **Wetterstation** (Schritt 3): Außentemperatur, Luftfeuchte, Luftdruck, Regen, Wind, Böen, Windrichtung und
   Sonnenstrahlung für Startseite, Raumklima und Garten. Ohne Zuordnung nimmt Core ein Gerät mit Wind- oder
   Regensensor und Temperatur.
+- **Außenfühler** (ab 0.29, `catalog.outdoor`): Temperatur, Luftfeuchte und Luftdruck von der Wetterstation, sonst
+  Fühler in Außenbereichen (Garten, Terrasse, Balkon) oder mit „außen“ im Namen – für Raumklima und Garten.
 - **Kaffeemaschine:** Leistung, Schalter und Energie der Steckdose bzw. des Relais.
 - **Fernseher, Zuspieler, Sync-Box** (Kino auf der Startseite): ohne Zuordnung findet Core sie über die Integration
   (LG webOS, Samsung, Sony Bravia, Philips, Android TV Remote; Apple TV, Android TV; Hue Sync Box).
