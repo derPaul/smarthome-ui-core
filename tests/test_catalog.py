@@ -287,6 +287,156 @@ async def test_page_lists(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_c
     assert (await client.receive_json())["result"]["made"] == 0
 
 
+async def test_step3_auto_and_migrate(
+    hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client
+) -> None:
+    _device(hass, "webostv", "LG OLED", [("media_player", "lg_oled", "off", {})])
+    _device(
+        hass,
+        "huesyncbox",
+        "Sync Box",
+        [
+            ("switch", "sync_box_light_sync", "off", {}),
+            ("switch", "sync_box_power", "on", {}),
+            ("select", "sync_box_sync_mode", "video", {}),
+        ],
+    )
+    _device(
+        hass,
+        "ecowitt",
+        "GW2000",
+        [
+            (
+                "sensor",
+                "gw2000_outdoor_temperature",
+                "12.5",
+                {"device_class": "temperature", "unit_of_measurement": "°C"},
+            ),
+            (
+                "sensor",
+                "gw2000_dewpoint",
+                "8",
+                {"device_class": "temperature", "unit_of_measurement": "°C"},
+            ),
+            (
+                "sensor",
+                "gw2000_wind_speed",
+                "5",
+                {"device_class": "wind_speed", "unit_of_measurement": "km/h"},
+            ),
+            (
+                "sensor",
+                "gw2000_wind_gust",
+                "9",
+                {"device_class": "wind_speed", "unit_of_measurement": "km/h"},
+            ),
+            (
+                "sensor",
+                "gw2000_rain_total",
+                "300",
+                {"device_class": "precipitation", "unit_of_measurement": "mm"},
+            ),
+        ],
+    )
+    # the weather station is found by its wind sensor: on the registry entry, not only the state
+    reg = er.async_get(hass)
+    for eid, device_class in (
+        ("sensor.gw2000_wind_speed", "wind_speed"),
+        ("sensor.gw2000_wind_gust", "wind_speed"),
+        ("sensor.gw2000_rain_total", "precipitation"),
+    ):
+        reg.async_update_entity(eid, original_device_class=device_class)
+    coffee = _device(
+        hass,
+        "shelly",
+        "Siebträger",
+        [
+            ("switch", "siebtrager", "off", {}),
+            ("sensor", "siebtrager_power", "0", {"unit_of_measurement": "W"}),
+            ("sensor", "siebtrager_energy", "12", {"unit_of_measurement": "kWh"}),
+        ],
+    )
+    catalog = entry.runtime_data.catalog
+    assert catalog.first("tv")["entities"] == {"media": "media_player.lg_oled"}
+    assert catalog.first("syncbox")["entities"] == {
+        "sync": "switch.sync_box_light_sync",
+        "power": "switch.sync_box_power",
+        "mode": "select.sync_box_sync_mode",
+    }
+    station = catalog.first("weather_station")
+    assert station["source"] == "auto"
+    assert station["entities"] == {
+        "temperature": "sensor.gw2000_outdoor_temperature",
+        "rain": "sensor.gw2000_rain_total",
+        "wind_speed": "sensor.gw2000_wind_speed",
+        "wind_gust": "sensor.gw2000_wind_gust",
+    }
+    assert catalog.first("coffee") is None  # only by subentry
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "smarthome_ui/catalog/migrate", "items": []})
+    assert (await client.receive_json())["result"]["made"] == 0
+    # step 3 runs once, even after the first takeover
+    items = [{"role": "coffee", "anchor": "sensor.siebtrager_power", "entities": {}}]
+    await client.send_json(
+        {"id": 2, "type": "smarthome_ui/catalog/migrate", "items": items, "step": 3}
+    )
+    assert (await client.receive_json())["result"]["made"] == 1
+    await hass.async_block_till_done()
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    found = entry.runtime_data.catalog.first("coffee")
+    assert found["device_id"] == coffee
+    assert found["entities"] == {
+        "power": "sensor.siebtrager_power",
+        "switch": "switch.siebtrager",
+        "energy": "sensor.siebtrager_energy",
+    }
+    await client.send_json(
+        {"id": 3, "type": "smarthome_ui/catalog/migrate", "items": items, "step": 3}
+    )
+    assert (await client.receive_json())["result"]["made"] == 0
+    await client.send_json({"id": 4, "type": "smarthome_ui/get"})
+    assert (await client.receive_json())["result"]["catalog"]["steps"] == [1, 3]
+
+
+async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "smarthome_ui/lists/migrate",
+            "page": "values",
+            "lists": {"weather.entity": "weather.home", "nope": "x", "cinema.scene": ""},
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["made"] == 1 and res["values"] == {"weather.entity": "weather.home"}
+    await client.send_json(
+        {
+            "id": 2,
+            "type": "smarthome_ui/lists/value",
+            "path": "media_player",
+            "value": "media_player.kuche",
+        }
+    )
+    res = (await client.receive_json())["result"]
+    assert res["values"]["media_player"] == "media_player.kuche"
+    await client.send_json(
+        {"id": 3, "type": "smarthome_ui/lists/value", "path": "weather.entity", "value": None}
+    )
+    assert "weather.entity" not in (await client.receive_json())["result"]["values"]
+    await client.send_json(
+        {
+            "id": 4,
+            "type": "smarthome_ui/lists/migrate",
+            "page": "home",
+            "lists": {"scenes": [{"entity": "scene.abend"}]},
+        }
+    )
+    assert (await client.receive_json())["result"]["pages"]["home"] == {
+        "scenes": [{"entity": "scene.abend"}]
+    }
+
+
 def test_identifiers_with_three_parts() -> None:
     """Newer Home Assistant versions keep device identifiers with three parts."""
     from types import SimpleNamespace

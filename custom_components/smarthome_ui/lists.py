@@ -5,7 +5,11 @@ survive a new dashboard and are the same for every display. Shape: ``{page: {pat
 an item is ``{"entity": ..., ...}`` (extra fields like a name or a motion sensor stay as they are);
 ``None`` means "automatic" (the page finds them itself).
 
-The dashboard's own lists are taken over once per page (``lists/migrate``).
+Besides the lists a few single entities that belong to no device are kept here (``values``): the
+weather entity, the music player, the cinema's volume and scenes. They hold for every page.
+
+The dashboard's own lists are taken over once per page (``lists/migrate``), its single values once
+(page ``values``).
 """
 
 from __future__ import annotations
@@ -31,7 +35,23 @@ PAGES = {
         "exclude",
     ),
     "status": ("services", "exclude"),
+    "home": (
+        "scenes",
+        "hcal.entities",
+        "hrem.entities",
+        "reminders.entities",
+        "calendar.entities",
+    ),
+    "rooms": ("exclude",),
+    "garden": ("devices.entities", "mower.tasks", "mower.zones"),
 }
+VALUES = (
+    "weather.entity",
+    "media_player",
+    "cinema.volume",
+    "cinema.scene",
+    "cinema.scene_off",
+)
 
 
 class PageLists:
@@ -60,9 +80,31 @@ class PageLists:
         self.store.save(SIGNAL_DATA)
 
     @callback
+    def set_value(self, path: str, value: str | None) -> None:
+        """Set one single entity (None = automatic again)."""
+        if path not in VALUES:
+            raise ValueError(path)
+        values = self.data.setdefault("values", {})
+        if value:
+            values[path] = value
+        else:
+            values.pop(path, None)
+        self.store.save(SIGNAL_DATA)
+
+    @callback
     def migrate(self, page: str, lists: dict[str, Any]) -> int:
-        """Take over a page's lists once."""
+        """Take over a page's lists (or the single values) once."""
         done = self.data.setdefault("migrated", [])
+        if page == "values" and page not in done:
+            own = self.data.setdefault("values", {})
+            made = 0
+            for path, value in lists.items():
+                if path in VALUES and isinstance(value, str) and value and path not in own:
+                    own[path] = value
+                    made += 1
+            done.append(page)
+            self.store.save(SIGNAL_DATA)
+            return made
         if page in done or page not in PAGES:
             return 0
         own = self.data.setdefault("pages", {}).setdefault(page, {})
@@ -79,6 +121,8 @@ class PageLists:
         """Return the lists for the dashboard."""
         return {
             "pages": self.data.get("pages") or {},
+            "values": self.data.get("values") or {},
+            "value_paths": list(VALUES),
             "migrated": list(self.data.get("migrated") or []),
             "paths": {k: list(v) for k, v in PAGES.items()},
         }

@@ -235,7 +235,7 @@
             "max_discharge": "Max. discharge power",
             "climate": "Heating circuit",
             "mode_select": "Operating mode",
-            "pressure": "Heating pressure",
+            "pressure": "Pressure",
             "compressor": "Compressor",
             "heat_mode": "Heating mode",
             "summer_mode": "Summer mode",
@@ -262,6 +262,20 @@
             "wan_rx": "WAN received",
             "wan_tx": "WAN sent",
             "wan_ip": "WAN IP",
+            "disk": "Disk",
+            "cpu_temp": "CPU temperature",
+            "humidity": "Humidity",
+            "rain": "Rain (total)",
+            "wind_speed": "Wind",
+            "wind_gust": "Gusts",
+            "wind_direction": "Wind direction",
+            "radiation": "Solar radiation",
+            "switch": "Switch",
+            "energy": "Energy",
+            "media": "Media player",
+            "sync": "Light sync",
+            "mode": "Mode",
+            "intensity": "Intensity",
             "capacity": "Usable capacity"
           }
         }
@@ -771,7 +785,13 @@
         "internet": "Internet router",
         "gateway": "Gateway",
         "switch": "Switch",
-        "ap": "Access point"
+        "ap": "Access point",
+        "server": "Home Assistant server",
+        "weather_station": "Weather station",
+        "coffee": "Coffee machine",
+        "tv": "TV",
+        "player": "Player (Apple TV …)",
+        "syncbox": "Sync box"
       }
     }
   }

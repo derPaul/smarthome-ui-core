@@ -318,11 +318,22 @@ automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
   Katalog.
 - **Home-Assistant-Server** (Rolle `server`): CPU, Arbeitsspeicher, Speicherplatz und Temperatur findet Core am
   System-Monitor-Gerät, dazu das Home-Assistant-Update und das letzte Backup – auch ohne Zuordnung.
+- **Wetterstation** (Schritt 3): Außentemperatur, Luftfeuchte, Luftdruck, Regen, Wind, Böen, Windrichtung und
+  Sonnenstrahlung für Startseite, Raumklima und Garten. Ohne Zuordnung nimmt Core ein Gerät mit Wind- oder
+  Regensensor und Temperatur.
+- **Kaffeemaschine:** Leistung, Schalter und Energie der Steckdose bzw. des Relais.
+- **Fernseher, Zuspieler, Sync-Box** (Kino auf der Startseite): ohne Zuordnung findet Core sie über die Integration
+  (LG webOS, Samsung, Sony Bravia, Philips, Android TV Remote; Apple TV, Android TV; Hue Sync Box).
+- Mit Dashboard 1.272 übernimmt Core einmalig auch diese Geräte (Schritt 3).
 
 **Listen der Seiten** (Schritt 2): Welche Kameras, Fenster & Türen, Bewegungsmelder, Schlösser, Chimes und Sensoren
 für „Letzte Nacht“ die Sicherheits-Seite zeigt, welche Dienste die Status-Seite überwacht und was ignoriert wird,
 steht in Core. Das Dashboard bearbeitet sie in seinen Dialogen und übernimmt seine bisherigen Listen einmalig;
-ohne eigene Liste erkennt die Seite die Geräte automatisch.
+ohne eigene Liste erkennt die Seite die Geräte automatisch. Seit Schritt 3 auch: Szenen, Kalender und Listen der
+Startseite, ignorierte Entitäten der Räume, Garten & Terrasse sowie Aufgaben und Zonen des Mähers.
+
+**Einzelne Entitäten ohne Gerät** stehen ebenfalls in Core und gelten auf allen Seiten: Wetter-Entität,
+Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos.
 
 ## Haustechnik
 
@@ -551,9 +562,10 @@ actions:
 | `smarthome_ui/technik/settings` | Haustechnik-Sensoren und Schwellen (`heatpump_error`, `inverter_error`, `inverter_error_ok`, `reach`, `pressure`, `pressure_min`, `pressure_critical`, `pressure_drop`, `salt`, `salt_max`, `syr`, `flow`, `valve`, `water_minutes`, `compressor`, `cycles_per_hour`, `power`) |
 | `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
 | `smarthome_ui/catalog/link` | Gerät einer Rolle zuordnen (`device_id`, `role`, optional `name`) |
-| `smarthome_ui/catalog/migrate` | einmalig: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`) |
+| `smarthome_ui/catalog/migrate` | einmalig je Schritt: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`; `step`, Standard 1) |
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
-| `smarthome_ui/lists/migrate` | einmalig: Listen einer Seite übernehmen (`page`, `lists`) |
+| `smarthome_ui/lists/migrate` | einmalig: Listen einer Seite übernehmen (`page`, `lists`; Seite `values` = einzelne Entitäten) |
+| `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

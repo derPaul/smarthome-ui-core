@@ -6,7 +6,10 @@ way the dashboard did it; single entities can be set by hand ("Entitäten anpass
 UniFi devices without a subentry come in automatically (model: gateway / switch / access point).
 
 The catalog is the one source for the dashboard (what to show) and for Core's own checks
-(house technology, system & network). Step 1: house technology and network.
+(house technology, system & network). Step 1: house technology and network; step 2: the Home
+Assistant server; step 3: weather station, coffee machine, TV, player and sync box (home, rooms,
+garden, household). TV, player and sync box are found by their integration, the weather station
+by its sensors (wind, rain).
 
 The dashboard's former settings are taken over once (``catalog/migrate``): for every role it used,
 a subentry with the device of its entities.
@@ -41,6 +44,11 @@ ROLES = [
     "switch",
     "ap",
     "server",
+    "weather_station",
+    "coffee",
+    "tv",
+    "player",
+    "syncbox",
 ]
 ROLE_LABELS = {
     "inverter": "Wechselrichter",
@@ -53,8 +61,31 @@ ROLE_LABELS = {
     "ap": "Accesspoint",
     "network": "Netzwerkgerät",
     "server": "Home-Assistant-Server",
+    "weather_station": "Wetterstation",
+    "coffee": "Kaffeemaschine",
+    "tv": "Fernseher",
+    "player": "Zuspieler",
+    "syncbox": "Sync-Box",
 }
-SINGLE_ROLES = ("inverter", "battery", "heatpump", "water", "internet", "server")
+SINGLE_ROLES = (
+    "inverter",
+    "battery",
+    "heatpump",
+    "water",
+    "internet",
+    "server",
+    "weather_station",
+    "coffee",
+    "tv",
+    "player",
+    "syncbox",
+)
+# found by their integration (the platform of their media player / switch) without a subentry
+AUTO_PLATFORMS = {
+    "tv": ("media_player", ("webostv", "samsungtv", "braviatv", "philips_js", "androidtv_remote")),
+    "player": ("media_player", ("apple_tv", "androidtv", "nvidia_shield")),
+    "syncbox": ("switch", ("huesyncbox",)),
+}
 
 
 @dataclass(frozen=True)
@@ -65,7 +96,7 @@ class Key:
     pattern: str
     exclude: str | None = None
     units: tuple[str, ...] | None = None
-    device_class: str | None = None
+    device_class: tuple[str, ...] | None = None
     numeric: bool | None = None
 
 
@@ -193,6 +224,43 @@ KEYS: dict[str, dict[str, Key]] = {
     "switch": dict(_NET),
     "ap": dict(_NET),
     "network": dict(_NET),
+    "weather_station": {
+        "temperature": Key(
+            ("sensor",),
+            r".",
+            r"(dew|taupunkt|feels|gefühlt|gefuehlt|wind.?chill|heat.?index|innen|indoor|min|max)",
+            None,
+            ("temperature",),
+        ),
+        "humidity": Key(("sensor",), r".", r"(innen|indoor|absolute|absolut)", None, ("humidity",)),
+        "pressure": Key(("sensor",), r".", None, None, ("atmospheric_pressure", "pressure")),
+        "rain": Key(
+            ("sensor",),
+            r".",
+            r"(rate|intensit|stunde|hour|heute|today|daily|tag|week|woche|month|monat|year|jahr|event)",
+            None,
+            ("precipitation",),
+        ),
+        "wind_speed": Key(("sensor",), r".", r"(gust|böe|boe|max)", None, ("wind_speed",)),
+        "wind_gust": Key(("sensor",), r"(gust|böe|boe)", r"max", None, ("wind_speed",)),
+        "wind_direction": Key(
+            ("sensor",), r"(wind|richtung|direction|bearing)", r"(text|cardinal)", ("°",)
+        ),
+        "radiation": Key(("sensor",), r"(strahlung|radiation|solar|irradi)", r"(uv|lux)"),
+    },
+    "coffee": {
+        "power": Key(("sensor",), r".", r"(max|peak|apparent|schein)", _W),
+        "switch": Key(("switch",), r".", r"(led|child|kinder|lock|sperre)"),
+        "energy": Key(("sensor",), r".", r"(today|heute|daily|tag)", ("kWh", "Wh")),
+    },
+    "tv": {"media": Key(("media_player",), r".")},
+    "player": {"media": Key(("media_player",), r".")},
+    "syncbox": {
+        "sync": Key(("switch",), r"(light_sync|lichtsync|sync$|sync\s)", r"(power|strom)"),
+        "power": Key(("switch",), r"(power|strom)"),
+        "mode": Key(("select",), r"(sync.?mode|modus|mode)"),
+        "intensity": Key(("select",), r"(intensity|intensit)"),
+    },
     # Home Assistant itself: System Monitor (or the host's own integration)
     "server": {
         "cpu": Key(
@@ -278,6 +346,12 @@ class Catalog:
         if not re.search(key.pattern, text) or (key.exclude and re.search(key.exclude, text)):
             return False
         state = self.hass.states.get(entry.entity_id)
+        if key.device_class is not None:
+            device_class = entry.device_class or entry.original_device_class
+            if device_class is None and state is not None:
+                device_class = state.attributes.get("device_class")
+            if device_class not in key.device_class:
+                return False
         if key.units is not None:
             unit = state.attributes.get("unit_of_measurement") if state else None
             if unit not in key.units:
@@ -335,6 +409,12 @@ class Catalog:
             )
         if not any(d["role"] == "server" for d in out) and (server := self._server_auto()):
             out.append(server)
+        roles = {d["role"] for d in out}
+        for role in AUTO_PLATFORMS:
+            if role not in roles and (found := self._platform_auto(role, linked)):
+                out.append(found)
+        if "weather_station" not in roles and (station := self._station_auto(linked)):
+            out.append(station)
         if self.unifi_auto():
             for device in all_devices(self.hass):
                 if device.id in linked or not has_identifier(device, "unifi"):
@@ -389,6 +469,50 @@ class Catalog:
             "prefix": None,
             "source": "auto",
         }
+
+    def _platform_auto(self, role: str, linked: set[str]) -> dict[str, Any] | None:
+        """Return the first device of a TV / player / sync box integration (no subentry)."""
+        domain, platforms = AUTO_PLATFORMS[role]
+        registry = er.async_get(self.hass)
+        devices = dr.async_get(self.hass)
+        for entry in sorted(registry.entities.values(), key=lambda e: e.entity_id):
+            if (
+                entry.domain != domain
+                or entry.platform not in platforms
+                or entry.disabled_by
+                or entry.hidden_by
+                or not entry.device_id
+                or entry.device_id in linked
+                or (device := devices.async_get(entry.device_id)) is None
+            ):
+                continue
+            entities = self.detect(role, device.id)
+            if entities:
+                name = device.name_by_user or device.name or ROLE_LABELS[role]
+                return self._item(f"{role}_auto", role, device.id, name, entities, "auto", {})
+        return None
+
+    def _station_auto(self, linked: set[str]) -> dict[str, Any] | None:
+        """Return a weather station: a device with wind or rain and a temperature."""
+        registry = er.async_get(self.hass)
+        candidates = {
+            e.device_id
+            for e in registry.entities.values()
+            if e.domain == "sensor"
+            and e.device_id
+            and not e.disabled_by
+            and (e.device_class or e.original_device_class) in ("wind_speed", "precipitation")
+        }
+        for device in all_devices(self.hass):
+            if device.id in linked or device.id not in candidates:
+                continue
+            entities = self.detect("weather_station", device.id)
+            if "temperature" in entities and ("wind_speed" in entities or "rain" in entities):
+                name = device.name_by_user or device.name or ROLE_LABELS["weather_station"]
+                return self._item(
+                    "weather_station_auto", "weather_station", device.id, name, entities, "auto", {}
+                )
+        return None
 
     def _item(
         self,
@@ -574,6 +698,11 @@ class Catalog:
             made += 1
         return made
 
-    def info(self, migrated: bool) -> dict[str, Any]:
-        """Return the catalog for the dashboard."""
-        return {"migrated": migrated, "devices": self.devices(), "roles": ROLE_LABELS}
+    def info(self, migrated: bool, steps: list[int] | None = None) -> dict[str, Any]:
+        """Return the catalog for the dashboard (steps: the takeovers done after the first)."""
+        return {
+            "migrated": migrated,
+            "steps": [1, *(steps or [])] if migrated else list(steps or []),
+            "devices": self.devices(),
+            "roles": ROLE_LABELS,
+        }

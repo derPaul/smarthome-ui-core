@@ -235,7 +235,7 @@
             "max_discharge": "Max. Entladeleistung",
             "climate": "Heizkreis",
             "mode_select": "Betriebsart",
-            "pressure": "Heizungsdruck",
+            "pressure": "Druck",
             "compressor": "Verdichter",
             "heat_mode": "Heizbetrieb",
             "summer_mode": "Sommerbetrieb",
@@ -262,6 +262,20 @@
             "wan_rx": "WAN empfangen",
             "wan_tx": "WAN gesendet",
             "wan_ip": "WAN-IP",
+            "disk": "Datenträger",
+            "cpu_temp": "CPU-Temperatur",
+            "humidity": "Luftfeuchte",
+            "rain": "Regen (Summe)",
+            "wind_speed": "Wind",
+            "wind_gust": "Böen",
+            "wind_direction": "Windrichtung",
+            "radiation": "Sonnenstrahlung",
+            "switch": "Schalter",
+            "energy": "Energie",
+            "media": "Medienplayer",
+            "sync": "Lichtsync",
+            "mode": "Modus",
+            "intensity": "Intensität",
             "capacity": "Nutzbare Kapazität"
           }
         }
@@ -771,7 +785,13 @@
         "internet": "Internet-Router",
         "gateway": "Gateway",
         "switch": "Switch",
-        "ap": "Accesspoint"
+        "ap": "Accesspoint",
+        "server": "Home-Assistant-Server",
+        "weather_station": "Wetterstation",
+        "coffee": "Kaffeemaschine",
+        "tv": "Fernseher",
+        "player": "Zuspieler (Apple TV …)",
+        "syncbox": "Sync-Box"
       }
     }
   }

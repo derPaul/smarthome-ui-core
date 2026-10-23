@@ -53,7 +53,7 @@ from .doorbell import DoorbellManager
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
-from .lists import PAGES as LIST_PAGES, PageLists
+from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
@@ -297,6 +297,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_catalog_migrate,
         ws_lists_set,
         ws_lists_migrate,
+        ws_lists_value,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -624,7 +625,9 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "technik": runtime.technik.info(),
         "forecast": runtime.forecasts.info(),
         "system": runtime.system.info(),
-        "catalog": runtime.catalog.info(store.data["catalog_migrated"]),
+        "catalog": runtime.catalog.info(
+            store.data["catalog_migrated"], store.data["catalog_steps"]
+        ),
         "lists": runtime.lists.info(),
         "features": [
             "task_defs",
@@ -705,7 +708,9 @@ def ws_subscribe(
                     "technik": runtime.technik.info(),
                     "forecast": runtime.forecasts.info(),
                     "system": runtime.system.info(),
-                    "catalog": runtime.catalog.info(runtime.store.data["catalog_migrated"]),
+                    "catalog": runtime.catalog.info(
+                        runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
+                    ),
                     "lists": runtime.lists.info(),
                 },
             )
@@ -1159,17 +1164,24 @@ def ws_catalog_link(
     {
         vol.Required("type"): "smarthome_ui/catalog/migrate",
         vol.Required("items"): [dict],
+        vol.Optional("step", default=1): vol.All(int, vol.Range(min=1)),
     }
 )
 @callback
 def ws_catalog_migrate(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Take over the dashboard's device settings once (one device subentry per device)."""
+    """Take over the dashboard's device settings once per step (one device subentry per device)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         made = 0
-        if not runtime.store.data["catalog_migrated"]:
-            runtime.store.data["catalog_migrated"] = True
+        data = runtime.store.data
+        if msg["step"] == 1:
+            if not data["catalog_migrated"]:
+                data["catalog_migrated"] = True
+                runtime.store.save(SIGNAL_DATA)
+                made = runtime.catalog.migrate(msg["items"])
+        elif msg["step"] not in data["catalog_steps"]:
+            data["catalog_steps"] = [*data["catalog_steps"], msg["step"]]
             runtime.store.save(SIGNAL_DATA)
             made = runtime.catalog.migrate(msg["items"])
         connection.send_result(msg["id"], {"made": made})
@@ -1199,8 +1211,25 @@ def ws_lists_set(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "smarthome_ui/lists/value",
+        vol.Required("path"): vol.In(list(LIST_VALUES)),
+        vol.Required("value"): vol.Any(None, str),
+    }
+)
+@callback
+def ws_lists_value(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Set one single entity (weather, music player, cinema …; None = automatic)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.lists.set_value(msg["path"], msg["value"])
+        connection.send_result(msg["id"], runtime.lists.info())
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "smarthome_ui/lists/migrate",
-        vol.Required("page"): vol.In(list(LIST_PAGES)),
+        vol.Required("page"): vol.In([*LIST_PAGES, "values"]),
         vol.Required("lists"): dict,
     }
 )

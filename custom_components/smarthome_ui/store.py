@@ -94,6 +94,8 @@ def _default() -> dict[str, Any]:
         "system": {},
         # the dashboard's device settings were taken over into the catalog (device subentries)
         "catalog_migrated": False,
+        # later takeovers of the catalog (step 3: home, rooms, household, garden)
+        "catalog_steps": [],
         # lists of the dashboard's pages (cameras, windows, locks …)
         "lists": {},
     }
