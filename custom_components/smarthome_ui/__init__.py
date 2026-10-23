@@ -63,6 +63,7 @@ from .planner import PlannerManager
 from .plants import PlantManager
 from .presence_sim import PresenceSim
 from .security import Security
+from .setup_devices import TYPES as SETUP_TYPES, add_device, suggest_devices
 from .store import CoreStore
 from .system import System
 from .tasks import find_task, task_states
@@ -299,6 +300,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_catalog_migrate,
         ws_catalog_suggest,
         ws_catalog_unlink,
+        ws_devices_suggest,
+        ws_devices_add,
         ws_onboarding_done,
         ws_lists_set,
         ws_lists_migrate,
@@ -670,6 +673,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "lists",
             "onboarding",
             "energy",
+            "setup_devices",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1192,6 +1196,60 @@ def ws_catalog_suggest(
         connection.send_result(
             msg["id"], {"roles": runtime.catalog.suggest(), "labels": CATALOG_LABELS}
         )
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/devices/suggest"})
+@callback
+def ws_devices_suggest(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Mowers, vacuums, appliances and doorbells found in Home Assistant (setup assistant)."""
+    if _ws_runtime(connection, msg) is not None:
+        entry = hass.config_entries.async_loaded_entries(DOMAIN)[0]
+        connection.send_result(msg["id"], suggest_devices(hass, entry))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/devices/add",
+        vol.Required("items"): [
+            {
+                vol.Required("type"): vol.In(SETUP_TYPES),
+                vol.Required("device_id"): str,
+                vol.Optional("name"): vol.Any(None, str),
+                vol.Optional("kind"): vol.Any(None, str),
+                vol.Optional("camera"): vol.Any(None, str),
+                vol.Optional("lock"): vol.Any(None, str),
+            }
+        ],
+    }
+)
+@callback
+def ws_devices_add(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Add several of them at once (one reload afterwards, not one per device)."""
+    if _ws_runtime(connection, msg) is None:
+        return
+    entry = hass.config_entries.async_loaded_entries(DOMAIN)[0]
+    made = 0
+    for it in msg["items"]:
+        try:
+            sub = add_device(
+                hass,
+                entry,
+                it["type"],
+                it["device_id"],
+                it.get("name"),
+                it.get("kind"),
+                it.get("camera"),
+                it.get("lock"),
+            )
+        except ValueError as err:
+            connection.send_error(msg["id"], "invalid", str(err))
+            return
+        made += sub is not None
+    connection.send_result(msg["id"], {"made": made})
 
 
 @websocket_api.websocket_command(

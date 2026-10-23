@@ -306,7 +306,9 @@ Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **En
 
 **Einrichtungsassistent** (ab 0.26, Dashboard 1.275): Beim ersten Start schlägt Core für jede Rolle passende Geräte
 vor (gefundene Entitäten am Gerät, bei der Kaffeemaschine zusätzlich der Name). Das Dashboard zeigt die Vorschläge,
-legt die Zuordnungen an und erzeugt das Lovelace-Dashboard. Bestehende Installationen gelten als eingerichtet.
+legt die Zuordnungen an und erzeugt das Lovelace-Dashboard. Ab 0.28 fügt er auch Mähroboter, Saugroboter,
+Haushaltsgeräte und Klingeln hinzu (in einem Aufruf, Einstellungen bleiben auf Standard). Bestehende Installationen
+gelten als eingerichtet.
 
 Welches Gerät der Wechselrichter, die Batterie, die Wärmepumpe, der Enthärter, der Internet-Router, das Gateway,
 ein Switch oder ein Accesspoint ist, steht in Core – nicht mehr im Dashboard. **„Gerät zuordnen“** (beliebig oft):
@@ -576,6 +578,8 @@ actions:
 | `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
 | `smarthome_ui/catalog/link` | Gerät einer Rolle zuordnen (`device_id`, `role`, optional `name`) |
 | `smarthome_ui/catalog/suggest` | Einrichtung: passende Geräte je Rolle, bestes zuerst (`roles`: `device_id`, `name`, `manufacturer`, `model`, `entities`, `score`, `current`) |
+| `smarthome_ui/devices/suggest` | Einrichtung: Mähroboter, Saugroboter, Haushaltsgeräte und Klingeln in Home Assistant (`added` = schon hinzugefügt) |
+| `smarthome_ui/devices/add` | mehrere davon auf einmal hinzufügen (`items`: `type`, `device_id`, optional `name`, `kind`, `camera`, `lock`) |
 | `smarthome_ui/catalog/unlink` | Gerät einer Rolle wieder entfernen (`role`) |
 | `smarthome_ui/onboarding/done` | Einrichtungsassistent abgeschlossen (`done`, Standard `true`; `false` = noch einmal anbieten) |
 | `smarthome_ui/catalog/migrate` | einmalig je Schritt: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`; `step`, Standard 1) |

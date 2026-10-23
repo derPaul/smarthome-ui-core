@@ -523,3 +523,41 @@ def test_identifiers_with_three_parts() -> None:
     assert has_identifier(old, "unifi", "ap1") and not has_identifier(old, "zha")
     assert entry_ids(new) == {"entry"}
     assert entry_ids(old) == {"a", "b"}
+
+
+async def test_setup_devices(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
+    mower = _device(hass, "mammotion", "Yuka", [("lawn_mower", "yuka", "docked", {})])
+    dish = _device(hass, "home_connect", "Geschirrspüler", [("sensor", "spuler_status", "off", {})])
+    bell = _device(
+        hass,
+        "unifiprotect",
+        "G6 Entry",
+        [
+            ("event", "g6_entry_doorbell", "unknown", {}),
+            ("camera", "g6_entry_high", "idle", {}),
+        ],
+    )
+    _device(hass, "shelly", "Licht Flur", [("light", "flur", "off", {})])
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "smarthome_ui/devices/suggest"})
+    res = (await client.receive_json())["result"]
+    assert [c["device_id"] for c in res["mower"]] == [mower]
+    assert res["appliance"][0]["kind"] == "dishwasher"
+    assert res["doorbell"][0]["camera"] == "camera.g6_entry_high"
+    assert res["vacuum"] == []
+    items = [
+        {"type": "mower", "device_id": mower},
+        {"type": "appliance", "device_id": dish, "kind": "dishwasher"},
+        {"type": "doorbell", "device_id": bell, "camera": "camera.g6_entry_high"},
+    ]
+    await client.send_json({"id": 2, "type": "smarthome_ui/devices/add", "items": items})
+    assert (await client.receive_json())["result"]["made"] == 3
+    await hass.async_block_till_done()
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    types = sorted(s.subentry_type for s in entry.subentries.values())
+    assert types == ["appliance", "doorbell", "mower"]
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 3, "type": "smarthome_ui/devices/add", "items": items})
+    assert (await client.receive_json())["result"]["made"] == 0  # already there
+    await client.send_json({"id": 4, "type": "smarthome_ui/devices/suggest"})
+    assert (await client.receive_json())["result"]["mower"][0]["added"] is True
