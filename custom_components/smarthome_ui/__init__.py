@@ -1073,6 +1073,9 @@ def ws_grocery_settings(
         vol.Optional("battery"): dict,
         vol.Optional("dhw"): vol.Any(None, str),
         vol.Optional("dhw_target"): vol.Any(None, str),
+        vol.Optional("hp_power"): vol.Any(None, str),
+        vol.Optional("heat_mode"): vol.Any(None, str),
+        vol.Optional("summer_mode"): vol.Any(None, str),
     }
 )
 @callback

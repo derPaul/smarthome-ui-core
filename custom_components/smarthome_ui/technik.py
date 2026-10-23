@@ -76,6 +76,9 @@ DEFAULTS: dict[str, Any] = {
     "battery": {},
     "dhw": None,
     "dhw_target": None,
+    "hp_power": None,  # what the heat pump draws (W)
+    "heat_mode": None,  # heating mode on / off (cycles)
+    "summer_mode": None,
     "checks": {"pressure": True, "water": True, "cycling": True, "baseload": True},
 }
 _BENIGN = re.compile(

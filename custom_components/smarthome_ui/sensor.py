@@ -922,7 +922,11 @@ class ForecastSensor(TechnikEntity, SensorEntity):
         data, key = self._data()
         iso = lambda ms: dt_util.utc_from_timestamp(ms / 1000).isoformat() if ms else None  # noqa: E731
         if self._key.startswith("battery"):
-            return {"min_soc": data.get("min"), "learning": not data}
+            return {
+                "min_soc": data.get("min"),
+                "hp_runs": data.get("hp_runs"),
+                "learning": not data,
+            }
         if self._key == "solar_window":
             return {"end": iso(data.get("end")), "kwh": data.get("kwh")}
         return {

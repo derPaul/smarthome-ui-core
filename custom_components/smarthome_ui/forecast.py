@@ -6,7 +6,10 @@ The dashboard showed these on its Haustechnik page; here they become sensors (de
 * **battery** – the battery power is sampled every minute and kept as mean per hour (7 days).
   From the typical course per hour (starting from the current power) Core rolls the state of
   charge forward in 15 minute steps for 36 hours: when it reaches the reserve ("empty") and from
-  when it charges again. Needs 3 days of data for 20 of the 24 hours,
+  when it charges again. Needs 3 days of data for 20 of the 24 hours. The heat pump's coming runs
+  replace its average while the battery discharges: heating cycles (typical on / pause duration of
+  the heating mode, not in summer mode) and the next hot water run (from the hot water forecast),
+  each with the power it draws while running,
 * **solar window** – the solar forecast of the energy dashboard (Forecast.Solar, Solcast …) minus
   what the house usually uses: the 3 hours of today with the most surplus (at least 2.5 kWh),
 * **hot water** – the temperature at which the heat pump starts heating hot water, learned from
@@ -45,6 +48,8 @@ SOLAR_MIN_WH = 2500
 DHW_RISE = 3.0
 DHW_RISE_MS = 3 * 3_600_000
 DHW_KEEP = 14
+CYCLES_KEEP = 20
+DHW_DUR_MS = 45 * 60_000
 INVALID = ("unknown", "unavailable", "")
 
 
@@ -77,6 +82,10 @@ class Forecasts:
         self._dhw_low: tuple[float, int] | None = None
         self._dhw_peak: tuple[float, int] | None = None
         self._dhw_heating = False
+        self._dhw_start: int | None = None
+        self._hp_acc: list[float] = []
+        self._heat_on: int | None = None
+        self._heat_off: int | None = None
 
     @property
     def data(self) -> dict[str, Any]:
@@ -127,25 +136,54 @@ class Forecasts:
         if self._listener:
             self._listener()
             self._listener = None
-        dhw = self._s().get("dhw")
-        if not dhw:
+        s = self._s()
+        dhw, heat = s.get("dhw"), s.get("heat_mode")
+        if heat and (state := self.hass.states.get(heat)) is not None:
+            since = int(state.last_changed.timestamp() * 1000)
+            self._heat_on, self._heat_off = (since, None) if state.state == "on" else (None, since)
+        if not dhw and not heat:
             return
 
         @callback
         def relevant(data: EventStateChangedData) -> bool:
-            return data["entity_id"] == dhw
+            return data["entity_id"] in (dhw, heat)
 
         @callback
         def changed(event: Event[EventStateChangedData]) -> None:
-            new = event.data["new_state"]
-            if new is not None and (value := _num(new.state)) is not None:
+            new, old = event.data["new_state"], event.data["old_state"]
+            if new is None:
+                return
+            if event.data["entity_id"] == heat:
+                if old is not None and old.state != new.state:
+                    self.heat_changed(new.state == "on")
+            elif (value := _num(new.state)) is not None:
                 self.dhw_sample(value)
 
         self._listener = self.hass.bus.async_listen(
             EVENT_STATE_CHANGED, changed, event_filter=relevant
         )
-        if (value := self._value(dhw)) is not None:
+        if dhw and (value := self._value(dhw)) is not None:
             self.dhw_sample(value)
+
+    @callback
+    def heat_changed(self, on: bool, t: int | None = None) -> None:
+        """The heating mode went on / off: keep the on and pause durations."""
+        t = t or now_ms()
+
+        def keep(key: str, value: int) -> None:
+            items = self.data.setdefault(key, [])
+            items.append(value)
+            del items[:-CYCLES_KEEP]
+
+        if on:
+            if self._heat_off and t - self._heat_off < 12 * 3_600_000:
+                keep("heat_gaps", t - self._heat_off)
+            self._heat_on, self._heat_off = t, None
+        else:
+            if self._heat_on and t - self._heat_on < 12 * 3_600_000:
+                keep("heat_ons", t - self._heat_on)
+            self._heat_on, self._heat_off = None, t
+        self.store.save()
 
     @callback
     def _minute(self, _now: Any = None) -> None:
@@ -170,28 +208,72 @@ class Forecasts:
         """Add the current battery power to the mean of this hour."""
         bat = self._bat()
         watts = self._watts(bat.get("power"), bool(bat.get("invert")))
+        hp = self._watts(self._s().get("hp_power"))
         hour = dt_util.now().strftime("%Y-%m-%dT%H")
         if hour != self._hour:
-            if self._hour is not None and self._acc:
-                hours = self.data.setdefault("battery_hours", {})
-                hours[self._hour] = round(sum(self._acc) / len(self._acc), 1)
-                for old in sorted(hours)[:-HOURS_KEEP]:
-                    hours.pop(old)
+            if self._hour is not None:
+                for key, acc in (("battery_hours", self._acc), ("hp_hours", self._hp_acc)):
+                    if not acc:
+                        continue
+                    hours = self.data.setdefault(key, {})
+                    hours[self._hour] = round(sum(acc) / len(acc), 1)
+                    for old in sorted(hours)[:-HOURS_KEEP]:
+                        hours.pop(old)
                 self.store.save()
-            self._hour, self._acc = hour, []
+            self._hour, self._acc, self._hp_acc = hour, [], []
         if watts is not None:
             self._acc.append(watts)
+        if hp is not None:
+            self._hp_acc.append(hp)
+            if hp > 300:  # running: keep what it draws then (slow mean)
+                run = self.data.get("hp_run_w")
+                self.data["hp_run_w"] = round(hp if run is None else run * 0.98 + hp * 0.02, 1)
 
-    def battery_profile(self) -> list[float | None] | None:
-        """Return the mean battery power per hour of day (W, + charging), None if too few."""
+    def battery_profile(self, name: str = "battery_hours") -> list[float | None] | None:
+        """Return the mean power per hour of day (W; battery: + charging), None if too few."""
         sums, counts = [0.0] * 24, [0] * 24
-        for key, value in (self.data.get("battery_hours") or {}).items():
+        for key, value in (self.data.get(name) or {}).items():
             hour = int(key[-2:])
             sums[hour] += value
             counts[hour] += 1
         if sum(1 for n in counts if n >= 3) < 20:
             return None
         return [s / n if n else None for s, n in zip(sums, counts, strict=True)]
+
+    def heat_cycle(self) -> tuple[int, int] | None:
+        """Return the typical heating on and pause duration (ms), None without enough cycles."""
+        ons, gaps = self.data.get("heat_ons") or [], self.data.get("heat_gaps") or []
+        if len(ons) < 3 or len(gaps) < 3:
+            return None
+        return int(median(ons)), int(median(gaps))
+
+    def runs_ahead(self, until: int, now: int | None = None) -> list[tuple[int, int]]:
+        """Return when the heat pump will probably run: heating cycles and the next hot water."""
+        now = now or now_ms()
+        runs: list[tuple[int, int]] = []
+        s = self._s()
+        summer = self.hass.states.get(s.get("summer_mode") or "")
+        if (cycle := self.heat_cycle()) and not (summer is not None and summer.state == "on"):
+            on, gap = cycle
+            if self._heat_on:
+                end = max(now, self._heat_on + on)
+                runs.append((now, end))
+                t = end + gap
+            else:
+                t = max(now, (self._heat_off or now) + gap)
+            while t < until and len(runs) < 48:
+                runs.append((t, t + on))
+                t += on + gap
+        dhw = self.dhw_forecast(now)
+        durs = self.data.get("dhw_durations") or []
+        dur = int(median(durs)) if durs else DHW_DUR_MS
+        if dhw.get("heating"):
+            runs.append((now, now + dur // 2))
+        elif dhw.get("due"):
+            runs.append((now, now + dur))
+        elif dhw.get("eta") and dhw["eta"] < until:
+            runs.append((dhw["eta"], dhw["eta"] + dur))
+        return runs
 
     def battery_forecast(self, now: int | None = None) -> dict[str, Any]:
         """Return when the battery is empty / charges again (ms) and its lowest charge."""
@@ -209,13 +291,34 @@ class Forecasts:
         energy = soc / 100 * full
         empty = charge = None
         low = soc
+        until = now + AHEAD_MS
+        # the heat pump: its coming runs instead of its average (only while the battery discharges)
+        hp_prof = self.battery_profile("hp_hours")
+        known = [v for v in hp_prof or [] if v is not None]
+        hp_avg = sum(known) / len(known) if known else None
+        runs = self.runs_ahead(until, now) if hp_avg is not None else []
+        cycle = self.heat_cycle()
+        duty = min(1.0, max(0.1, cycle[0] / (cycle[0] + cycle[1]) if cycle else 0.4))
+        hp_now = self._watts(self._s().get("hp_power"))
+        run_w = None
+        if hp_avg is not None:
+            run_w = (
+                hp_now
+                if hp_now is not None and hp_now > 300
+                else self.data.get("hp_run_w") or min(6000, max(500, hp_avg / duty))
+            )
         t = now
-        while t < now + AHEAD_MS:
+        while t < until:
             hour = dt_util.as_local(dt_util.utc_from_timestamp(t / 1000)).hour
             power = profile[hour] or 0.0
             first = 1 - (t - now) / 3_600_000 if t - now < 3_600_000 else 0
             if current is not None:
                 power = power * (1 - first) + current * first
+            if run_w and hp_prof and power < 0:
+                run = next((r for r in runs if t + STEP_MS > r[0] and t < r[1]), None)
+                share = (min(t + STEP_MS, run[1]) - max(t, run[0])) / STEP_MS if run else 0
+                avg = hp_prof[hour] if hp_prof[hour] is not None else hp_avg
+                power -= run_w * share - avg
             if max_d and power < -max_d:
                 power = -max_d
             if power > 50 and t - now > 3_600_000 and charge is None and energy < full * 0.98:
@@ -228,7 +331,12 @@ class Forecasts:
             if charge is not None and t - charge > 2 * 3_600_000:
                 break
             t += STEP_MS
-        return {"empty": empty, "charge": charge, "min": round(low, 1)}
+        return {
+            "empty": empty,
+            "charge": charge,
+            "min": round(low, 1),
+            "hp_runs": len([r for r in runs if not empty or r[0] < empty]),
+        }
 
     # ---------------------------------------------------------------- solar window
 
@@ -309,6 +417,10 @@ class Forecasts:
             elif peak[0] - value >= 0.5:  # cools down again
                 self._dhw_heating = False
                 self._dhw_low = (value, t)
+                if self._dhw_start and peak[1] - self._dhw_start > 5 * 60_000:
+                    durs = self.data.setdefault("dhw_durations", [])
+                    durs.append(peak[1] - self._dhw_start)
+                    del durs[:-DHW_KEEP]
             return
         if low is None or value <= low[0] or t - low[1] > DHW_RISE_MS:
             self._dhw_low = (value, t)
@@ -321,6 +433,7 @@ class Forecasts:
             del starts[:-DHW_KEEP]
             self.store.save()
             self._dhw_heating = True
+            self._dhw_start = low[1]
             self._dhw_peak = (value, t)
 
     def dhw_forecast(self, now: int | None = None) -> dict[str, Any]:

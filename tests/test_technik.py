@@ -217,3 +217,40 @@ async def test_forecasts(hass: HomeAssistant, hass_ws_client) -> None:
         fc.dhw_sample(value, t + i * 600_000)
     assert fc.data["dhw_starts"] == [44.0, 44.5]
     assert hass.states.get("sensor.technik_dhw_next") is not None
+
+
+async def test_battery_forecast_with_heat_pump_runs(hass: HomeAssistant, hass_ws_client) -> None:
+    hass.states.async_set("sensor.bat_soc", "60", {})
+    hass.states.async_set("sensor.bat_power", "-300", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.wp_leistung", "0", {"unit_of_measurement": "W"})
+    hass.states.async_set("binary_sensor.heizbetrieb", "off", {})
+    entry = await _setup(hass, hass_ws_client)
+    technik, fc = entry.runtime_data.technik, entry.runtime_data.forecasts
+    technik.set_settings(
+        {
+            **SETTINGS,
+            "battery": {"power": "sensor.bat_power", "soc": "sensor.bat_soc", "capacity": 10},
+            "hp_power": "sensor.wp_leistung",
+            "heat_mode": "binary_sensor.heizbetrieb",
+        }
+    )
+    day = dt_util.now().date()
+    keys = [
+        f"{(day - timedelta(days=d)).isoformat()}T{h:02d}" for d in range(1, 4) for h in range(24)
+    ]
+    fc.data["battery_hours"] = dict.fromkeys(keys, -300.0)
+    base = fc.battery_forecast()
+    assert base["hp_runs"] == 0  # nothing known about the heat pump yet
+
+    # heat pump: on average 300 W, runs 30 min every 90 min with 1.2 kW
+    fc.data["hp_hours"] = dict.fromkeys(keys, 300.0)
+    fc.data["hp_run_w"] = 1200.0
+    t = 1_000_000_000_000
+    for i in range(4):
+        fc.heat_changed(True, t + i * 90 * 60_000)
+        fc.heat_changed(False, t + i * 90 * 60_000 + 30 * 60_000)
+    assert fc.heat_cycle() == (30 * 60_000, 60 * 60_000)
+    with_runs = fc.battery_forecast()
+    assert with_runs["hp_runs"] > 0
+    # 1.2 kW for a third of the time = 400 W instead of the 300 W average: empty sooner
+    assert with_runs["empty"] < base["empty"]

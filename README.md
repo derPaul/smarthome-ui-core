@@ -339,7 +339,9 @@ Quellen „Heizung & Wärmepumpe“, „Strom, PV & Batterie“ und „Wasser & 
 | `sensor.technik_dhw_next` | wann die Wärmepumpe voraussichtlich Warmwasser macht; Attribute `start_temperature` (gelernt), `cooling_rate`, `heating` |
 
 Die Batterie-Prognose lernt den typischen Verlauf je Stunde selbst mit (Ladeleistung jede Minute, 7 Tage) – sie
-braucht dafür etwa 3 Tage. Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
+braucht dafür etwa 3 Tage. Die kommenden Läufe der Wärmepumpe rechnet sie gesondert ein: den typischen Heiztakt (Laufzeit
+und Pause des Heizbetriebs, nicht im Sommerbetrieb) und den nächsten Warmwasser-Lauf, jeweils mit der Leistung, die
+die Wärmepumpe im Lauf aufnimmt (Attribut `hp_runs` = Läufe bis leer). Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
 jedem Aufheizen (bis dahin Soll − 5 K).
 
 ## Haushaltsgeräte
