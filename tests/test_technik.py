@@ -174,3 +174,46 @@ async def test_pressure_trend(hass: HomeAssistant, hass_ws_client, notify_calls)
     technik.evaluate()
     await hass.async_block_till_done()
     assert any("Heizungsdruck fällt (-0,14 bar pro Woche)" in m for m in _messages(notify_calls))
+
+
+async def test_forecasts(hass: HomeAssistant, hass_ws_client) -> None:
+    hass.states.async_set("sensor.bat_soc", "50", {})
+    hass.states.async_set("sensor.bat_power", "-500", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.ww_ist", "50", {})
+    hass.states.async_set("sensor.ww_soll", "50", {})
+    entry = await _setup(hass, hass_ws_client)
+    technik, fc = entry.runtime_data.technik, entry.runtime_data.forecasts
+    technik.set_settings(
+        {
+            **SETTINGS,
+            "battery": {"power": "sensor.bat_power", "soc": "sensor.bat_soc", "capacity": 10},
+            "dhw": "sensor.ww_ist",
+            "dhw_target": "sensor.ww_soll",
+        }
+    )
+    # battery: not enough data yet, then 3 days of -500 W at night, +2000 W in the day
+    assert fc.battery_forecast() == {}
+    day = dt_util.now().date()
+    fc.data["battery_hours"] = {
+        f"{(day - timedelta(days=d)).isoformat()}T{h:02d}": (2000.0 if 10 <= h < 16 else -500.0)
+        for d in range(1, 4)
+        for h in range(24)
+    }
+    result = fc.battery_forecast()
+    assert result["min"] < 50
+    assert result["empty"] or result["charge"]
+
+    # solar window: 4 kWh per hour from 11 to 14 o'clock today
+    noon = dt_util.start_of_local_day() + timedelta(hours=11)
+    start = int(noon.timestamp() * 1000)
+    hours = {start + i * 3_600_000: 4000.0 for i in range(3)}
+    window = fc.solar_window(hours, now=start - 3_600_000)
+    assert window["start"] == start and window["kwh"] > 9
+    assert fc.solar_window({start: 600.0}, now=start - 3_600_000) == {}
+
+    # hot water: heats from 44 to 52, cools down; the start temperature is learned
+    t = 1_000_000_000_000
+    for i, value in enumerate([46, 45, 44, 47, 50, 52, 51.5, 50, 46, 44.5, 45, 48, 51, 52, 51.4]):
+        fc.dhw_sample(value, t + i * 600_000)
+    assert fc.data["dhw_starts"] == [44.0, 44.5]
+    assert hass.states.get("sensor.technik_dhw_next") is not None

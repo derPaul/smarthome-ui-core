@@ -16,6 +16,7 @@ from . import CoreConfigEntry, durations
 from .appliance import STATES, ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
 from .const import (
     SIGNAL_ALARM,
+    SIGNAL_FORECAST,
     SIGNAL_MOWER,
     SIGNAL_SECURITY,
     SIGNAL_SENT,
@@ -112,6 +113,11 @@ async def async_setup_entry(
     waste = entry.runtime_data.waste
     async_add_entities([WasteNextSensor(entry.entry_id, waste)])
     async_add_entities([TechnikHints(entry.entry_id, entry.runtime_data.technik)])
+    forecasts = entry.runtime_data.forecasts
+    async_add_entities(
+        ForecastSensor(entry.entry_id, entry.runtime_data.technik, forecasts, key)
+        for key in ("battery_empty", "battery_charge", "solar_window", "dhw_next")
+    )
     kinds: set[str] = set()
 
     @callback
@@ -881,3 +887,54 @@ class TechnikHints(TechnikEntity, SensorEntity):
             "pressure_trend": info["pressure_trend"],
             "valve": info["valve"],
         }
+
+
+class ForecastSensor(TechnikEntity, SensorEntity):
+    """A forecast as time: battery empty / charging again, solar window start, hot water."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, entry_id: str, technik: Any, forecasts: Any, key: str) -> None:
+        """Initialize (sensor.technik_<key>)."""
+        super().__init__(entry_id, technik, key, "sensor")
+        self._forecasts = forecasts
+        self._key = key
+
+    def _data(self) -> tuple[dict[str, Any], str]:
+        f = self._forecasts
+        return {
+            "battery_empty": (f.battery, "empty"),
+            "battery_charge": (f.battery, "charge"),
+            "solar_window": (f.solar, "start"),
+            "dhw_next": (f.dhw, "eta"),
+        }[self._key]
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the forecast time (empty: not within the forecast)."""
+        data, key = self._data()
+        ms = data.get(key)
+        return dt_util.utc_from_timestamp(ms / 1000) if ms else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the details of the forecast."""
+        data, key = self._data()
+        iso = lambda ms: dt_util.utc_from_timestamp(ms / 1000).isoformat() if ms else None  # noqa: E731
+        if self._key.startswith("battery"):
+            return {"min_soc": data.get("min"), "learning": not data}
+        if self._key == "solar_window":
+            return {"end": iso(data.get("end")), "kwh": data.get("kwh")}
+        return {
+            "start_temperature": data.get("at"),
+            "learned": data.get("learned"),
+            "cooling_rate": data.get("rate"),
+            "heating": data.get("heating"),
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Update with every new forecast."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_FORECAST, self.async_write_ha_state)
+        )

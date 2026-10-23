@@ -52,6 +52,18 @@
       },
       "technik_hints": {
         "default": "mdi:home-alert-outline"
+      },
+      "technik_battery_empty": {
+        "default": "mdi:battery-clock-outline"
+      },
+      "technik_battery_charge": {
+        "default": "mdi:battery-charging-outline"
+      },
+      "technik_solar_window": {
+        "default": "mdi:solar-power-variant-outline"
+      },
+      "technik_dhw_next": {
+        "default": "mdi:water-boiler"
       }
     },
     "switch": {
@@ -195,6 +207,12 @@
         "default": "mdi:mailbox-outline",
         "state": {
           "on": "mdi:mailbox-up"
+        }
+      },
+      "technik_solar_window_now": {
+        "default": "mdi:solar-power-variant-outline",
+        "state": {
+          "on": "mdi:solar-power-variant"
         }
       }
     },

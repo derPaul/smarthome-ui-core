@@ -49,6 +49,7 @@ from .const import (
 )
 from .displays import DisplayManager
 from .doorbell import DoorbellManager
+from .forecast import Forecasts
 from .grocery import Grocery
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
@@ -101,6 +102,7 @@ class CoreRuntime:
     presence_sim: PresenceSim
     grocery: Grocery
     technik: Technik
+    forecasts: Forecasts
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -338,6 +340,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
                 actions=actions,
             )
 
+    technik = Technik(hass, store, technik_notify)
     doorbells = DoorbellManager(hass, store)
     alarm = AlarmLogic(hass, store)
 
@@ -384,7 +387,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Mailbox(hass, store, security_notify),
         PresenceSim(hass, store, lambda: alarm.panel or _first_panel(hass)),
         Grocery(hass, store),
-        Technik(hass, store, technik_notify),
+        technik,
+        Forecasts(hass, store, technik),
     )
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)
@@ -455,6 +459,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.presence_sim.async_setup()
     entry.runtime_data.grocery.async_setup()
     entry.runtime_data.technik.async_setup()
+    forecasts = entry.runtime_data.forecasts
+
+    @callback
+    def technik_settings() -> None:
+        forecasts.listen()
+        forecasts.update()
+
+    technik.on_settings = technik_settings
+    forecasts.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -550,6 +563,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.presence_sim.async_stop()
     entry.runtime_data.grocery.async_stop()
     entry.runtime_data.technik.async_stop()
+    entry.runtime_data.forecasts.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -588,6 +602,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "presence_sim": runtime.presence_sim.info(),
         "grocery": runtime.grocery.info(),
         "technik": runtime.technik.info(),
+        "forecast": runtime.forecasts.info(),
         "features": [
             "task_defs",
             "waste",
@@ -605,6 +620,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "presence_sim",
             "grocery",
             "technik",
+            "forecast",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -661,6 +677,7 @@ def ws_subscribe(
                     "presence_sim": runtime.presence_sim.info(),
                     "grocery": runtime.grocery.info(),
                     "technik": runtime.technik.info(),
+                    "forecast": runtime.forecasts.info(),
                 },
             )
         )
@@ -1053,6 +1070,9 @@ def ws_grocery_settings(
         vol.Optional("compressor"): vol.Any(None, str),
         vol.Optional("cycles_per_hour"): vol.Coerce(float),
         vol.Optional("power"): dict,
+        vol.Optional("battery"): dict,
+        vol.Optional("dhw"): vol.Any(None, str),
+        vol.Optional("dhw_target"): vol.Any(None, str),
     }
 )
 @callback

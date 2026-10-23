@@ -314,6 +314,18 @@
       },
       "technik_hints": {
         "name": "Hints"
+      },
+      "technik_battery_empty": {
+        "name": "Battery empty at"
+      },
+      "technik_battery_charge": {
+        "name": "Battery charges again from"
+      },
+      "technik_solar_window": {
+        "name": "Best solar window"
+      },
+      "technik_dhw_next": {
+        "name": "Hot water heats up at"
       }
     },
     "binary_sensor": {
@@ -331,6 +343,9 @@
       },
       "mail_waiting": {
         "name": "Mail in the mailbox"
+      },
+      "technik_solar_window_now": {
+        "name": "Solar window now"
       }
     },
     "button": {

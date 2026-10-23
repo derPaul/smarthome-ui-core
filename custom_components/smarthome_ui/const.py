@@ -29,6 +29,7 @@ SIGNAL_ALARM: Final = f"{DOMAIN}_alarm"
 SIGNAL_MAILBOX: Final = f"{DOMAIN}_mailbox"
 SIGNAL_PRESENCE_SIM: Final = f"{DOMAIN}_presence_sim"
 SIGNAL_TECHNIK: Final = f"{DOMAIN}_technik"
+SIGNAL_FORECAST: Final = f"{DOMAIN}_forecast"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)

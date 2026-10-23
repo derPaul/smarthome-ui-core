@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry
 from .appliance import ApplianceEntity, ApplianceTracker, async_setup_appliance_entities
-from .const import SIGNAL_DATA, SIGNAL_MAILBOX, SIGNAL_SECURITY
+from .const import SIGNAL_DATA, SIGNAL_FORECAST, SIGNAL_MAILBOX, SIGNAL_SECURITY
 from .displays import DisplayEntity, async_setup_display_entities
 from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
+from .store import now_ms
+from .technik import TechnikEntity
 
 
 async def async_setup_entry(
@@ -44,6 +48,9 @@ async def async_setup_entry(
         ]
     )
     async_add_entities([MailWaiting(entry.entry_id, entry.runtime_data.mailbox)])
+    async_add_entities(
+        [SolarWindowNow(entry.entry_id, entry.runtime_data.technik, entry.runtime_data.forecasts)]
+    )
     async_setup_appliance_entities(
         entry.runtime_data.appliances,
         async_add_entities,
@@ -194,3 +201,32 @@ class MailWaiting(CoreEntity, BinarySensorEntity):
             self.async_on_remove(
                 async_dispatcher_connect(self.hass, signal, self.async_write_ha_state)
             )
+
+
+class SolarWindowNow(TechnikEntity, BinarySensorEntity):
+    """Now is the best solar window of today (for starting appliances, the wallbox …)."""
+
+    def __init__(self, entry_id: str, technik: Any, forecasts: Any) -> None:
+        """Initialize (binary_sensor.technik_solar_window_now)."""
+        super().__init__(entry_id, technik, "solar_window_now", "binary_sensor")
+        self._forecasts = forecasts
+
+    @property
+    def is_on(self) -> bool:
+        """Return True within the window."""
+        solar = self._forecasts.solar
+        return bool(solar) and solar["start"] <= now_ms() < solar["end"]
+
+    async def async_added_to_hass(self) -> None:
+        """Update with the forecast and every minute (start / end of the window)."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_FORECAST, self.async_write_ha_state)
+        )
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._minute, timedelta(minutes=1))
+        )
+
+    @callback
+    def _minute(self, _now: Any) -> None:
+        self.async_write_ha_state()

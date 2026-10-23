@@ -314,6 +314,18 @@
       },
       "technik_hints": {
         "name": "Hinweise"
+      },
+      "technik_battery_empty": {
+        "name": "Batterie leer um"
+      },
+      "technik_battery_charge": {
+        "name": "Batterie lädt wieder ab"
+      },
+      "technik_solar_window": {
+        "name": "Bestes Sonnenfenster"
+      },
+      "technik_dhw_next": {
+        "name": "Warmwasser heizt nach um"
       }
     },
     "binary_sensor": {
@@ -331,6 +343,9 @@
       },
       "mail_waiting": {
         "name": "Post im Briefkasten"
+      },
+      "technik_solar_window_now": {
+        "name": "Sonnenfenster jetzt"
       }
     },
     "button": {

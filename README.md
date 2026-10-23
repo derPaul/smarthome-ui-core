@@ -329,6 +329,19 @@ Quellen „Heizung & Wärmepumpe“, „Strom, PV & Batterie“ und „Wasser & 
 | `number.technik_pressure_min` | Mindest-Heizungsdruck (bar) – eigener Wert hat Vorrang vor dem Dashboard |
 | `number.technik_water_minutes` | nach wie vielen Minuten fließendes Wasser gemeldet wird |
 
+**Prognosen** (für eigene Automationen, gleiche Rechnung wie auf der Haustechnik-Seite):
+
+| Entität | |
+|---|---|
+| `sensor.technik_battery_empty` | wann die Batterie die Reserve erreicht (leer = nicht in den nächsten 36 Stunden); Attribut `min_soc` |
+| `sensor.technik_battery_charge` | ab wann sie wieder lädt |
+| `sensor.technik_solar_window` / `binary_sensor.technik_solar_window_now` | die 3 Stunden heute mit dem meisten Sonnenüberschuss laut Solarprognose des Energie-Dashboards (ab 2,5 kWh); Attribute `end`, `kwh` – z. B. Spülmaschine oder Wallbox starten, wenn „Sonnenfenster jetzt“ an geht |
+| `sensor.technik_dhw_next` | wann die Wärmepumpe voraussichtlich Warmwasser macht; Attribute `start_temperature` (gelernt), `cooling_rate`, `heating` |
+
+Die Batterie-Prognose lernt den typischen Verlauf je Stunde selbst mit (Ladeleistung jede Minute, 7 Tage) – sie
+braucht dafür etwa 3 Tage. Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
+jedem Aufheizen (bis dahin Soll − 5 K).
+
 ## Haushaltsgeräte
 
 **„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder

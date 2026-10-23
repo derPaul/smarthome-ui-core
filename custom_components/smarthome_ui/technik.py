@@ -72,6 +72,10 @@ DEFAULTS: dict[str, Any] = {
     "compressor": None,
     "cycles_per_hour": 4,
     "power": {},  # {"house"} or {"pv", "grid", "battery", "grid_invert", "battery_invert"}
+    # forecasts: battery {power, soc, capacity (kWh), invert, reserve (%), max_discharge}, hot water
+    "battery": {},
+    "dhw": None,
+    "dhw_target": None,
     "checks": {"pressure": True, "water": True, "cycling": True, "baseload": True},
 }
 _BENIGN = re.compile(
@@ -123,6 +127,7 @@ class Technik:
         self._flow_since: int | None = None
         self._starts: list[int] = []
         self.hints: dict[str, dict[str, Any]] = {}
+        self.on_settings: Callable[[], None] | None = None
 
     # ---------------------------------------------------------------- settings
 
@@ -146,6 +151,8 @@ class Technik:
                 continue
             self.data[key] = settings[key]
         self.data["configured"] = True
+        if self.on_settings is not None:
+            self.on_settings()
         self._listen()
         self.evaluate()
         self.store.save(SIGNAL_TECHNIK, SIGNAL_DATA)

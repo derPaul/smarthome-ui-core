@@ -88,6 +88,8 @@ def _default() -> dict[str, Any]:
         "grocery": {},
         # house technology: sensors from the dashboard, own thresholds, pressure / base load samples
         "technik": {},
+        # forecasts: battery power per hour (7 days), hot water start temperatures
+        "forecast": {},
     }
 
 
