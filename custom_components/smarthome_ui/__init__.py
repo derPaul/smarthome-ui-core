@@ -30,7 +30,7 @@ from homeassistant.util import dt as dt_util
 from . import durations
 from .alarm import AlarmLogic
 from .appliance import ApplianceManager
-from .catalog import ROLES as CATALOG_ROLES, Catalog
+from .catalog import ROLE_LABELS as CATALOG_LABELS, ROLES as CATALOG_ROLES, Catalog
 from .const import (
     ATTR_AREA,
     ATTR_DATE,
@@ -295,6 +295,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_system_settings,
         ws_catalog_link,
         ws_catalog_migrate,
+        ws_catalog_suggest,
+        ws_catalog_unlink,
+        ws_onboarding_done,
         ws_lists_set,
         ws_lists_migrate,
         ws_lists_value,
@@ -603,6 +606,14 @@ def _ws_runtime(
     return entries[0].runtime_data
 
 
+def _onboarding(store: Any) -> dict[str, Any]:
+    """Return whether the setup assistant ran (an installation that already has data counts)."""
+    data = store.data["onboarding"]
+    if "done" in data:
+        return {"done": bool(data["done"]), "at": data.get("at")}
+    return {"done": bool(store.data["catalog_migrated"]), "at": None}
+
+
 def _state(runtime: CoreRuntime) -> dict[str, Any]:
     store = runtime.store
     return {
@@ -629,6 +640,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
         "lists": runtime.lists.info(),
+        "onboarding": _onboarding(store),
         "features": [
             "task_defs",
             "waste",
@@ -650,6 +662,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "system",
             "catalog",
             "lists",
+            "onboarding",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -712,6 +725,7 @@ def ws_subscribe(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
                     "lists": runtime.lists.info(),
+                    "onboarding": _onboarding(runtime.store),
                 },
             )
         )
@@ -1158,6 +1172,53 @@ def ws_catalog_link(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         sub = runtime.catalog.link(msg["device_id"], msg["role"], msg.get("name"))
         connection.send_result(msg["id"], {"subentry_id": sub})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/catalog/suggest"})
+@callback
+def ws_catalog_suggest(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Candidate devices per role for the setup assistant."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(
+            msg["id"], {"roles": runtime.catalog.suggest(), "labels": CATALOG_LABELS}
+        )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/catalog/unlink",
+        vol.Required("role"): vol.In(CATALOG_ROLES),
+    }
+)
+@callback
+def ws_catalog_unlink(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Remove the device of a role (no device for it)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], {"removed": runtime.catalog.unlink(msg["role"])})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/onboarding/done",
+        vol.Optional("done", default=True): bool,
+    }
+)
+@callback
+def ws_onboarding_done(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """The setup assistant finished (or is to run again: done = false)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.store.data["onboarding"] = {
+            "done": msg["done"],
+            "at": int(dt_util.utcnow().timestamp() * 1000),
+        }
+        runtime.store.save(SIGNAL_DATA)
+        connection.send_result(msg["id"], _onboarding(runtime.store))
 
 
 @websocket_api.websocket_command(

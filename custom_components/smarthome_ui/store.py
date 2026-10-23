@@ -98,6 +98,8 @@ def _default() -> dict[str, Any]:
         "catalog_steps": [],
         # lists of the dashboard's pages (cameras, windows, locks …)
         "lists": {},
+        # setup assistant: done (existing installations count as done)
+        "onboarding": {},
     }
 
 

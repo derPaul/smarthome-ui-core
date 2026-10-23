@@ -277,6 +277,30 @@ KEYS: dict[str, dict[str, Key]] = {
         ),
     },
 }
+# Suggestions (setup assistant): the entities a device needs at least to qualify for a role –
+# all keys of one group (any group will do)
+SUGGEST_NEEDS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "inverter": (("pv_power",),),
+    "battery": (("soc", "power"),),
+    "heatpump": (
+        ("climate", "compressor"),
+        ("climate", "pressure"),
+        ("climate", "dhw"),
+        ("climate", "heat_mode"),
+    ),
+    "water": (("salt",), ("state", "flow")),
+    "internet": (("connected", "download"), ("connected", "external_ip")),
+    "weather_station": (("temperature", "wind_speed"), ("temperature", "rain")),
+    "coffee": (("power",),),
+}
+# only devices whose name fits
+SUGGEST_NAME = {
+    "coffee": re.compile(
+        r"(kaffee|coffee|espresso|siebtr(ä|ae)ger|vollautomat|barista|jura|delonghi|de.?longhi|"
+        r"melitta|saeco|gaggia|rancilio|lelit|rocket)",
+        re.I,
+    ),
+}
 _UNIFI_GATEWAY = re.compile(r"^(udm|uxg|usg|ucg|udr|uck|ux|dream|gateway|cloud gateway)", re.I)
 _UNIFI_SWITCH = re.compile(r"^(usw|us-|us8|us16|us24|us48|usl|switch|flex)", re.I)
 _UNIFI_AP = re.compile(r"^(u6|u7|uap|ual|uacc|nanohd|ac-|ap|access point|ubb|uk-ultra|e7)", re.I)
@@ -697,6 +721,86 @@ class Catalog:
             linked.add(device_id)
             made += 1
         return made
+
+    # ---------------------------------------------------------------- suggestions (onboarding)
+
+    def suggest(self) -> dict[str, list[dict[str, Any]]]:
+        """Return candidate devices per role, best first (for the setup assistant)."""
+        devices = all_devices(self.hass)
+        registry = er.async_get(self.hass)
+        own = {
+            e.device_id
+            for e in registry.entities.values()
+            if e.platform == "smarthome_ui" and e.device_id
+        }
+        current = {d["role"]: d.get("device_id") for d in self.devices()}
+        out: dict[str, list[dict[str, Any]]] = {}
+        for role in ROLES:
+            found: list[dict[str, Any]] = []
+            if role in AUTO_PLATFORMS:
+                domain, platforms = AUTO_PLATFORMS[role]
+                ids = {
+                    e.device_id
+                    for e in registry.entities.values()
+                    if e.domain == domain
+                    and e.platform in platforms
+                    and e.device_id
+                    and not e.disabled_by
+                }
+                if role == "tv":
+                    # other TVs: media players of device class tv
+                    ids |= {
+                        e.device_id
+                        for e in registry.entities.values()
+                        if e.domain == "media_player"
+                        and (e.device_class or e.original_device_class) == "tv"
+                        and e.device_id
+                    }
+                pool = [d for d in devices if d.id in ids]
+            elif role in SUGGEST_NEEDS:
+                pool = devices
+            else:
+                pool = []
+            # the device assigned now is always among the candidates
+            if (now := current.get(role)) and all(d.id != now for d in pool):
+                pool = [*(d for d in devices if d.id == now), *pool]
+            for device in pool:
+                if device.id in own:
+                    continue
+                name = device.name_by_user or device.name or ""
+                entities = self.detect(role, device.id)
+                if device.id != current.get(role):
+                    if (pattern := SUGGEST_NAME.get(role)) and not pattern.search(name):
+                        continue
+                    needs = SUGGEST_NEEDS.get(role)
+                    if needs and not any(all(k in entities for k in group) for group in needs):
+                        continue
+                    if not entities:
+                        continue
+                found.append(
+                    {
+                        "device_id": device.id,
+                        "name": name or ROLE_LABELS[role],
+                        "manufacturer": device.manufacturer,
+                        "model": device.model,
+                        "area": device.area_id,
+                        "entities": entities,
+                        "score": round(len(entities) / max(1, len(KEYS[role])), 2),
+                        "current": current.get(role) == device.id,
+                    }
+                )
+            found.sort(key=lambda c: (not c["current"], -c["score"], c["name"]))
+            if found or role in current:
+                out[role] = found[:6]
+        return out
+
+    @callback
+    def unlink(self, role: str) -> int:
+        """Remove the device subentries of a role (the setup assistant's "none")."""
+        subs = [s for s in self.links() if s.data.get(CONF_ROLE) == role]
+        for sub in subs:
+            self.hass.config_entries.async_remove_subentry(self.entry, sub.subentry_id)
+        return len(subs)
 
     def info(self, migrated: bool, steps: list[int] | None = None) -> dict[str, Any]:
         """Return the catalog for the dashboard (steps: the takeovers done after the first)."""

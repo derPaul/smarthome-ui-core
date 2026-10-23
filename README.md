@@ -304,6 +304,10 @@ Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **En
 
 ## Geräte zuordnen (Geräte-Katalog)
 
+**Einrichtungsassistent** (ab 0.26, Dashboard 1.275): Beim ersten Start schlägt Core für jede Rolle passende Geräte
+vor (gefundene Entitäten am Gerät, bei der Kaffeemaschine zusätzlich der Name). Das Dashboard zeigt die Vorschläge,
+legt die Zuordnungen an und erzeugt das Lovelace-Dashboard. Bestehende Installationen gelten als eingerichtet.
+
 Welches Gerät der Wechselrichter, die Batterie, die Wärmepumpe, der Enthärter, der Internet-Router, das Gateway,
 ein Switch oder ein Accesspoint ist, steht in Core – nicht mehr im Dashboard. **„Gerät zuordnen“** (beliebig oft):
 Gerät wählen, Rolle wählen, optional Name. Core findet am Gerät (und an Geräten, die darüber verbunden sind) die
@@ -563,6 +567,9 @@ actions:
 | `smarthome_ui/technik/settings` | Haustechnik-Sensoren und Schwellen (`heatpump_error`, `inverter_error`, `inverter_error_ok`, `reach`, `pressure`, `pressure_min`, `pressure_critical`, `pressure_drop`, `salt`, `salt_max`, `syr`, `flow`, `valve`, `water_minutes`, `compressor`, `cycles_per_hour`, `power`) |
 | `smarthome_ui/system/settings` | System & Netzwerk (`internet`, `devices`, `status`, `services`, `automations`) |
 | `smarthome_ui/catalog/link` | Gerät einer Rolle zuordnen (`device_id`, `role`, optional `name`) |
+| `smarthome_ui/catalog/suggest` | Einrichtung: passende Geräte je Rolle, bestes zuerst (`roles`: `device_id`, `name`, `manufacturer`, `model`, `entities`, `score`, `current`) |
+| `smarthome_ui/catalog/unlink` | Gerät einer Rolle wieder entfernen (`role`) |
+| `smarthome_ui/onboarding/done` | Einrichtungsassistent abgeschlossen (`done`, Standard `true`; `false` = noch einmal anbieten) |
 | `smarthome_ui/catalog/migrate` | einmalig je Schritt: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`; `step`, Standard 1) |
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
 | `smarthome_ui/lists/migrate` | einmalig: Listen einer Seite übernehmen (`page`, `lists`; Seite `values` = einzelne Entitäten) |

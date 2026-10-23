@@ -466,6 +466,48 @@ async def test_values_added_later(hass: HomeAssistant, entry: MockConfigEntry) -
     assert lists.migrate("values", {"waste.calendar": "calendar.mull"}) == 0
 
 
+async def test_suggest_unlink_onboarding(
+    hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client
+) -> None:
+    hp = _heatpump(hass)
+    # a plain thermostat is no heat pump
+    _device(hass, "tado", "Thermostat Bad", [("climate", "thermostat_bad", "heat", {})])
+    _device(
+        hass,
+        "shelly",
+        "Siebträger",
+        [("sensor", "siebtrager_power", "0", {"unit_of_measurement": "W"})],
+    )
+    _device(
+        hass,
+        "shelly",
+        "Wasserkocher",
+        [("sensor", "kocher_power", "0", {"unit_of_measurement": "W"})],
+    )
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "smarthome_ui/get"})
+    assert (await client.receive_json())["result"]["onboarding"] == {"done": False, "at": None}
+    await client.send_json({"id": 2, "type": "smarthome_ui/catalog/suggest"})
+    roles = (await client.receive_json())["result"]["roles"]
+    assert [c["device_id"] for c in roles["heatpump"]] == [hp]
+    assert [c["name"] for c in roles["coffee"]] == ["Siebträger"]
+    assert "inverter" not in roles
+    # assign, then "none" again
+    await client.send_json(
+        {"id": 3, "type": "smarthome_ui/catalog/link", "device_id": hp, "role": "heatpump"}
+    )
+    assert (await client.receive_json())["success"]
+    await hass.async_block_till_done()
+    await client.send_json({"id": 4, "type": "smarthome_ui/catalog/unlink", "role": "heatpump"})
+    assert (await client.receive_json())["result"]["removed"] == 1
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 5, "type": "smarthome_ui/onboarding/done"})
+    assert (await client.receive_json())["result"]["done"] is True
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    assert entry.runtime_data.catalog.links() == []
+
+
 def test_identifiers_with_three_parts() -> None:
     """Newer Home Assistant versions keep device identifiers with three parts."""
     from types import SimpleNamespace
