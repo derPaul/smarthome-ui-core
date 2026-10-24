@@ -357,6 +357,14 @@ Thermostate, Verbraucher, „WLAN & Schalter“, Geräte), dazu die Hausverbrauc
 Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos, ab 0.25 auch Klappe und Tür des Briefkastens und
 der Müll-Kalender. Werte, die eine neuere Version dazubringt, übernimmt Core beim nächsten Mal einmalig.
 
+## Diagnose
+
+**Einstellungen → Geräte & Dienste → Smarthome UI Core → ⋮ → Diagnose herunterladen** (ab 0.30) liefert eine Datei
+mit allem, was Core weiß und warum es gehandelt hat: Geräte-Katalog, Listen, Alarm (inklusive „Gäste von Hand“ und
+letztem Auslöser), letzte Nacht, Haustechnik, System, die vom Dashboard übergebenen Einstellungen und die letzten
+Mitteilungen. Namen, Personen, Benachrichtigungsziele, WLAN-Namen und IP-Adressen sind unkenntlich gemacht,
+Haushaltsdaten (Erledigt, Protokolle) nur als Anzahl. Hilft bei Fragen wie „warum ging der Alarm an?“.
+
 ## Haustechnik
 
 Gerät **„Haustechnik“**. Welche Sensoren gemeint sind (Wärmepumpe, Wechselrichter, Heizungsdruck, Enthärter,
