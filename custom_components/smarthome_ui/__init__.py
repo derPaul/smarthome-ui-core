@@ -750,6 +750,7 @@ def ws_subscribe(
                     ),
                     "lists": runtime.lists.info(),
                     "energy": runtime.energy.info(),
+                    "ui": runtime.ui.info(),
                     "onboarding": _onboarding(runtime.store),
                 },
             )
