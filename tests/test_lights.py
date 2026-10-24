@@ -149,3 +149,97 @@ async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freez
     hass.states.async_set("binary_sensor.flur_bewegung", "on")
     await hass.async_block_till_done()
     assert on[-1].data["brightness_pct"] == 20
+
+
+async def test_covered_by_area_device_and_group(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Automations switching the light via the area or a light group count too."""
+    _room(hass, "Küche", "kuche_bewegung", ["kuche_decke"])
+    _room(hass, "Flur", "flur_bewegung", ["flur_decke"])
+    _room(hass, "Bad", "bad_bewegung", ["bad_decke"])
+    area_kuche = next(a for a in ar.async_get(hass).areas.values() if a.name == "Küche").id
+    hass.states.async_set("light.flur_gruppe", "off", {"entity_id": ["light.flur_decke"]})
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": [
+                {
+                    "id": "kuche",
+                    "alias": "Küche per Bereich",
+                    "triggers": [{"trigger": "state", "entity_id": "binary_sensor.kuche_bewegung"}],
+                    "actions": [{"action": "light.turn_on", "target": {"area_id": area_kuche}}],
+                },
+                {
+                    "id": "flur",
+                    "alias": "Flur per Gruppe",
+                    "triggers": [{"trigger": "state", "entity_id": "binary_sensor.flur_bewegung"}],
+                    "actions": [
+                        {"action": "light.turn_on", "target": {"entity_id": "light.flur_gruppe"}}
+                    ],
+                },
+            ]
+        },
+    )
+    await hass.async_block_till_done()
+    rooms = {r["area"]: r for r in suggest(hass, [])}
+    assert rooms["Küche"]["automation"]["name"] == "Küche per Bereich"
+    assert rooms["Flur"]["automation"]["name"] == "Flur per Gruppe"
+    assert rooms["Bad"]["automation"] is None
+
+
+async def test_ignore_room(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
+    area = _room(hass, "Bad", "bad_bewegung", ["bad_decke"])
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "smarthome_ui/lights/ignore", "area_id": area})
+    res = (await client.receive_json())["result"]
+    assert res["rooms"][0]["ignored"] is True
+    await client.send_json(
+        {"id": 2, "type": "smarthome_ui/lights/ignore", "area_id": area, "ignore": False}
+    )
+    assert (await client.receive_json())["result"]["rooms"][0]["ignored"] is False
+
+
+async def test_label_and_category(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Automations from Core's blueprints get the label Smart-Core and the category Licht."""
+    from homeassistant.helpers import category_registry as cr, label_registry as lr
+
+    _room(hass, "Flur", "flur_bewegung", ["flur"])
+    hass.states.async_set("binary_sensor.flur_bewegung", "off")
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": [
+                {
+                    "id": "flur",
+                    "alias": "Bewegungslicht Flur",
+                    "use_blueprint": {
+                        "path": BLUEPRINT,
+                        "input": {
+                            "motion": ["binary_sensor.flur_bewegung"],
+                            "light": ["light.flur"],
+                        },
+                    },
+                },
+                {"id": "andere", "alias": "Andere", "triggers": [], "actions": []},
+            ]
+        },
+    )
+    await hass.async_block_till_done()
+    hass.bus.async_fire("automation_reloaded")
+    await hass.async_block_till_done()
+    reg = er.async_get(hass)
+    label = lr.async_get(hass).async_get_label_by_name("Smart-Core")
+    flur = reg.async_get("automation.bewegungslicht_flur")
+    assert label.label_id in flur.labels
+    cat = cr.async_get(hass).async_get_category(
+        scope="automation", category_id=flur.categories["automation"]
+    )
+    assert cat.name == "Licht"
+    assert not reg.async_get("automation.andere").labels
+    # the room counts as covered by its own motion light, with the blueprint's inputs
+    flur_room = next(r for r in suggest(hass, []) if r["area"] == "Flur")
+    assert flur_room["automation"]["ours"] is True
+    assert flur_room["automation"]["input"]["light"] == ["light.flur"]

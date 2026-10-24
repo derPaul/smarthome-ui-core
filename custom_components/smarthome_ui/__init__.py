@@ -24,6 +24,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
@@ -54,7 +55,7 @@ from .energy import EnergyPrefs
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
-from .lights import LightSettings, suggest as suggest_lights
+from .lights import LightSettings, suggest as suggest_lights, tag_automations
 from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
@@ -313,6 +314,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_ui_notes,
         ws_lights_suggest,
         ws_lights_settings,
+        ws_lights_ignore,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -495,6 +497,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     doorbells.async_setup(list(entry.subentries.values()))
     alarm.async_setup()
     entry.runtime_data.mailbox.async_setup()
+
+    # automations from Core's blueprints: label "Smart-Core" and a category (start, every reload)
+    @callback
+    def tag(*_args: Any) -> None:
+        tag_automations(hass)
+
+    entry.async_on_unload(hass.bus.async_listen("automation_reloaded", tag))
+    entry.async_on_unload(async_at_started(hass, tag))
     # the dashboard card: served right away, GitHub checked a minute later
     await entry.runtime_data.ui.async_setup()
     entry.async_on_unload(entry.runtime_data.ui.async_start())
@@ -1418,8 +1428,13 @@ def ws_lights_suggest(
 ) -> None:
     """Return rooms with motion sensors and lights (and the automation that covers them)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
+        tag_automations(hass)
         connection.send_result(
-            msg["id"], {"rooms": suggest_lights(hass), "settings": runtime.lights.info()}
+            msg["id"],
+            {
+                "rooms": suggest_lights(hass, runtime.lights.ignored()),
+                "settings": runtime.lights.info(),
+            },
         )
 
 
@@ -1446,3 +1461,20 @@ def ws_lights_settings(
             connection.send_error(msg["id"], "invalid", str(err))
             return
         connection.send_result(msg["id"], runtime.lights.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/lights/ignore",
+        vol.Required("area_id"): str,
+        vol.Optional("ignore", default=True): bool,
+    }
+)
+@callback
+def ws_lights_ignore(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Hide (or show again) the motion light suggestion for a room."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.lights.ignore(msg["area_id"], msg["ignore"])
+        connection.send_result(msg["id"], {"rooms": suggest_lights(hass, runtime.lights.ignored())})

@@ -562,7 +562,14 @@ Seite Automationen und legt auf Knopfdruck eine **Home-Assistant-Automation** au
 - **Helligkeit zentral** am Core-Gerät „Licht“: `number.lights_brightness_day` und `number.lights_brightness_night` (%),
   die Nacht von `time.lights_night_start` bis `time.lights_night_end` (Standard 22:00–06:30). Eine Änderung gilt sofort
   für alle Räume.
-- Als „schon abgedeckt“ zählt jede Automation, in der ein Melder und ein Licht des Raums vorkommen – auch selbst gebaute.
+- Als „schon abgedeckt“ zählt jede Automation, die einen Melder des Raums (Entität oder Gerät, z. B. Geräte-Auslöser)
+  und ein Licht des Raums verwendet – als Entität, Gerät, über den Bereich, eine Lichtgruppe oder eine Szene mit
+  diesem Licht. Auch selbst gebaute zählen. Ab 0.33 erkennt Core das über die Bezüge, die Home Assistant für jede
+  Automation kennt, nicht nur über den Text.
+- Einen Vorschlag kannst du **ausblenden** (`lights/ignore`), z. B. wenn ein Raum bewusst ohne Bewegungslicht bleibt.
+- **Label und Kategorie** (ab 0.33): Automationen aus den Blaupausen von Core bekommen das Label **Smart-Core** und eine
+  Kategorie nach Anwendung („Licht“ für das Bewegungslicht, „Saugen“ für „Saugen, wenn alle weg sind“) – nach dem Start
+  und nach jedem Neuladen der Automationen. Eine selbst gewählte Kategorie bleibt.
 
 ## Saugen, wenn alle weg sind
 
@@ -641,6 +648,7 @@ actions:
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
 | `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
 | `smarthome_ui/lights/suggest` | Räume mit Bewegungsmeldern und Lichtern, die abdeckende Automation (`automation`, `ours` = aus der Blaupause) und die zentralen Einstellungen |
+| `smarthome_ui/lights/ignore` | Vorschlag eines Raums ausblenden oder wieder zeigen (`area_id`, `ignore`, Standard `true`) |
 | `smarthome_ui/lights/settings` | Tag-/Nachthelligkeit (`day`, `night` in %) und Nachtzeiten (`night_start`, `night_end`, „HH:MM“) |
 | `smarthome_ui/ui/check` | neue Dashboard-Version suchen (Antwort mit `notes` seit der installierten) |
 | `smarthome_ui/ui/install` | neueste Dashboard-Version installieren (nur Admins) |
