@@ -217,3 +217,27 @@ async def test_bell_rule_with_camera(hass: HomeAssistant, notify_calls) -> None:
     data = notify_calls[-1].data["data"]
     assert data["image"] == "/api/camera_proxy/camera.haustur"
     assert data["entity_id"] == "camera.haustur"
+
+
+async def test_last_night_alarm(hass: HomeAssistant, notify_calls, freezer) -> None:
+    freezer.move_to(_local(2026, 6, 1, 21, 0))
+    _house(hass)
+    entry = await _setup(hass)
+    security = entry.runtime_data.security
+    freezer.move_to(_local(2026, 6, 1, 22, 0))
+    security._night_start()
+    freezer.move_to(_local(2026, 6, 2, 3, 10))
+    hass.states.async_set("alarm_control_panel.haus", "armed_night", {})
+    await hass.async_block_till_done()
+    hass.states.async_set("alarm_control_panel.haus", "triggered", {})
+    await hass.async_block_till_done()
+    hass.states.async_set("alarm_control_panel.haus", "triggered", {"changed": 1})
+    await hass.async_block_till_done()
+    summary = security.night_summary()
+    assert summary["counts"]["alarm"] == 1  # once, not per update
+    assert summary["events"][0]["id"] == "alarm_control_panel.haus"
+    freezer.move_to(_local(2026, 6, 2, 6, 0))
+    security._night_end()
+    await hass.async_block_till_done()
+    night = [c for c in notify_calls if c.data["title"] == "Letzte Nacht"]
+    assert night[0].data["message"] == "Alarm ausgelöst (03:10)"

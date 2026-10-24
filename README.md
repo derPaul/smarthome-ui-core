@@ -284,6 +284,8 @@ kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an
   Personen- und Tier-Erkennungen (z. B. Kameras), Fahrzeuge (nur wenn gewählt), Bewegung im Haus (ohne Kameras und
   Außenbereiche) und geöffnete Türen. Am Ende der Nacht kommt eine Zusammenfassung, wenn eine Person erkannt oder eine
   Tür geöffnet wurde, z. B. „1 Person erkannt (Einfahrt 02:14) · 1× Tür geöffnet (Haustür 02:14)“.
+  Löst die Alarmanlage in der Nacht aus, zählt das mit (mit Auslöser) und steht in der Morgen-Mitteilung an
+  erster Stelle – die kommt dann auch, wenn sonst nichts los war (ab 0.29.2).
 
 - **Anwesenheit simulieren:** ersetzt die frühere Automation des Dashboards („Smarthome: Anwesenheit simulieren“).
   Eingestellt wird im Dashboard (Sicherheit → Anwesenheit simulieren): Lichter, Rollos, Beginn (Sonnenuntergang

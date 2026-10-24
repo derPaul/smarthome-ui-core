@@ -416,6 +416,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         EnergyPrefs(hass, store),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
+    security.alarm_reason = lambda: (
+        r if alarm.configured and (r := alarm.reason()) != "unbekannt" else None
+    )
     technik.overlay = entry.runtime_data.catalog.technik_overlay
     # maintenance tasks of the dashboard for filters, smoke detectors … become parts (once)
     async_migrate_tasks(hass, entry, store)

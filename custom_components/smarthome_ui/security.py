@@ -144,6 +144,8 @@ class Security:
         self.watchers = watchers
         self.notify = notify
         self.skip_devices = skip_devices
+        # what triggered the alarm (set by the alarm logic), for last night
+        self.alarm_reason: Callable[[], str | None] = lambda: None
         self._unsub: list[CALLBACK_TYPE] = []
         self._home: int | None = None
         self._rain_key: str | None = None
@@ -326,7 +328,12 @@ class Security:
         @callback
         def relevant(data: EventStateChangedData) -> bool:
             eid = data["entity_id"]
-            return eid in openings or eid in cats or eid.startswith("person.")
+            return (
+                eid in openings
+                or eid in cats
+                or eid.startswith("person.")
+                or eid.startswith("alarm_control_panel.")
+            )
 
         @callback
         def changed(event: Event[EventStateChangedData]) -> None:
@@ -335,6 +342,12 @@ class Security:
             if eid.startswith("person."):
                 self._persons_changed()
                 self._update_presence()
+                return
+            if eid.startswith("alarm_control_panel."):
+                # the alarm went off: part of last night (with what triggered it)
+                if new is not None and new.state == "triggered":
+                    if old is None or old.state != "triggered":
+                        self._night_event(eid, "alarm")
                 return
             if eid in cats and new is not None and new.state == "on":
                 if old is None or old.state != "on":
@@ -615,7 +628,10 @@ class Security:
             return
         self._start_night_if_needed()
         events = self._log()["events"]
-        events.append({"t": now_ms(), "id": entity_id, "cat": cat})
+        event: dict[str, Any] = {"t": now_ms(), "id": entity_id, "cat": cat}
+        if cat == "alarm" and (reason := self.alarm_reason()):
+            event["reason"] = reason
+        events.append(event)
         del events[:-EVENTS_MAX]
         self.store.save()
         async_dispatcher_send(self.hass, SIGNAL_SECURITY)
@@ -627,6 +643,7 @@ class Security:
         current = int(log.get("start") or 0) >= int((start.timestamp() - 60) * 1000)
         events = (log.get("events") or []) if current else []
         counts = {key: 0 for key in NIGHT_CATS}
+        counts["alarm"] = 0
         for event in events:
             counts[event["cat"]] = counts.get(event["cat"], 0) + 1
         return {
@@ -641,7 +658,7 @@ class Security:
         """Return the morning summary (None if nothing worth telling happened)."""
         summary = self.night_summary()
         counts, events = summary["counts"], summary["events"]
-        if not counts["persons"] and not counts["doors"]:
+        if not counts["persons"] and not counts["doors"] and not counts["alarm"]:
             return None
 
         def first(cat: str) -> str:
@@ -652,6 +669,11 @@ class Security:
             return f" ({hit['name']} {at})"
 
         parts = []
+        if n := counts["alarm"]:
+            hit = next(e for e in events if e["cat"] == "alarm")
+            at = dt_util.as_local(dt_util.utc_from_timestamp(hit["t"] / 1000)).strftime("%H:%M")
+            by = f" durch {hit['reason']}" if hit.get("reason") else ""
+            parts.append(f"{'Alarm' if n == 1 else f'{n}× Alarm'} ausgelöst{by} ({at})")
         if n := counts["persons"]:
             parts.append(f"{n} {'Person' if n == 1 else 'Personen'} erkannt{first('persons')}")
         if n := counts["doors"]:
