@@ -20,8 +20,9 @@ Eingestellt wird alles weiter im Dashboard. Ohne diese Integration arbeitet das 
 HACS lädt die Dateien direkt aus dem Repository (ab 0.30). Die Release-ZIP `smarthome_ui.zip` bleibt für die
 Installation von Hand; über `github.com/…/releases/download/` scheitert der Download in Home Assistant derzeit an
 einem zu langen Header von GitHub („Got more than 8190 bytes“).
-4. Dashboard öffnen: Es übernimmt einmalig die bisherigen Haushaltsdaten und überträgt die
-   Mitteilungs-Einstellungen. Fertig.
+4. Dashboard öffnen (ab 1.280): Der Einrichtungsassistent ordnet die Geräte zu. Fertig.
+   Von einer Dashboard-Version vor 1.279 erst auf 1.279 aktualisieren und einmal öffnen – ab 0.30 nimmt Core
+   keine Daten mehr aus dem Dashboard entgegen.
 
 ## Mitteilungen
 
@@ -327,8 +328,6 @@ automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
 
 - Geräte der **UniFi-Integration** kommen ohne Zuordnung dazu (Rolle aus dem Modell: Gateway, Switch, Accesspoint),
   solange „UniFi-Geräte automatisch“ an ist.
-- Beim ersten Start mit Dashboard 1.270 übernimmt Core einmalig, welche Geräte das Dashboard bisher verwendet hat
-  (je Rolle eine Zuordnung).
 - Das Dashboard zeigt, was im Katalog steht; die Prüfungen von Haustechnik und System & Netzwerk nutzen denselben
   Katalog.
 - **Home-Assistant-Server** (Rolle `server`): CPU, Arbeitsspeicher, Speicherplatz und Temperatur findet Core am
@@ -341,13 +340,11 @@ automatisch), bei der Batterie zusätzlich die nutzbare Kapazität.
 - **Kaffeemaschine:** Leistung, Schalter und Energie der Steckdose bzw. des Relais.
 - **Fernseher, Zuspieler, Sync-Box** (Kino auf der Startseite): ohne Zuordnung findet Core sie über die Integration
   (LG webOS, Samsung, Sony Bravia, Philips, Android TV Remote; Apple TV, Android TV; Hue Sync Box).
-- Mit Dashboard 1.272 übernimmt Core einmalig auch diese Geräte (Schritt 3).
 
 **Listen der Seiten** (Schritt 2): Welche Kameras, Fenster & Türen, Bewegungsmelder, Schlösser, Chimes und Sensoren
 für „Letzte Nacht“ die Sicherheits-Seite zeigt, welche Dienste die Status-Seite überwacht und was ignoriert wird,
-steht in Core. Das Dashboard bearbeitet sie in seinen Dialogen und übernimmt seine bisherigen Listen einmalig;
-ohne eigene Liste erkennt die Seite die Geräte automatisch. Seit Schritt 3 auch: Szenen, Kalender und Listen der
-Startseite, ignorierte Entitäten der Räume, Garten & Terrasse sowie Aufgaben und Zonen des Mähers.
+steht in Core. Das Dashboard bearbeitet sie in seinen Dialogen; ohne eigene Liste erkennt die Seite die Geräte
+automatisch. Seit Schritt 3 auch: Szenen, Kalender und Listen der Startseite, ignorierte Entitäten der Räume, Garten & Terrasse sowie Aufgaben und Zonen des Mähers.
 
 **Energie-Dashboard** (ab 0.27): Netzbezug, Einspeisung, PV, Batterie geladen/entladen, Leistungssensoren, Wasser,
 Gas und die einzelnen Geräte liest Core aus dem Energie-Dashboard von Home Assistant (und bei jeder Änderung neu). Das
@@ -359,7 +356,7 @@ Thermostate, Verbraucher, „WLAN & Schalter“, Geräte), dazu die Hausverbrauc
 
 **Einzelne Entitäten ohne Gerät** stehen ebenfalls in Core und gelten auf allen Seiten: Wetter-Entität,
 Musik-Player, Lautstärke sowie Start- und Aus-Szene des Kinos, ab 0.25 auch Klappe und Tür des Briefkastens und
-der Müll-Kalender. Werte, die eine neuere Version dazubringt, übernimmt Core beim nächsten Mal einmalig.
+der Müll-Kalender.
 
 ## Diagnose
 
@@ -581,7 +578,6 @@ actions:
 |---|---|
 | `smarthome_ui/get` | Daten (`done`, `done_log`, `household`, `mow_log`), Mäh- und Saugroboter, Haushaltsgeräte, Putz-Intervalle, Status |
 | `smarthome_ui/subscribe` | Ereignis bei jeder Datenänderung |
-| `smarthome_ui/import` | einmalige Datenübernahme aus dem Dashboard |
 | `smarthome_ui/done` | Abhaken / wieder öffnen / Rückgängig (`changes`, `log`, `unlog`) |
 | `smarthome_ui/data/set` | `household` bzw. `mow_log` ersetzen |
 | `smarthome_ui/tasks/sync` | Aufgaben mit Fälligkeit |
@@ -601,9 +597,7 @@ actions:
 | `smarthome_ui/devices/add` | mehrere davon auf einmal hinzufügen (`items`: `type`, `device_id`, optional `name`, `kind`, `camera`, `lock`) |
 | `smarthome_ui/catalog/unlink` | Gerät einer Rolle wieder entfernen (`role`) |
 | `smarthome_ui/onboarding/done` | Einrichtungsassistent abgeschlossen (`done`, Standard `true`; `false` = noch einmal anbieten) |
-| `smarthome_ui/catalog/migrate` | einmalig je Schritt: bisherige Geräte des Dashboards übernehmen (`items`: `role`, `anchor`, `entities`, `name`; `step`, Standard 1) |
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
-| `smarthome_ui/lists/migrate` | einmalig: Listen einer Seite übernehmen (`page`, `lists`; Seite `values` = einzelne Entitäten) |
 | `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |

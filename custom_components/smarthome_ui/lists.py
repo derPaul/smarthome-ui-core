@@ -8,9 +8,6 @@ an item is ``{"entity": ..., ...}`` (extra fields like a name or a motion sensor
 Besides the lists a few single entities that belong to no device are kept here (``values``): the
 weather entity, the music player, the cinema's volume and scenes, the mailbox sensors and the waste
 calendar. They hold for every page.
-
-The dashboard's own lists are taken over once per page (``lists/migrate``), its single values once
-per value (page ``values``; values added later are taken over on the next call).
 """
 
 from __future__ import annotations
@@ -107,43 +104,6 @@ class PageLists:
         else:
             values.pop(path, None)
         self.store.save(SIGNAL_DATA)
-
-    @callback
-    def migrate(self, page: str, lists: dict[str, Any]) -> int:
-        """Take over a page's lists (or the single values) once."""
-        done = self.data.setdefault("migrated", [])
-        if page == "values":
-            taken = self.value_done()
-            if set(VALUES) <= set(taken):
-                return 0
-            own = self.data.setdefault("values", {})
-            made = 0
-            for path, value in lists.items():
-                if (
-                    path in VALUES
-                    and path not in taken
-                    and isinstance(value, str)
-                    and value
-                    and path not in own
-                ):
-                    own[path] = value
-                    made += 1
-            self.data["value_done"] = list(VALUES)
-            if page not in done:
-                done.append(page)
-            self.store.save(SIGNAL_DATA)
-            return made
-        if page in done or page not in PAGES:
-            return 0
-        own = self.data.setdefault("pages", {}).setdefault(page, {})
-        made = 0
-        for path, items in lists.items():
-            if path in PAGES[page] and isinstance(items, list) and path not in own:
-                own[path] = items
-                made += 1
-        done.append(page)
-        self.store.save(SIGNAL_DATA)
-        return made
 
     def value_done(self) -> list[str]:
         """Return the values already taken over from the dashboard."""

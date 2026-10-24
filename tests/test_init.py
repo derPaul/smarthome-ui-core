@@ -29,7 +29,7 @@ async def test_config_flow(hass: HomeAssistant) -> None:
     assert result["reason"] == "single_instance_allowed"
 
 
-async def test_import_and_done(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
+async def test_data_and_done(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "smarthome_ui/get"})
     msg = await client.receive_json()
@@ -46,19 +46,11 @@ async def test_import_and_done(hass: HomeAssistant, entry: MockConfigEntry, hass
         "household": {"runs": [{"t": 900, "areas": ["kuche"]}]},
         "mow_log": {"Vorgarten": {"last": 800}},
     }
-    await client.send_json_auto_id({"type": "smarthome_ui/import", "data": old})
-    msg = await client.receive_json()
-    while msg["type"] == "event":
-        msg = await client.receive_json()
-    assert msg["result"]["imported"] is True
-    assert msg["result"]["data"]["mow_log"] == {"Vorgarten": {"last": 800}}
-
-    # a second import is ignored (data already here)
-    await client.send_json_auto_id({"type": "smarthome_ui/import", "data": {"done": {}}})
-    msg = await client.receive_json()
-    while msg["type"] == "event":
-        msg = await client.receive_json()
-    assert msg["result"]["imported"] is False
+    await client.send_json_auto_id({"type": "smarthome_ui/data/set", "data": old})
+    while (msg := await client.receive_json())["type"] == "event":
+        pass
+    assert msg["success"]
+    assert entry.runtime_data.store.data["data"]["mow_log"] == {"Vorgarten": {"last": 800}}
 
     await client.send_json_auto_id(
         {

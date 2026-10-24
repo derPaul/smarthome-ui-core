@@ -146,18 +146,6 @@ class CoreStore:
         return deepcopy(self.data["data"])
 
     @callback
-    def import_data(self, data: dict[str, Any], force: bool = False) -> bool:
-        """Take over the dashboard's data once; return False if already migrated."""
-        if self.data["migrated"] and not force:
-            return False
-        for key in DATA_KEYS:
-            if key in data and data[key] is not None:
-                self.data["data"][key] = deepcopy(data[key])
-        self.data["migrated"] = True
-        self.save(SIGNAL_DATA, SIGNAL_TASKS)
-        return True
-
-    @callback
     def set_data(self, data: dict[str, Any]) -> None:
         """Replace whole data keys (household, mow_log …)."""
         for key in DATA_KEYS:

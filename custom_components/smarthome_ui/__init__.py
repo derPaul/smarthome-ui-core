@@ -276,7 +276,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     for command in (
         ws_get,
         ws_subscribe,
-        ws_import,
         ws_done,
         ws_data_set,
         ws_tasks_sync,
@@ -297,14 +296,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_technik_settings,
         ws_system_settings,
         ws_catalog_link,
-        ws_catalog_migrate,
         ws_catalog_suggest,
         ws_catalog_unlink,
         ws_devices_suggest,
         ws_devices_add,
         ws_onboarding_done,
         ws_lists_set,
-        ws_lists_migrate,
         ws_lists_value,
     ):
         websocket_api.async_register_command(hass, command)
@@ -1354,20 +1351,3 @@ def ws_lists_value(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.lists.set_value(msg["path"], msg["value"])
         connection.send_result(msg["id"], runtime.lists.info())
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "smarthome_ui/lists/migrate",
-        vol.Required("page"): vol.In([*LIST_PAGES, "values"]),
-        vol.Required("lists"): dict,
-    }
-)
-@callback
-def ws_lists_migrate(
-    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
-) -> None:
-    """Take over a page's lists once."""
-    if (runtime := _ws_runtime(connection, msg)) is not None:
-        made = runtime.lists.migrate(msg["page"], msg["lists"])
-        connection.send_result(msg["id"], {"made": made, **runtime.lists.info()})

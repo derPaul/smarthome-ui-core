@@ -97,7 +97,7 @@ async def test_link_by_subentry_and_detect(hass: HomeAssistant, entry: MockConfi
     assert settings["reach"]["Heizkreis"] == "climate.wp_heizkreis_1"
 
 
-async def test_migrate_battery_water_router(
+async def test_link_battery_water_router(
     hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client
 ) -> None:
     bat = _device(
@@ -125,7 +125,7 @@ async def test_migrate_battery_water_router(
             ),
         ],
     )
-    _device(
+    syr = _device(
         hass,
         "syr_connect",
         "SYR",
@@ -135,7 +135,7 @@ async def test_migrate_battery_water_router(
             ("sensor", "syr_getala", "no_alarm", {"friendly_name": "Alarm"}),
         ],
     )
-    _device(
+    fritz = _device(
         hass,
         "fritz",
         "FRITZ!Box",
@@ -149,20 +149,12 @@ async def test_migrate_battery_water_router(
         ],
     )
     client = await hass_ws_client(hass)
-    items = [
-        {
-            "role": "battery",
-            "anchor": "sensor.varta_state_of_charge",
-            "entities": {"soc": "sensor.varta_state_of_charge"},
-        },
-        {"role": "water", "anchor": "sensor.syr_getsv1", "entities": {}},
-        {"role": "internet", "anchor": "binary_sensor.fritz_box_verbindung", "entities": {}},
-        {"role": "battery", "anchor": "sensor.unknown", "entities": {}},  # no device: skipped
-    ]
-    await client.send_json({"id": 1, "type": "smarthome_ui/catalog/migrate", "items": items})
-    res = await client.receive_json()
-    assert res["result"]["made"] == 3
-    await hass.async_block_till_done()
+    for n, (device, role) in enumerate(((bat, "battery"), (syr, "water"), (fritz, "internet")), 1):
+        await client.send_json(
+            {"id": n, "type": "smarthome_ui/catalog/link", "device_id": device, "role": role}
+        )
+        assert (await client.receive_json())["success"]
+        await hass.async_block_till_done()
     entry = hass.config_entries.async_get_entry(entry.entry_id)
     catalog = entry.runtime_data.catalog
     assert {d["role"] for d in catalog.devices()} == {"battery", "water", "internet"}
@@ -172,9 +164,6 @@ async def test_migrate_battery_water_router(
     assert settings["salt"] == "sensor.syr_getsv1"
     assert settings["syr"]["Alarm"] == "sensor.syr_getala"
     assert entry.runtime_data.system.internet() == "binary_sensor.fritz_box_verbindung"
-    # only once
-    await client.send_json({"id": 2, "type": "smarthome_ui/catalog/migrate", "items": items})
-    assert (await client.receive_json())["result"]["made"] == 0
 
 
 async def test_unifi_auto_and_link_from_dashboard(
@@ -247,13 +236,14 @@ async def test_page_lists(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_c
     await client.send_json(
         {
             "id": 1,
-            "type": "smarthome_ui/lists/migrate",
+            "type": "smarthome_ui/lists/set",
             "page": "security",
-            "lists": {"locks": [{"entity": "lock.haustur"}], "unknown": [1]},
+            "path": "locks",
+            "items": [{"entity": "lock.haustur"}],
         }
     )
     res = (await client.receive_json())["result"]
-    assert res["made"] == 1 and res["pages"]["security"] == {"locks": [{"entity": "lock.haustur"}]}
+    assert res["pages"]["security"] == {"locks": [{"entity": "lock.haustur"}]}
     await client.send_json(
         {
             "id": 2,
@@ -280,14 +270,9 @@ async def test_page_lists(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_c
         {"id": 4, "type": "smarthome_ui/lists/set", "page": "security", "path": "nope", "items": []}
     )
     assert (await client.receive_json())["success"] is False
-    # migrated only once
-    await client.send_json(
-        {"id": 5, "type": "smarthome_ui/lists/migrate", "page": "security", "lists": {"locks": []}}
-    )
-    assert (await client.receive_json())["result"]["made"] == 0
 
 
-async def test_step3_auto_and_migrate(
+async def test_step3_auto_and_link(
     hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client
 ) -> None:
     _device(hass, "webostv", "LG OLED", [("media_player", "lg_oled", "off", {})])
@@ -373,14 +358,11 @@ async def test_step3_auto_and_migrate(
     }
     assert catalog.first("coffee") is None  # only by subentry
     client = await hass_ws_client(hass)
-    await client.send_json({"id": 1, "type": "smarthome_ui/catalog/migrate", "items": []})
-    assert (await client.receive_json())["result"]["made"] == 0
-    # step 3 runs once, even after the first takeover
-    items = [{"role": "coffee", "anchor": "sensor.siebtrager_power", "entities": {}}]
+    # the coffee machine only by linking it
     await client.send_json(
-        {"id": 2, "type": "smarthome_ui/catalog/migrate", "items": items, "step": 3}
+        {"id": 1, "type": "smarthome_ui/catalog/link", "device_id": coffee, "role": "coffee"}
     )
-    assert (await client.receive_json())["result"]["made"] == 1
+    assert (await client.receive_json())["success"]
     await hass.async_block_till_done()
     entry = hass.config_entries.async_get_entry(entry.entry_id)
     found = entry.runtime_data.catalog.first("coffee")
@@ -390,12 +372,6 @@ async def test_step3_auto_and_migrate(
         "switch": "switch.siebtrager",
         "energy": "sensor.siebtrager_energy",
     }
-    await client.send_json(
-        {"id": 3, "type": "smarthome_ui/catalog/migrate", "items": items, "step": 3}
-    )
-    assert (await client.receive_json())["result"]["made"] == 0
-    await client.send_json({"id": 4, "type": "smarthome_ui/get"})
-    assert (await client.receive_json())["result"]["catalog"]["steps"] == [1, 3]
 
 
 async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
@@ -403,13 +379,13 @@ async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_
     await client.send_json(
         {
             "id": 1,
-            "type": "smarthome_ui/lists/migrate",
-            "page": "values",
-            "lists": {"weather.entity": "weather.home", "nope": "x", "cinema.scene": ""},
+            "type": "smarthome_ui/lists/value",
+            "path": "weather.entity",
+            "value": "weather.home",
         }
     )
     res = (await client.receive_json())["result"]
-    assert res["made"] == 1 and res["values"] == {"weather.entity": "weather.home"}
+    assert res["values"] == {"weather.entity": "weather.home"}
     await client.send_json(
         {
             "id": 2,
@@ -424,49 +400,10 @@ async def test_page_values(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_
         {"id": 3, "type": "smarthome_ui/lists/value", "path": "weather.entity", "value": None}
     )
     assert "weather.entity" not in (await client.receive_json())["result"]["values"]
-    # values added later (mailbox, waste) are taken over once more – the old ones stay
     await client.send_json(
-        {
-            "id": 4,
-            "type": "smarthome_ui/lists/migrate",
-            "page": "values",
-            "lists": {"weather.entity": "weather.other", "mailbox.flap": "binary_sensor.klappe"},
-        }
+        {"id": 4, "type": "smarthome_ui/lists/value", "path": "nope", "value": "x"}
     )
-    res = (await client.receive_json())["result"]
-    assert res["made"] == 0  # all values were taken over with the first call already
-    assert "mailbox.flap" in res["value_done"]
-    await client.send_json(
-        {
-            "id": 5,
-            "type": "smarthome_ui/lists/migrate",
-            "page": "home",
-            "lists": {"scenes": [{"entity": "scene.abend"}]},
-        }
-    )
-    assert (await client.receive_json())["result"]["pages"]["home"] == {
-        "scenes": [{"entity": "scene.abend"}]
-    }
-
-
-async def test_values_added_later(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    lists = entry.runtime_data.lists
-    # taken over with Core 0.24: only the first five values
-    lists.data["migrated"] = ["values"]
-    lists.data["values"] = {"weather.entity": "weather.home"}
-    assert "mailbox.flap" not in lists.value_done()
-    made = lists.migrate(
-        "values", {"weather.entity": "weather.other", "mailbox.flap": "binary_sensor.klappe"}
-    )
-    assert made == 1
-    assert lists.data["values"] == {
-        "weather.entity": "weather.home",
-        "mailbox.flap": "binary_sensor.klappe",
-    }
-    assert lists.migrate("values", {"waste.calendar": "calendar.mull"}) == 0
-    # lists of the house technology page
-    assert lists.migrate("haustechnik", {"consumers.entities": [{"entity": "sensor.wp"}]}) == 1
-    assert lists.info()["pages"]["haustechnik"] == {"consumers.entities": [{"entity": "sensor.wp"}]}
+    assert (await client.receive_json())["success"] is False
 
 
 async def test_suggest_unlink_onboarding(

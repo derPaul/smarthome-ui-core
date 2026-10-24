@@ -10,9 +10,6 @@ The catalog is the one source for the dashboard (what to show) and for Core's ow
 Assistant server; step 3: weather station, coffee machine, TV, player and sync box (home, rooms,
 garden, household). TV, player and sync box are found by their integration, the weather station
 by its sensors (wind, rain).
-
-The dashboard's former settings are taken over once (``catalog/migrate``): for every role it used,
-a subentry with the device of its entities.
 """
 
 from __future__ import annotations
@@ -702,40 +699,6 @@ class Catalog:
         sub = ConfigSubentry(data=data, subentry_type=SUBENTRY_DEVICE, title=title, unique_id=None)
         self.hass.config_entries.async_add_subentry(self.entry, sub)
         return sub.subentry_id
-
-    @callback
-    def migrate(self, items: list[dict[str, Any]]) -> int:
-        """Take over the dashboard's devices once: one subentry per device (with its role)."""
-        registry = er.async_get(self.hass)
-        linked = {s.data.get(CONF_DEVICE) for s in self.links()}
-        made = 0
-        for item in items:
-            role = item.get("role")
-            entities = {k: v for k, v in (item.get("entities") or {}).items() if v}
-            anchors = [item.get("anchor"), *entities.values()]
-            device_id = next(
-                (
-                    entry.device_id
-                    for eid in anchors
-                    if eid and (entry := registry.async_get(eid)) and entry.device_id
-                ),
-                None,
-            )
-            if role not in ROLES or not device_id or device_id in linked:
-                continue
-            if role in SINGLE_ROLES and any(s.data.get(CONF_ROLE) == role for s in self.links()):
-                continue
-            # only entities of this device count as own choice
-            own_device = {e.entity_id for e in self.device_entities(device_id)}
-            self.link(
-                device_id,
-                role,
-                item.get("name"),
-                {k: v for k, v in entities.items() if v in own_device},
-            )
-            linked.add(device_id)
-            made += 1
-        return made
 
     # ---------------------------------------------------------------- suggestions (onboarding)
 
