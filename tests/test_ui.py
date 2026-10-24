@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.smarthome_ui.ui import API, CARD, UiManager, notes_since
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_setup_component
 
 REAL_GET = UiManager._get
 CHANGELOG = """# Änderungen
@@ -107,3 +108,19 @@ def test_notes_since() -> None:
     assert "1.280.0" not in notes_since(CHANGELOG, "1.280.0", "1.282.0")
     assert notes_since(CHANGELOG, "1.282.0", "1.282.0") == ""
     assert "1.282.0" not in notes_since(CHANGELOG, "1.280.0", "1.281.0")
+
+
+async def test_path_on_frozen_router(hass: HomeAssistant) -> None:
+    """A web server that takes no more paths (test server) does not stop Core."""
+
+    assert await async_setup_component(hass, "http", {})
+
+    async def frozen(configs) -> None:
+        raise RuntimeError("Cannot register a resource into frozen router.")
+
+    hass.http.async_register_static_paths = frozen
+    entry = MockConfigEntry(domain="smarthome_ui", data={}, title="Smarthome UI Core")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert "path" not in hass.data["smarthome_ui_ui"]

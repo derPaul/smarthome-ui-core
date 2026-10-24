@@ -127,9 +127,13 @@ class UiManager:
             return
         from homeassistant.components.http import StaticPathConfig
 
-        await self.hass.http.async_register_static_paths(
-            [StaticPathConfig(URL_BASE, str(self.folder), False)]
-        )
+        try:
+            await self.hass.http.async_register_static_paths(
+                [StaticPathConfig(URL_BASE, str(self.folder), False)]
+            )
+        except RuntimeError as err:  # a frozen router (test web server): Core works without
+            _LOGGER.warning("Smarthome UI: Pfad für die Karte nicht angemeldet: %s", err)
+            return
         holder["path"] = True
 
     @callback
