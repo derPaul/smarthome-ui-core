@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
 
 from custom_components.smarthome_ui.const import DOMAIN
+from custom_components.smarthome_ui.ui import UiError, UiManager
 from homeassistant.core import HomeAssistant
 
 
@@ -13,6 +16,17 @@ from homeassistant.core import HomeAssistant
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading custom integrations in all tests."""
     return
+
+
+@pytest.fixture(autouse=True)
+def github_offline():
+    """GitHub is not reached in tests (the dashboard card); test_ui replaces this."""
+
+    async def offline(self, path: str) -> str:
+        raise UiError("offline")
+
+    with patch.object(UiManager, "_get", offline):
+        yield
 
 
 @pytest.fixture

@@ -8,7 +8,8 @@ Begleit-Integration zum [Smarthome-UI-Dashboard](https://github.com/derPaul/smar
 - **Haushalt & Garten** – Putzplan, Wartung, Gartenkalender, Müll und Mähbereiche liegen hier statt
   im Frontend-Speicher, als Entitäten nutzbar (Automationen, Sprache, andere Dashboards).
 
-Eingestellt wird alles weiter im Dashboard. Ohne diese Integration arbeitet das Dashboard wie bisher.
+Eingestellt wird alles im Dashboard. Ab 0.31 bringt Core auch **das Dashboard selbst** mit: Es lädt die Karte aus
+GitHub und bindet sie in Home Assistant ein (siehe [Dashboard](#dashboard)).
 
 ## Installation
 
@@ -16,13 +17,39 @@ Eingestellt wird alles weiter im Dashboard. Ohne diese Integration arbeitet das 
    oder `custom_components/smarthome_ui` nach `/config/custom_components/` kopieren.
 2. Home Assistant neu starten.
 3. *Einstellungen → Geräte & Dienste → Integration hinzufügen → Smarthome UI Core*.
+4. Das Dashboard-Repository ist privat: GitHub-Token (fine-grained, nur *Contents: Read-only* für
+   `derPaul/smarthome-ui`) in `/config/.smarthome_ui_token` ablegen oder unter *Smarthome UI Core → Konfigurieren*
+   eintragen, dort auch den Branch (Standard `main`). Core lädt die Karte eine Minute nach dem Start.
+5. Seite neu laden, ein Dashboard anlegen und die Karte `custom:smarthome-dashboard-card` einfügen – oder den
+   Einrichtungsassistenten das Dashboard anlegen lassen. Er ordnet auch die Geräte zu. Fertig.
 
 HACS lädt die Dateien direkt aus dem Repository (ab 0.30). Die Release-ZIP `smarthome_ui.zip` bleibt für die
 Installation von Hand; über `github.com/…/releases/download/` scheitert der Download in Home Assistant derzeit an
 einem zu langen Header von GitHub („Got more than 8190 bytes“).
-4. Dashboard öffnen (ab 1.280): Der Einrichtungsassistent ordnet die Geräte zu. Fertig.
-   Von einer Dashboard-Version vor 1.279 erst auf 1.279 aktualisieren und einmal öffnen – ab 0.30 nimmt Core
-   keine Daten mehr aus dem Dashboard entgegen.
+
+Von einer Dashboard-Version vor 1.279 erst auf 1.279 aktualisieren und einmal öffnen – ab 0.30 nimmt Core keine
+Daten mehr aus dem Dashboard entgegen.
+
+## Dashboard
+
+Ab 0.31 lädt Core die Dashboard-Karte (`dist/smarthome-dashboard-card.js`) aus dem privaten Repository
+`derPaul/smarthome-ui`, legt sie unter `/config/smarthome_ui/` ab und lädt sie auf jeder Seite von Home Assistant
+(`/smarthome_ui_ui/smarthome-dashboard-card.js?v=<Version>` – die Version in der Adresse sorgt dafür, dass Browser
+und App nach einem Update die neue Karte nehmen). Eine Dashboard-Ressource, `shell_command` oder Einträge in der
+`configuration.yaml` braucht es dafür nicht mehr.
+
+- **Erste Version:** installiert Core selbst, eine Minute nach dem Start.
+- **Neue Versionen** prüft Core alle sechs Stunden. Sie erscheinen als Update **Smarthome UI**
+  (`update.system_dashboard`) unter *Einstellungen → Updates*, mit den Release Notes aus dem CHANGELOG. Installieren
+  dort oder im Dashboard (*Einstellungen → Update*), danach die Seite neu laden. Ein Neustart ist nicht nötig.
+- **Branch und Token** unter *Smarthome UI Core → Konfigurieren*. Ohne eigenen Token nimmt Core
+  `/config/.smarthome_ui_token` (derselbe wie für das alte Update-Skript).
+- **Umstieg vom Update-Skript:** Läuft die Karte zusätzlich noch über die alte Ressource (`/local/smarthome-loader.js`
+  bzw. `/local/smarthome-dashboard-card.js`), zeigt das Dashboard einen Hinweis. Dann die Ressource unter
+  *Einstellungen → Dashboards → ⋮ → Ressourcen* löschen und die beiden `shell_command`-Einträge `smarthome_ui_update`
+  und `smarthome_ui_check` aus der `configuration.yaml` entfernen. Ein Dashboard im YAML-Modus
+  (`dashboards/smarthome.yaml`) bekommt dann keine neuen Seiten mehr; der Einrichtungsassistent legt ein
+  gleichwertiges Dashboard in Home Assistant an.
 
 ## Mitteilungen
 
@@ -599,6 +626,9 @@ actions:
 | `smarthome_ui/onboarding/done` | Einrichtungsassistent abgeschlossen (`done`, Standard `true`; `false` = noch einmal anbieten) |
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
 | `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
+| `smarthome_ui/ui/check` | neue Dashboard-Version suchen (Antwort mit `notes` seit der installierten) |
+| `smarthome_ui/ui/install` | neueste Dashboard-Version installieren (nur Admins) |
+| `smarthome_ui/ui/notes` | Zustand und Neuerungen seit der installierten Version |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
 | `smarthome_ui/display/connect` | offenes Dashboard als Bildschirm anmelden; Befehle (`set`, `reload`, `reconnect`) kommen als Ereignisse |

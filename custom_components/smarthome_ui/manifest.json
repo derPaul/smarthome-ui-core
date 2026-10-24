@@ -3,6 +3,8 @@
   "name": "Smarthome UI Core",
   "after_dependencies": [
     "calendar",
+    "frontend",
+    "http",
     "notify"
   ],
   "codeowners": [
@@ -18,5 +20,5 @@
   "issue_tracker": "https://github.com/derPaul/smarthome-ui-core/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.30.1"
+  "version": "0.31.0"
 }

@@ -651,6 +651,11 @@
       "security_good_night": {
         "name": "Good night check at"
       }
+    },
+    "update": {
+      "dashboard": {
+        "name": "Dashboard"
+      }
     }
   },
   "services": {
@@ -792,6 +797,21 @@
         "tv": "TV",
         "player": "Player (Apple TV …)",
         "syncbox": "Sync box"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Where the dashboard comes from",
+        "description": "Core fetches the dashboard card from GitHub and loads it on every page of Home Assistant. New versions appear under Settings → Updates.",
+        "data": {
+          "ui_ref": "Branch",
+          "ui_token": "Token (GitHub)"
+        },
+        "data_description": {
+          "ui_ref": "Usually main. Without a token Core uses /config/.smarthome_ui_token."
+        }
       }
     }
   }

@@ -11,6 +11,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryFlow,
+    OptionsFlow,
     SubentryFlowResult,
 )
 from homeassistant.core import callback
@@ -30,6 +31,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
     TimeSelector,
 )
 
@@ -78,6 +81,12 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="Smarthome UI Core", data={})
         return self.async_show_form(step_id="user")
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Return the options: where the dashboard card comes from."""
+        return SmarthomeUiOptionsFlow()
+
     @classmethod
     @callback
     def async_get_supported_subentry_types(
@@ -92,6 +101,33 @@ class SmarthomeUiConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_DOORBELL: DoorbellSubentryFlow,
             SUBENTRY_DEVICE: DeviceSubentryFlow,
         }
+
+
+class SmarthomeUiOptionsFlow(OptionsFlow):
+    """Branch and token for fetching the dashboard card from GitHub."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Show the options (saving reloads Core, which then checks again)."""
+        if user_input is not None:
+            return self.async_create_entry(
+                data={
+                    "ui_ref": (user_input.get("ui_ref") or "").strip() or "main",
+                    "ui_token": (user_input.get("ui_token") or "").strip(),
+                }
+            )
+        options = self.config_entry.options
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("ui_ref", default=options.get("ui_ref") or "main"): str,
+                    vol.Optional(
+                        "ui_token",
+                        description={"suggested_value": options.get("ui_token") or ""},
+                    ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+                }
+            ),
+        )
 
 
 class MowerSubentryFlow(ConfigSubentryFlow):

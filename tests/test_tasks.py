@@ -198,6 +198,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "time.security_good_night",
         "todo.garden",
         "todo.household",
+        "update.system_dashboard",
     ]
     assert hass.states.get("todo.garden").attributes["friendly_name"] == "Garten"
     assert hass.states.get("switch.notifications").attributes["friendly_name"] == "Mitteilungen"

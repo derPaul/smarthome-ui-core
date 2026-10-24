@@ -68,6 +68,7 @@ from .store import CoreStore
 from .system import System
 from .tasks import find_task, task_states
 from .technik import Technik
+from .ui import UiError, UiManager
 from .vacuum import VacuumManager
 from .waste import WasteManager
 from .watchers import Watchers
@@ -81,6 +82,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.TIME,
     Platform.TODO,
+    Platform.UPDATE,
 ]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -113,6 +115,7 @@ class CoreRuntime:
     catalog: Catalog
     lists: PageLists
     energy: EnergyPrefs
+    ui: UiManager
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -303,6 +306,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_onboarding_done,
         ws_lists_set,
         ws_lists_value,
+        ws_ui_check,
+        ws_ui_install,
+        ws_ui_notes,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -411,6 +417,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Catalog(hass, entry, lambda: entry.runtime_data.system.options()["unifi_auto"]),
         PageLists(hass, store),
         EnergyPrefs(hass, store),
+        UiManager(hass, store, dict(entry.options)),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
@@ -483,6 +490,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     doorbells.async_setup(list(entry.subentries.values()))
     alarm.async_setup()
     entry.runtime_data.mailbox.async_setup()
+    # the dashboard card: served right away, GitHub checked a minute later
+    await entry.runtime_data.ui.async_setup()
+    entry.async_on_unload(entry.runtime_data.ui.async_start())
     # the energy dashboard's meters (does not hold up the start)
     hass.async_create_task(entry.runtime_data.energy.async_setup())
     entry.runtime_data.presence_sim.async_setup()
@@ -580,6 +590,7 @@ async def _async_reload(hass: HomeAssistant, entry: CoreConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool:
     """Unload the config entry."""
     entry.runtime_data.engine.async_stop()
+    entry.runtime_data.ui.async_unload()
     entry.runtime_data.mowers.async_stop()
     entry.runtime_data.vacuums.async_stop()
     entry.runtime_data.planners.async_stop()
@@ -650,6 +661,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "lists": runtime.lists.info(),
         "energy": runtime.energy.info(),
         "onboarding": _onboarding(store),
+        "ui": runtime.ui.info(),
         "features": [
             "task_defs",
             "waste",
@@ -674,6 +686,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "onboarding",
             "energy",
             "setup_devices",
+            "ui",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1351,3 +1364,40 @@ def ws_lists_value(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.lists.set_value(msg["path"], msg["value"])
         connection.send_result(msg["id"], runtime.lists.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/ui/check"})
+@websocket_api.async_response
+async def ws_ui_check(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Look for a new version of the dashboard (with its release notes)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        info = await runtime.ui.async_check()
+        connection.send_result(msg["id"], {**info, "notes": runtime.ui.notes()})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/ui/install"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_ui_install(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Install the newest dashboard."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        try:
+            info = await runtime.ui.async_install()
+        except UiError as err:
+            connection.send_error(msg["id"], "ui_failed", str(err))
+            return
+        connection.send_result(msg["id"], info)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/ui/notes"})
+@callback
+def ws_ui_notes(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return what is new since the installed dashboard (and the state)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], {**runtime.ui.info(), "notes": runtime.ui.notes()})
