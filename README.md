@@ -16,6 +16,10 @@ Eingestellt wird alles weiter im Dashboard. Ohne diese Integration arbeitet das 
    oder `custom_components/smarthome_ui` nach `/config/custom_components/` kopieren.
 2. Home Assistant neu starten.
 3. *Einstellungen → Geräte & Dienste → Integration hinzufügen → Smarthome UI Core*.
+
+HACS lädt die Dateien direkt aus dem Repository (ab 0.30). Die Release-ZIP `smarthome_ui.zip` bleibt für die
+Installation von Hand; über `github.com/…/releases/download/` scheitert der Download in Home Assistant derzeit an
+einem zu langen Header von GitHub („Got more than 8190 bytes“).
 4. Dashboard öffnen: Es übernimmt einmalig die bisherigen Haushaltsdaten und überträgt die
    Mitteilungs-Einstellungen. Fertig.
 
