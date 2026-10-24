@@ -54,6 +54,7 @@ from .energy import EnergyPrefs
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
+from .lights import LightSettings, suggest as suggest_lights
 from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
@@ -116,6 +117,7 @@ class CoreRuntime:
     lists: PageLists
     energy: EnergyPrefs
     ui: UiManager
+    lights: LightSettings
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -309,6 +311,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_ui_check,
         ws_ui_install,
         ws_ui_notes,
+        ws_lights_suggest,
+        ws_lights_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -418,6 +422,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         PageLists(hass, store),
         EnergyPrefs(hass, store),
         UiManager(hass, store, dict(entry.options)),
+        LightSettings(hass, store),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
@@ -662,6 +667,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "energy": runtime.energy.info(),
         "onboarding": _onboarding(store),
         "ui": runtime.ui.info(),
+        "lights": runtime.lights.info(),
         "features": [
             "task_defs",
             "waste",
@@ -687,6 +693,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "energy",
             "setup_devices",
             "ui",
+            "lights",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1402,3 +1409,40 @@ def ws_ui_notes(
     """Return what is new since the installed dashboard (and the state)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         connection.send_result(msg["id"], {**runtime.ui.info(), "notes": runtime.ui.notes()})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/lights/suggest"})
+@callback
+def ws_lights_suggest(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return rooms with motion sensors and lights (and the automation that covers them)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(
+            msg["id"], {"rooms": suggest_lights(hass), "settings": runtime.lights.info()}
+        )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/lights/settings",
+        vol.Optional("day"): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.Optional("night"): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.Optional("night_start"): str,
+        vol.Optional("night_end"): str,
+    }
+)
+@callback
+def ws_lights_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Change the central brightness and night times of the motion lights."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        try:
+            for key in ("day", "night", "night_start", "night_end"):
+                if key in msg:
+                    runtime.lights.set(key, msg[key])
+        except ValueError as err:
+            connection.send_error(msg["id"], "invalid", str(err))
+            return
+        connection.send_result(msg["id"], runtime.lights.info())

@@ -550,6 +550,20 @@ Bereichen zuordnen“, sonst `vacuum.start`), Mäher über seine Bereichs-Schalt
 eine Aufgabe mit dem Namen der Fläche). Höchstens ein automatischer Start je Roboter und Tag. Fällig heißt: Mähplan
 (Mäher) bzw. Putz-Intervall des Raums (Sauger, wie im Dashboard).
 
+## Bewegungslicht (Vorschläge)
+
+Ab 0.32: Core schlägt je Raum ein **Bewegungslicht** vor, wenn es dort Bewegungs- oder Präsenzmelder und Lichter gibt,
+aber noch keine Automation, die diese Lichter über diese Melder schaltet. Das Dashboard zeigt die Vorschläge auf der
+Seite Automationen und legt auf Knopfdruck eine **Home-Assistant-Automation** aus der Blaupause
+`smarthome_ui/motion_light.yaml` an. Sie steht danach unter *Einstellungen → Automationen* und lässt sich dort ändern.
+
+- Licht an bei Bewegung, aus nach einer einstellbaren Zeit ohne Bewegung (alle Melder des Raums ruhig).
+- Optional nur, wenn ein Helligkeitssensor unter einem Lux-Wert liegt (oder das Licht schon an ist).
+- **Helligkeit zentral** am Core-Gerät „Licht“: `number.lights_brightness_day` und `number.lights_brightness_night` (%),
+  die Nacht von `time.lights_night_start` bis `time.lights_night_end` (Standard 22:00–06:30). Eine Änderung gilt sofort
+  für alle Räume.
+- Als „schon abgedeckt“ zählt jede Automation, in der ein Melder und ein Licht des Raums vorkommen – auch selbst gebaute.
+
 ## Saugen, wenn alle weg sind
 
 Core bringt die Aktion **`smarthome_ui.vacuum_rooms`** mit: saugt die gewählten Bereiche jetzt – nur Räume auf der Etage
@@ -626,6 +640,8 @@ actions:
 | `smarthome_ui/onboarding/done` | Einrichtungsassistent abgeschlossen (`done`, Standard `true`; `false` = noch einmal anbieten) |
 | `smarthome_ui/lists/set` | eine Liste einer Seite setzen (`page`, `path`, `items` – `null` = automatisch) |
 | `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
+| `smarthome_ui/lights/suggest` | Räume mit Bewegungsmeldern und Lichtern, die abdeckende Automation (`automation`, `ours` = aus der Blaupause) und die zentralen Einstellungen |
+| `smarthome_ui/lights/settings` | Tag-/Nachthelligkeit (`day`, `night` in %) und Nachtzeiten (`night_start`, `night_end`, „HH:MM“) |
 | `smarthome_ui/ui/check` | neue Dashboard-Version suchen (Antwort mit `notes` seit der installierten) |
 | `smarthome_ui/ui/install` | neueste Dashboard-Version installieren (nur Admins) |
 | `smarthome_ui/ui/notes` | Zustand und Neuerungen seit der installierten Version |

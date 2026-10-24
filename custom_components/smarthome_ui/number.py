@@ -14,7 +14,8 @@ from homeassistant.util import slugify
 from . import CoreConfigEntry
 from .alarm import OPTION_NUMBERS, AlarmLogic, AlarmOption
 from .const import SIGNAL_SECURITY, SIGNAL_TASKS
-from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
+from .entity import DEVICE_HOUSEHOLD, DEVICE_LIGHTS, DEVICE_SECURITY, CoreEntity
+from .lights import SIGNAL_LIGHTS, LightSettings
 from .store import CoreStore
 from .technik import TechnikOption
 
@@ -52,6 +53,8 @@ async def async_setup_entry(
     )
     alarm = entry.runtime_data.alarm
     async_add_entities(AlarmOptionNumber(entry.entry_id, alarm, *o) for o in OPTION_NUMBERS)
+    lights = entry.runtime_data.lights
+    async_add_entities(LightBrightness(entry.entry_id, lights, key) for key in ("day", "night"))
 
 
 class CleanInterval(CoreEntity, NumberEntity):
@@ -202,3 +205,37 @@ class TechnikNumber(TechnikOption, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the threshold (the dashboard does not overwrite it then)."""
         self._technik.set_option(self._key, value)
+
+
+class LightBrightness(CoreEntity, NumberEntity):
+    """Central brightness for the motion light automations (day / night, %)."""
+
+    _attr_native_min_value = 1
+    _attr_native_max_value = 100
+    _attr_native_step = 1
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, entry_id: str, lights: LightSettings, key: str) -> None:
+        """Initialize (number.lights_brightness_day / _night)."""
+        super().__init__(
+            entry_id, f"lights_brightness_{key}", DEVICE_LIGHTS, "number", f"brightness_{key}"
+        )
+        self._attr_translation_key = f"lights_brightness_{key}"
+        self._lights = lights
+        self._key = key
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the brightness."""
+        return float(self._lights.settings()[self._key])
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the brightness."""
+        self._lights.set(self._key, value)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_LIGHTS, self.async_write_ha_state)
+        )

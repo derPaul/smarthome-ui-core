@@ -1,4 +1,4 @@
-"""Time: when the good night check runs."""
+"""Time: when the good night check runs; when the night of the motion lights starts and ends."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import CoreConfigEntry
 from .const import SIGNAL_SECURITY
-from .entity import DEVICE_SECURITY, CoreEntity
+from .entity import DEVICE_LIGHTS, DEVICE_SECURITY, CoreEntity
+from .lights import SIGNAL_LIGHTS, LightSettings
 
 
 async def async_setup_entry(
@@ -22,6 +23,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the time of the good night check."""
     async_add_entities([GoodNightTime(entry.entry_id, entry.runtime_data.security)])
+    lights = entry.runtime_data.lights
+    async_add_entities(
+        NightTime(entry.entry_id, lights, key) for key in ("night_start", "night_end")
+    )
 
 
 class GoodNightTime(CoreEntity, TimeEntity):
@@ -51,4 +56,34 @@ class GoodNightTime(CoreEntity, TimeEntity):
         """Update when the settings change."""
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_SECURITY, self.async_write_ha_state)
+        )
+
+
+class NightTime(CoreEntity, TimeEntity):
+    """When the night brightness of the motion lights starts / ends."""
+
+    def __init__(self, entry_id: str, lights: LightSettings, key: str) -> None:
+        """Initialize (time.lights_night_start / _end)."""
+        super().__init__(entry_id, f"lights_{key}", DEVICE_LIGHTS, "time", key)
+        self._attr_translation_key = f"lights_{key}"
+        self._lights = lights
+        self._key = key
+
+    @property
+    def native_value(self) -> time | None:
+        """Return the time."""
+        hour, _, minute = str(self._lights.settings()[self._key]).partition(":")
+        try:
+            return time(int(hour), int(minute or 0))
+        except ValueError:
+            return None
+
+    async def async_set_value(self, value: time) -> None:
+        """Change the time."""
+        self._lights.set(self._key, value.strftime("%H:%M"))
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_LIGHTS, self.async_write_ha_state)
         )

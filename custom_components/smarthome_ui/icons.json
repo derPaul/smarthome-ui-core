@@ -317,11 +317,23 @@
       },
       "technik_water_minutes": {
         "default": "mdi:timer-outline"
+      },
+      "lights_brightness_day": {
+        "default": "mdi:brightness-7"
+      },
+      "lights_brightness_night": {
+        "default": "mdi:brightness-4"
       }
     },
     "time": {
       "security_good_night": {
         "default": "mdi:clock-outline"
+      },
+      "lights_night_start": {
+        "default": "mdi:weather-night"
+      },
+      "lights_night_end": {
+        "default": "mdi:weather-sunset-up"
       }
     }
   },

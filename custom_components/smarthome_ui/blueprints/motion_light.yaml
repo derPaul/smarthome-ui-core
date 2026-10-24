@@ -1,0 +1,137 @@
+blueprint:
+  name: Bewegungslicht (Smarthome UI Core)
+  description: >-
+    Licht an, sobald ein Bewegungs- oder Präsenzmelder etwas erkennt, und aus, wenn
+    für die eingestellte Zeit keiner mehr etwas meldet. Die Helligkeit kommt zentral
+    aus Smarthome UI Core: tagsüber die Taghelligkeit, nachts die Nachthelligkeit
+    (Gerät „Licht“). Optional nur, wenn es dunkel genug ist.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/motion_light.yaml
+  input:
+    motion:
+      name: Bewegungsmelder
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: binary_sensor
+    light:
+      name: Lichter
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: light
+    delay:
+      name: Aus nach … ohne Bewegung
+      default: 120
+      selector:
+        number:
+          min: 10
+          max: 3600
+          step: 10
+          unit_of_measurement: s
+    illuminance:
+      name: Helligkeitssensor (optional)
+      description: Leer lassen, wenn das Licht immer angehen soll.
+      default: ""
+      selector:
+        entity:
+          filter:
+            domain: sensor
+            device_class: illuminance
+    lux_max:
+      name: Nur unter … Lux
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 1000
+          unit_of_measurement: lx
+    day_brightness:
+      name: Taghelligkeit (zentral)
+      default: number.lights_brightness_day
+      selector:
+        entity:
+          filter:
+            domain: number
+    night_brightness:
+      name: Nachthelligkeit (zentral)
+      default: number.lights_brightness_night
+      selector:
+        entity:
+          filter:
+            domain: number
+    night_start:
+      name: Nacht ab (zentral)
+      default: time.lights_night_start
+      selector:
+        entity:
+          filter:
+            domain: time
+    night_end:
+      name: Nacht bis (zentral)
+      default: time.lights_night_end
+      selector:
+        entity:
+          filter:
+            domain: time
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  motion_ids: !input motion
+  light_ids: !input light
+  lux_entity: !input illuminance
+  lux_max: !input lux_max
+  day_entity: !input day_brightness
+  night_entity: !input night_brightness
+  start_entity: !input night_start
+  end_entity: !input night_end
+
+triggers:
+  - trigger: state
+    entity_id: !input motion
+    to: "on"
+    id: "on"
+  - trigger: state
+    entity_id: !input motion
+    to: "off"
+    for:
+      seconds: !input delay
+    id: "off"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "on"
+          - condition: template
+            value_template: >-
+              {{ not lux_entity
+                 or states(lux_entity) | float(0) <= lux_max | float(30)
+                 or expand(light_ids) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+        sequence:
+          - variables:
+              ns: "{{ states(start_entity)[:5] }}"
+              ne: "{{ states(end_entity)[:5] }}"
+              t: "{{ now().strftime('%H:%M') }}"
+              night: "{{ (t >= ns or t < ne) if ns > ne else (ns <= t < ne) }}"
+              pct: >-
+                {{ states(night_entity) | int(20) if night else states(day_entity) | int(100) }}
+          - action: light.turn_on
+            target:
+              entity_id: "{{ light_ids }}"
+            data:
+              brightness_pct: "{{ pct }}"
+      - conditions:
+          - condition: trigger
+            id: "off"
+          - condition: template
+            value_template: >-
+              {{ expand(motion_ids) | selectattr('state', 'eq', 'on') | list | count == 0 }}
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: "{{ light_ids }}"

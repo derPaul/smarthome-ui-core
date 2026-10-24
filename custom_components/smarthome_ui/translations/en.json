@@ -304,6 +304,9 @@
     },
     "system": {
       "name": "System"
+    },
+    "lights": {
+      "name": "Lights"
     }
   },
   "entity": {
@@ -645,11 +648,23 @@
       },
       "technik_water_minutes": {
         "name": "Report flowing water after"
+      },
+      "lights_brightness_day": {
+        "name": "Day brightness"
+      },
+      "lights_brightness_night": {
+        "name": "Night brightness"
       }
     },
     "time": {
       "security_good_night": {
         "name": "Good night check at"
+      },
+      "lights_night_start": {
+        "name": "Night starts"
+      },
+      "lights_night_end": {
+        "name": "Night ends"
       }
     },
     "update": {
