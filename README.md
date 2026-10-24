@@ -212,6 +212,9 @@ Eingestellt wird weiter im Dashboard (*Sicherheit → Alarmanlage → Zahnrad*);
   beim Entschärfen, Sirenen, alle Lichter an, Meldung in Home Assistant mit dem auslösenden Sensor.
 - **Gäste:** Gäste-Geräte, WLANs oder das UniFi-Gästenetz schalten „Gäste da“ ein (aus, wenn alle eine Weile weg
   sind). Dann sind die gewählten Bewegungsmelder in den Gäste-Modi stumm; auf Wunsch Push beim Scharfschalten.
+  Von Hand eingeschaltet (`switch.security_guests`) bleibt „Gäste da“ an, bis es von Hand ausgeht – die Erkennung
+  beendet es dann nicht (ab 0.29.1). Zählt ein bei Gästen stummer Sensor trotzdem, steht der Grund im Logbuch
+  („Gäste nicht da“ bzw. „Modus … zählt nicht für Gäste“).
 - **Nachtweg:** Bewegung oben öffnet ein kurzes Fenster, in dem Bewegung unten nicht als Einbruch zählt – nur wenn
   unten vorher alles ruhig war. Auf Wunsch fragt Core per Push „bist du das?“ und löst ohne Antwort aus.
 

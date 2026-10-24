@@ -138,6 +138,33 @@ async def test_guests(hass: HomeAssistant, notify_calls, freezer) -> None:
     assert len(trigger) == 2
 
 
+async def test_guests_by_hand_stay(hass: HomeAssistant, notify_calls, freezer) -> None:
+    """Guests switched on by hand: the detection (no guest phone there) does not end it."""
+    entry, trigger = await _setup(hass, "armed_home")
+    alarm = entry.runtime_data.alarm
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": "switch.security_guests"}, blocking=True
+    )
+    assert alarm.guests_on
+    # some phone changes (nobody of the guests is detected) – long after the away time
+    hass.states.async_set("device_tracker.gast", "not_home", {})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=120))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.security_guests").state == "on"
+    hass.states.async_set(HALL, "on", {})
+    await hass.async_block_till_done()
+    assert trigger == []  # still silent
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": "switch.security_guests"}, blocking=True
+    )
+    hass.states.async_set(HALL, "off", {})
+    hass.states.async_set(HALL, "on", {})
+    await hass.async_block_till_done()
+    assert len(trigger) == 1
+
+
 async def test_nightwalk_allow(hass: HomeAssistant, notify_calls, freezer) -> None:
     entry, trigger = await _setup(hass, "armed_night", nightwalk={"enabled": True})
     alarm = entry.runtime_data.alarm

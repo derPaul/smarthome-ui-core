@@ -207,11 +207,22 @@ class AlarmLogic:
             )
 
     @callback
-    def set_guests(self, on: bool) -> None:
-        """Guests there or not (by hand; the detection changes it again on the next change)."""
+    def set_guests(self, on: bool, manual: bool = True) -> None:
+        """Guests there or not.
+
+        Switched on by hand it stays on until it is switched off by hand – the detection (phones in
+        the WLAN) only adds guests, it does not end a guest mode set by hand (phones that sleep at
+        night or are not known would end it otherwise and the silent sensors would count again).
+        """
+        if manual:
+            self.data["guests_manual"] = on
+            if self._guest_timer:
+                self._guest_timer()
+                self._guest_timer = None
         if self.guests_on != on:
             self.data["guests_on"] = on
-            self._save()
+            self._log("Gäste da" + (" (von Hand)" if manual else "") if on else "Gäste weg")
+        self._save()
 
     @callback
     def open_nightwalk(self, reason: str = "von Hand") -> None:
@@ -311,6 +322,10 @@ class AlarmLogic:
         if self.guests_on and mode in guests["modes"] and entity_id in guests["skip"]:
             self._log(f"{name}: wegen Gästen stumm")
             return
+        if entity_id in guests["skip"]:
+            # silent with guests, but not now: tell why in the logbook (to find out what happened)
+            why = "Gäste nicht da" if not self.guests_on else f"Modus {mode} zählt nicht für Gäste"
+            self._log(f"{name}: bei Gästen stumm, zählt aber ({why})")
         walk = self.nightwalk()
         if (
             walk["enabled"]
@@ -438,16 +453,16 @@ class AlarmLogic:
             if self._guest_timer:
                 self._guest_timer()
                 self._guest_timer = None
-            self.set_guests(True)
+            self.set_guests(True, manual=False)
             return
-        if not self.guests_on or self._guest_timer:
+        if not self.guests_on or self._guest_timer or self.data.get("guests_manual"):
             return
 
         @callback
         def gone(_now: Any) -> None:
             self._guest_timer = None
-            if not self.guests_present():
-                self.set_guests(False)
+            if not self.guests_present() and not self.data.get("guests_manual"):
+                self.set_guests(False, manual=False)
 
         self._guest_timer = async_call_later(
             self.hass, timedelta(minutes=float(guests["away"] or 30)), gone
