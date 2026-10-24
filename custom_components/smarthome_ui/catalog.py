@@ -15,6 +15,7 @@ by its sensors (wind, rain).
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -341,6 +342,9 @@ class Catalog:
         self.hass = hass
         self.entry = entry
         self.unifi_auto = unifi_auto
+        # the catalog of this turn of the event loop: entities writing their state together
+        # (house technology, system) share one search instead of each running it again
+        self._cached: tuple[tuple[Any, ...], list[dict[str, Any]]] | None = None
 
     # ---------------------------------------------------------------- entities of a device
 
@@ -428,6 +432,23 @@ class Catalog:
 
     def devices(self) -> list[dict[str, Any]]:
         """Return all devices with a role: linked ones and (if on) UniFi devices found."""
+        # a changed setting, link or registry counts at once (same turn included)
+        key = (
+            self.unifi_auto(),
+            tuple(self.entry.subentries),
+            len(dr.async_get(self.hass).devices),
+            len(er.async_get(self.hass).entities),
+        )
+        if self._cached is None or self._cached[0] != key:
+            if self._cached is None:
+                self.hass.loop.call_soon(self._forget)
+            self._cached = (key, self._devices())
+        return deepcopy(self._cached[1])
+
+    def _forget(self) -> None:
+        self._cached = None
+
+    def _devices(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         devices = dr.async_get(self.hass)
         linked: set[str] = set()
@@ -596,13 +617,16 @@ class Catalog:
         """Return the house technology sensors from the catalog (over the dashboard's)."""
         out: dict[str, Any] = {}
         reach: dict[str, str] = {}
-        if inv := self.first("inverter"):
+        first: dict[str, dict[str, Any]] = {}
+        for device in self.devices():
+            first.setdefault(device["role"], device)
+        if inv := first.get("inverter"):
             e = inv["entities"]
             if e.get("error"):
                 out["inverter_error"] = e["error"]
             if e.get("pv_power"):
                 reach["Wechselrichter"] = e["pv_power"]
-        if bat := self.first("battery"):
+        if bat := first.get("battery"):
             e = bat["entities"]
             battery = {k: e[k] for k in ("power", "soc", "max_discharge") if e.get(k)}
             if bat.get("capacity"):
@@ -618,7 +642,7 @@ class Catalog:
                 out["battery"] = battery
             if e.get("soc"):
                 reach["Batterie"] = e["soc"]
-        if hp := self.first("heatpump"):
+        if hp := first.get("heatpump"):
             e = hp["entities"]
             for key, target in (
                 ("error", "heatpump_error"),
@@ -634,7 +658,7 @@ class Catalog:
                     out[target] = e[key]
             if e.get("climate"):
                 reach["Heizkreis"] = e["climate"]
-        if water := self.first("water"):
+        if water := first.get("water"):
             e = water["entities"]
             for key in ("salt", "flow"):
                 if e.get(key):

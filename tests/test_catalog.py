@@ -526,3 +526,25 @@ async def test_outdoor_sensors(hass: HomeAssistant, entry: MockConfigEntry) -> N
         "humidity": "sensor.fuehler_hum",
         "pressure": "sensor.wetter_luftdruck",
     }
+
+
+async def test_devices_searched_once_per_turn(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    catalog = entry.runtime_data.catalog
+    calls = 0
+    search = catalog._devices
+
+    def counted() -> list:
+        nonlocal calls
+        calls += 1
+        return search()
+
+    catalog._devices = counted
+    await hass.async_block_till_done()
+    catalog.technik_overlay()
+    catalog.devices()
+    catalog.first("server")
+    assert calls == 1
+    # the next turn searches again (states may have changed)
+    await hass.async_block_till_done()
+    catalog.devices()
+    assert calls == 2
