@@ -120,9 +120,13 @@ async def test_guests(hass: HomeAssistant, notify_calls, freezer) -> None:
     hass.states.async_set(HALL, "on", {})
     await hass.async_block_till_done()
     assert trigger == []  # silent with guests
+    logged = []
+    hass.bus.async_listen("logbook_entry", lambda ev: logged.append(ev.data["message"]))
     hass.states.async_set(WINDOW, "on", {})
     await hass.async_block_till_done()
     assert len(trigger) == 1  # windows still count
+    # the logbook says why it counted although guests are there
+    assert any("Gäste da, aber" in m and "nicht stumm" in m for m in logged)
 
     # guest leaves: off after 30 minutes
     hass.states.async_set("device_tracker.gast", "not_home", {})

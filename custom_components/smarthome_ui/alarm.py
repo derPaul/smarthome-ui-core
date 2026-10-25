@@ -326,6 +326,9 @@ class AlarmLogic:
             # silent with guests, but not now: tell why in the logbook (to find out what happened)
             why = "Gäste nicht da" if not self.guests_on else f"Modus {mode} zählt nicht für Gäste"
             self._log(f"{name}: bei Gästen stumm, zählt aber ({why})")
+        elif self.guests_on:
+            # guests there, but this sensor is not set silent for guests (person symbol in rules)
+            self._log(f"{name}: Gäste da, aber {name} ist bei Gästen nicht stumm geschaltet")
         walk = self.nightwalk()
         if (
             walk["enabled"]

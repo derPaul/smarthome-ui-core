@@ -278,6 +278,8 @@ verfügbar). Die Listen – welche Sensoren, welche Modi – bleiben im Dialog.
 Bei der Übergabe (Dashboard: „An Core übergeben“ bzw. Speichern) übernimmt Core auch den aktuellen Stand von
 „Gäste da“ und „Nachtweg bis“ und schaltet die alten Automationen aus.
 
+
+**Warum hat es ausgelöst?** Core schreibt ins Logbuch („Alarmanlage“), welcher Sensor ausgelöst hat. Sind Gäste da und der Sensor ist nicht „bei Gästen stumm“ (Personen-Symbol im Reiter Auslöser), steht dort ab 0.33.1 „Gäste da, aber … ist bei Gästen nicht stumm geschaltet“. Die Diagnose enthält dazu die Regeln, die Gäste-Einstellungen und den Nachtweg (`alarm_settings`).
 ## Klingel
 
 **„Klingel hinzufügen“** (beliebig viele): Gerät der Klingel wählen (UniFi Protect, Reolink, Ring …), optional Name,

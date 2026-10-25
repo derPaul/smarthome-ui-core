@@ -96,6 +96,12 @@ async def async_get_config_entry_diagnostics(
             )
         },
         "settings": {key: store.get(key) for key in SETTINGS},
+        # which sensor triggers in which mode, silent with guests, night walk (to explain an alarm)
+        "alarm_settings": {
+            "rules": alarm.get("rules"),
+            "guests": alarm.get("guests"),
+            "nightwalk": alarm.get("nightwalk"),
+        },
         "recent_notifications": [
             {k: v for k, v in n.items() if k in ("src", "t", "tag", "urgent", "title")}
             for n in (store.get("recent") or [])[-30:]
