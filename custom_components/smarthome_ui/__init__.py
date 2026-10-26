@@ -312,6 +312,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_ui_check,
         ws_ui_install,
         ws_ui_notes,
+        ws_ui_dashboard,
         ws_lights_suggest,
         ws_lights_settings,
         ws_lights_ignore,
@@ -704,6 +705,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "setup_devices",
             "ui",
             "lights",
+            "dashboard_yaml",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1406,6 +1408,32 @@ async def ws_ui_install(
         try:
             info = await runtime.ui.async_install()
         except UiError as err:
+            connection.send_error(msg["id"], "ui_failed", str(err))
+            return
+        connection.send_result(msg["id"], info)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/ui/dashboard",
+        vol.Optional("url_path"): vol.Any(str, None),
+        vol.Optional("update", default=False): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_ui_dashboard(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Tell whether a dashboard is a YAML file Core keeps up to date (update: fetch it anew)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        url_path = msg.get("url_path")
+        if not msg["update"]:
+            connection.send_result(msg["id"], runtime.ui.dashboard_info(url_path))
+            return
+        try:
+            info = await runtime.ui.async_update_dashboard(url_path)
+        except (UiError, OSError) as err:
             connection.send_error(msg["id"], "ui_failed", str(err))
             return
         connection.send_result(msg["id"], info)

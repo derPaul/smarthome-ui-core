@@ -35,6 +35,9 @@ _LOGGER = logging.getLogger(__name__)
 REPO = "derPaul/smarthome-ui"
 API = "https://api.github.com/repos/" + REPO + "/contents/"
 CARD = "dist/smarthome-dashboard-card.js"
+DASHBOARD_YAML = "examples/dashboard-komplett.yaml"
+# the dashboard file the old update script kept up to date (before Core served the card)
+MANAGED_YAML = "dashboards/smarthome.yaml"
 FILE = "smarthome-dashboard-card.js"
 URL_BASE = "/smarthome_ui_ui"
 DEFAULT_REF = "main"
@@ -255,6 +258,58 @@ class UiManager:
     def _changed(self) -> None:
         self.store.save(SIGNAL_DATA)
         async_dispatcher_send(self.hass, SIGNAL_UI)
+
+    # ---------------------------------------------------------------- dashboard in YAML mode
+
+    def _yaml_dashboard(self, url_path: str | None) -> tuple[Any, str]:
+        """Return the YAML dashboard and its file relative to the configuration (or raise)."""
+        data = self.hass.data.get("lovelace")
+        dashboards = getattr(data, "dashboards", None) or {}
+        dash = dashboards.get(url_path)
+        if dash is None or getattr(dash, "mode", None) != "yaml" or not getattr(dash, "path", None):
+            raise UiError("kein Dashboard im YAML-Modus")
+        root = Path(self.hass.config.config_dir).resolve()
+        path = Path(dash.path).resolve()
+        if root not in path.parents:
+            raise UiError("Datei liegt nicht im Konfigurationsordner")
+        return dash, path.relative_to(root).as_posix()
+
+    def dashboard_info(self, url_path: str | None) -> dict[str, Any]:
+        """Return the file of a YAML dashboard and whether Core may update it."""
+        try:
+            _dash, rel = self._yaml_dashboard(url_path)
+        except UiError:
+            return {"mode": "storage", "file": None, "managed": False}
+        return {"mode": "yaml", "file": rel, "managed": rel == MANAGED_YAML}
+
+    async def async_update_dashboard(self, url_path: str | None) -> dict[str, Any]:
+        """Replace the dashboard file of the old update script with the newest one from GitHub.
+
+        Only ``dashboards/smarthome.yaml`` (what the script wrote every update) and only if it still
+        holds the dashboard's cards; the old file is kept as ``smarthome.yaml.bak``.
+        """
+        dash, rel = self._yaml_dashboard(url_path)
+        if rel != MANAGED_YAML:
+            raise UiError(f"{rel} ist eine eigene Datei – Core ändert nur {MANAGED_YAML}")
+        path = Path(dash.path)
+        old = await self.hass.async_add_executor_job(path.read_text, "utf-8")
+        if "custom:smarthome-" not in old:
+            raise UiError(f"{rel} enthält keine Smarthome-Karten")
+        new = await self._get(DASHBOARD_YAML)
+        if "custom:smarthome-" not in new or "views:" not in new:
+            raise UiError("Dashboard-YAML aus GitHub unvollständig")
+
+        def write() -> None:
+            path.with_name(path.name + ".bak").write_text(old, encoding="utf-8")
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(new, encoding="utf-8")
+            tmp.replace(path)
+
+        await self.hass.async_add_executor_job(write)
+        # reload now: tells open dashboards (lovelace_updated) to fetch the new views
+        await dash.async_load(True)
+        _LOGGER.info("Smarthome UI: %s aus GitHub aktualisiert (Sicherung: %s.bak)", rel, rel)
+        return {**self.dashboard_info(url_path), "backup": rel + ".bak"}
 
     # ---------------------------------------------------------------- for the dashboard
 

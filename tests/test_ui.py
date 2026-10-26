@@ -124,3 +124,67 @@ async def test_path_on_frozen_router(hass: HomeAssistant) -> None:
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert "path" not in hass.data["smarthome_ui_ui"]
+
+
+class _YamlDash:
+    """A YAML dashboard as Home Assistant keeps it (mode, file, reload)."""
+
+    mode = "yaml"
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.loaded = 0
+
+    async def async_load(self, force: bool) -> dict:
+        self.loaded += 1
+        return {}
+
+
+async def test_dashboard_yaml(
+    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker, hass_ws_client
+) -> None:
+    """The file of the old update script comes anew from GitHub; own files stay untouched."""
+    from types import SimpleNamespace
+
+    from custom_components.smarthome_ui.ui import DASHBOARD_YAML
+
+    folder = Path(hass.config.path("dashboards"))
+    await hass.async_add_executor_job(lambda: folder.mkdir(exist_ok=True))
+    managed, own = folder / "smarthome.yaml", folder / "eigen.yaml"
+    old = "views:\n  - cards:\n      - type: custom:smarthome-dashboard-card\n"
+    await hass.async_add_executor_job(managed.write_text, old)
+    await hass.async_add_executor_job(own.write_text, old)
+    dash, mine = _YamlDash(str(managed)), _YamlDash(str(own))
+    hass.data["lovelace"] = SimpleNamespace(dashboards={"smarthome-ui": dash, "eigen": mine})
+    new = old + "  - path: musik\n    cards:\n      - type: custom:smarthome-music-card\n"
+    client = await hass_ws_client(hass)
+    with patch.object(UiManager, "_get", REAL_GET):
+        aioclient_mock.get(API + DASHBOARD_YAML, params={"ref": "main"}, text=new)
+        await client.send_json(
+            {"id": 1, "type": "smarthome_ui/ui/dashboard", "url_path": "smarthome-ui"}
+        )
+        res = (await client.receive_json())["result"]
+        assert res == {"mode": "yaml", "file": "dashboards/smarthome.yaml", "managed": True}
+
+        await client.send_json(
+            {
+                "id": 2,
+                "type": "smarthome_ui/ui/dashboard",
+                "url_path": "smarthome-ui",
+                "update": True,
+            }
+        )
+        res = (await client.receive_json())["result"]
+        assert res["backup"] == "dashboards/smarthome.yaml.bak" and dash.loaded == 1
+        assert "smarthome-music-card" in await hass.async_add_executor_job(managed.read_text)
+        assert await hass.async_add_executor_job((folder / "smarthome.yaml.bak").read_text) == old
+
+        await client.send_json(
+            {"id": 3, "type": "smarthome_ui/ui/dashboard", "url_path": "eigen", "update": True}
+        )
+        res = await client.receive_json()
+        assert res["success"] is False and "eigene Datei" in res["error"]["message"]
+        assert await hass.async_add_executor_job(own.read_text) == old
+
+        await client.send_json({"id": 4, "type": "smarthome_ui/ui/dashboard", "url_path": None})
+        assert (await client.receive_json())["result"]["mode"] == "storage"

@@ -44,6 +44,10 @@ und App nach einem Update die neue Karte nehmen). Eine Dashboard-Ressource, `she
   dort oder im Dashboard (*Einstellungen → Update*), danach die Seite neu laden. Ein Neustart ist nicht nötig.
 - **Branch und Token** unter *Smarthome UI Core → Konfigurieren*. Ohne eigenen Token nimmt Core
   `/config/.smarthome_ui_token` (derselbe wie für das alte Update-Skript).
+- **Dashboard-YAML des Update-Skripts** (`/config/dashboards/smarthome.yaml`, ab 0.34): Im Dashboard unter
+  *Menü → Darstellung → Seiten hinzufügen* holt Core die Datei neu aus GitHub (`examples/dashboard-komplett.yaml`),
+  so kommen neue Seiten wie „Musik“ dazu. Die alte Datei bleibt als `smarthome.yaml.bak`. Andere YAML-Dateien
+  ändert Core nicht.
 - **Umstieg vom Update-Skript:** Läuft die Karte zusätzlich noch über die alte Ressource (`/local/smarthome-loader.js`
   bzw. `/local/smarthome-dashboard-card.js`), zeigt das Dashboard einen Hinweis. Dann die Ressource unter
   *Einstellungen → Dashboards → ⋮ → Ressourcen* löschen und die beiden `shell_command`-Einträge `smarthome_ui_update`
@@ -654,6 +658,7 @@ actions:
 | `smarthome_ui/lights/settings` | Tag-/Nachthelligkeit (`day`, `night` in %) und Nachtzeiten (`night_start`, `night_end`, „HH:MM“) |
 | `smarthome_ui/ui/check` | neue Dashboard-Version suchen (Antwort mit `notes` seit der installierten) |
 | `smarthome_ui/ui/install` | neueste Dashboard-Version installieren (nur Admins) |
+| `smarthome_ui/ui/dashboard` | YAML-Datei eines Dashboards (`url_path`); mit `update: true` holt Core `dashboards/smarthome.yaml` neu aus GitHub (nur Admins) |
 | `smarthome_ui/ui/notes` | Zustand und Neuerungen seit der installierten Version |
 | `smarthome_ui/plants/settings` | Düngen nach Kalender je Pflanze (`entity`, `feed`: `every` Wochen, `from`/`to` Monat) |
 | `smarthome_ui/cleaning/settings` | eigene Putz-Intervalle je Raum (`intervals`) |
