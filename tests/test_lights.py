@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -149,6 +150,62 @@ async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freez
     hass.states.async_set("binary_sensor.flur_bewegung", "on")
     await hass.async_block_till_done()
     assert on[-1].data["brightness_pct"] == 20
+
+
+async def test_blueprint_waits_for_stale_lux(
+    hass: HomeAssistant, entry: MockConfigEntry, freezer
+) -> None:
+    """Right after the light went off the sensor still reports that light: wait for a new value."""
+
+    async def _settle() -> None:
+        # the run is waiting: block_till_done would wait for it, so only let the loop run a while
+        for _ in range(20):
+            await asyncio.sleep(0)
+
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 21, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    on = async_mock_service(hass, "light", "turn_on")
+    hass.states.async_set("binary_sensor.hwr_bewegung", "off")
+    hass.states.async_set("light.hwr", "off")
+    hass.states.async_set("sensor.hwr_lux", "13.5", {"device_class": "illuminance"})
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "hwr",
+                "alias": "HWR Bewegungslicht",
+                "use_blueprint": {
+                    "path": BLUEPRINT,
+                    "input": {
+                        "motion": ["binary_sensor.hwr_bewegung"],
+                        "light": ["light.hwr"],
+                        "illuminance": "sensor.hwr_lux",
+                        "lux_max": 10,
+                    },
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.hwr_bewegung", "on")
+    await _settle()
+    assert not on  # still the brightness with the light on
+    hass.states.async_set("sensor.hwr_lux", "1.0", {"device_class": "illuminance"})
+    await _settle()
+    assert on[-1].data["entity_id"] == ["light.hwr"]
+    # really bright: gives up after 30 s
+    on.clear()
+    hass.states.async_set("binary_sensor.hwr_bewegung", "off")
+    hass.states.async_set("sensor.hwr_lux", "400", {"device_class": "illuminance"})
+    await _settle()
+    hass.states.async_set("binary_sensor.hwr_bewegung", "on")
+    await _settle()
+    freezer.tick(timedelta(seconds=31))
+    async_fire_time_changed(hass)
+    await _settle()
+    assert not on
 
 
 async def test_covered_by_area_device_and_group(

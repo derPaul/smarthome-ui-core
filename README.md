@@ -564,7 +564,9 @@ Seite Automationen und legt auf Knopfdruck eine **Home-Assistant-Automation** au
 `smarthome_ui/motion_light.yaml` an. Sie steht danach unter *Einstellungen → Automationen* und lässt sich dort ändern.
 
 - Licht an bei Bewegung, aus nach einer einstellbaren Zeit ohne Bewegung (alle Melder des Raums ruhig).
-- Optional nur, wenn ein Helligkeitssensor unter einem Lux-Wert liegt (oder das Licht schon an ist).
+- Optional nur, wenn ein Helligkeitssensor unter einem Lux-Wert liegt (oder das Licht schon an ist). Ab 0.35 wartet
+  die Automation dann bis zu 30 s auf einen neuen Messwert: Direkt nach dem Ausschalten meldet der Sensor oft noch die
+  Helligkeit mit Licht, sonst bliebe das Licht bei schneller Rückkehr aus.
 - **Helligkeit zentral** am Core-Gerät „Licht“: `number.lights_brightness_day` und `number.lights_brightness_night` (%),
   die Nacht von `time.lights_night_start` bis `time.lights_night_end` (Standard 22:00–06:30). Eine Änderung gilt sofort
   für alle Räume.
