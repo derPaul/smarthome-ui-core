@@ -78,17 +78,14 @@ blueprint:
           min: 0
           max: 100
           unit_of_measurement: "%"
-    off_pct:
-      name: Statt aus dimmen auf
+    restore:
+      name: Danach Ausgangszustand wiederherstellen
       description: >-
-        0 = ausschalten. Sonst bleibt das Licht nach der Abklingzeit mit dieser Helligkeit an, z. B.
-        als Grundlicht am Eingang (nur solange es dunkel ist: Dunkel-Sensor bzw. Helligkeitssensor).
-      default: 0
+        Statt auszuschalten kommen die Lichter nach der Abklingzeit wieder so, wie sie vor der
+        Bewegung waren (z. B. ein Grundlicht am Eingang wieder auf 10 %, die anderen aus).
+      default: false
       selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: "%"
+        boolean:
     fade_on:
       name: Eigenes Einblenden
       description: -1 = Einblenden aus Smarthome UI Core, 0 = sofort an.
@@ -178,7 +175,10 @@ variables:
   end_entity: !input night_end
   own_day: !input day_pct
   own_night: !input night_pct
-  off_pct: !input off_pct
+  restore: !input restore
+  # Merkszene des Ausgangszustands (scene.ml_<automation>), lebt nur bis zum Wiederherstellen
+  snap_id: "ml_{{ this.entity_id.split('.')[1] if this is defined and this.entity_id is defined else 'light' }}"
+  snap: "scene.{{ snap_id }}"
   own_fade_on: !input fade_on
   own_fade_off: !input fade_off
   fade_on_entity: !input default_fade_on
@@ -231,6 +231,16 @@ actions:
               pct: >-
                 {{ own if own > 0
                    else states(night_entity) | int(20) if night else states(day_entity) | int(100) }}
+          # Ausgangszustand merken, nur am Anfang (bei erneuter Bewegung steht die Szene schon)
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ restore and snap not in states.scene | map(attribute='entity_id') | list }}
+            then:
+              - action: scene.create
+                data:
+                  scene_id: "{{ snap_id }}"
+                  snapshot_entities: "{{ light_ids }}"
           - action: light.turn_on
             target:
               entity_id: "{{ light_ids }}"
@@ -244,20 +254,20 @@ actions:
             value_template: >-
               {{ expand(motion_ids) | selectattr('state', 'eq', 'on') | list | count == 0 }}
         sequence:
-          # gedimmt statt aus: nur im Dunkeln (sonst bliebe das Grundlicht tagsüber an)
+          # Ausgangszustand zurück (fehlt die Merkszene, z. B. nach einem Neustart: ausschalten)
           - if:
               - condition: template
                 value_template: >-
-                  {{ off_pct | int(0) > 0
-                     and (not dark_entity or is_state(dark_entity, 'on'))
-                     and (not lux_entity or states(lux_entity) | float(0) <= lux_max | float(30)) }}
+                  {{ restore and snap in states.scene | map(attribute='entity_id') | list }}
             then:
-              - action: light.turn_on
+              - action: scene.turn_on
                 target:
-                  entity_id: "{{ light_ids }}"
+                  entity_id: "{{ snap }}"
                 data:
-                  brightness_pct: "{{ off_pct | int }}"
                   transition: "{{ fade_out }}"
+              - action: scene.delete
+                target:
+                  entity_id: "{{ snap }}"
             else:
               - action: light.turn_off
                 target:

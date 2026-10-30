@@ -100,7 +100,7 @@ class LightSettings:
             "blueprint": BLUEPRINT,
             "own_brightness": True,
             "dark_sensor": True,
-            "off_dim": True,
+            "restore": True,
         }
 
 

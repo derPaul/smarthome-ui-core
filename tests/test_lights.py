@@ -156,7 +156,7 @@ def test_blueprint_valid() -> None:
         "day_pct",
         "night_pct",
         "dark",
-        "off_pct",
+        "restore",
         "fade_on",
         "fade_off",
         "day_brightness",
@@ -494,52 +494,55 @@ async def test_blueprint_dark_sensor(hass: HomeAssistant, entry: MockConfigEntry
     assert on[-1].data["brightness_pct"] == 100
 
 
-async def test_blueprint_dim_instead_of_off(
-    hass: HomeAssistant, entry: MockConfigEntry, freezer
-) -> None:
-    """With off_pct the light stays on dimmed after the delay while it is dark, else goes off."""
+async def test_blueprint_restore(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
+    """With restore the lights come back as they were before the motion (dim one, other off)."""
     freezer.move_to(
         dt_util.as_utc(datetime(2026, 10, 24, 20, 0, tzinfo=dt_util.get_default_time_zone()))
     )
+    assert await async_setup_component(hass, "scene", {})
     on = async_mock_service(hass, "light", "turn_on")
     off = async_mock_service(hass, "light", "turn_off")
     hass.states.async_set("binary_sensor.person", "off")
-    hass.states.async_set("binary_sensor.ist_dunkel", "on")
-    hass.states.async_set("light.tuer", "off")
+    hass.states.async_set("light.links", "on", {"brightness": 26, "color_mode": "brightness"})
+    hass.states.async_set("light.rechts", "off")
     assert await async_setup_component(
         hass,
         "automation",
         {
             "automation": {
-                "id": "tuer",
-                "alias": "Tuer",
+                "id": "eingang",
+                "alias": "Eingang",
                 "use_blueprint": {
                     "path": BLUEPRINT,
                     "input": {
                         "motion": ["binary_sensor.person"],
-                        "light": ["light.tuer"],
-                        "dark": "binary_sensor.ist_dunkel",
+                        "light": ["light.links", "light.rechts"],
                         "delay": 30,
-                        "off_pct": 10,
+                        "restore": True,
                     },
                 },
             }
         },
     )
     await hass.async_block_till_done()
-    for dark, expect in (("on", "dim"), ("off", "off")):
-        on.clear()
-        off.clear()
-        hass.states.async_set("binary_sensor.ist_dunkel", "on")
-        hass.states.async_set("binary_sensor.person", "on")
-        await hass.async_block_till_done()
-        hass.states.async_set("binary_sensor.ist_dunkel", dark)
-        hass.states.async_set("binary_sensor.person", "off")
-        await hass.async_block_till_done()
-        freezer.tick(timedelta(seconds=31))
-        async_fire_time_changed(hass)
-        await hass.async_block_till_done()
-        if expect == "dim":
-            assert on[-1].data["brightness_pct"] == 10 and not off
-        else:
-            assert off and off[-1].data["entity_id"] == ["light.tuer"]
+    hass.states.async_set("binary_sensor.person", "on")
+    await hass.async_block_till_done()
+    assert on[-1].data["brightness_pct"] == 100
+    assert hass.states.get("scene.ml_eingang") is not None
+    # the (mocked) lights are now bright
+    hass.states.async_set("light.links", "on", {"brightness": 255, "color_mode": "brightness"})
+    hass.states.async_set("light.rechts", "on", {"brightness": 255, "color_mode": "brightness"})
+    hass.states.async_set("binary_sensor.person", "off")
+    hass.states.async_set("binary_sensor.person", "on")  # moves again: snapshot stays
+    await hass.async_block_till_done()
+    on.clear()
+    hass.states.async_set("binary_sensor.person", "off")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=31))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert any(
+        c.data.get("entity_id") == "light.links" and c.data.get("brightness") == 26 for c in on
+    )
+    assert any(c.data.get("entity_id") == "light.rechts" for c in off)
+    assert hass.states.get("scene.ml_eingang") is None
