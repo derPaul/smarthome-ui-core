@@ -86,7 +86,13 @@ class LightSettings:
 
     def info(self) -> dict[str, Any]:
         """Return the settings and the entities for the dashboard."""
-        return {**self.settings(), "entities": ENTITIES, "blueprint": BLUEPRINT}
+        # own_brightness: the blueprint takes day_pct / night_pct per automation (0 = central)
+        return {
+            **self.settings(),
+            "entities": ENTITIES,
+            "blueprint": BLUEPRINT,
+            "own_brightness": True,
+        }
 
 
 def _automations(hass: HomeAssistant) -> list[dict[str, Any]]:

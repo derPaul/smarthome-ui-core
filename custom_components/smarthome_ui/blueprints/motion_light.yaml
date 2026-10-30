@@ -50,6 +50,24 @@ blueprint:
           min: 0
           max: 1000
           unit_of_measurement: lx
+    day_pct:
+      name: Eigene Taghelligkeit
+      description: 0 = Taghelligkeit aus Smarthome UI Core.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    night_pct:
+      name: Eigene Nachthelligkeit
+      description: 0 = Nachthelligkeit aus Smarthome UI Core.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
     day_brightness:
       name: Taghelligkeit (zentral)
       default: number.lights_brightness_day
@@ -102,6 +120,8 @@ variables:
   night_entity: !input night_brightness
   start_entity: !input night_start
   end_entity: !input night_end
+  own_day: !input day_pct
+  own_night: !input night_pct
 
 triggers:
   - trigger: state
@@ -137,8 +157,11 @@ actions:
               ne: "{{ states(end_entity)[:5] }}"
               t: "{{ now().strftime('%H:%M') }}"
               night: "{{ (t >= ns or t < ne) if ns > ne else (ns <= t < ne) }}"
+              # eigene Helligkeit dieser Automation, sonst die zentrale
+              own: "{{ (own_night if night else own_day) | int(0) }}"
               pct: >-
-                {{ states(night_entity) | int(20) if night else states(day_entity) | int(100) }}
+                {{ own if own > 0
+                   else states(night_entity) | int(20) if night else states(day_entity) | int(100) }}
           - action: light.turn_on
             target:
               entity_id: "{{ light_ids }}"

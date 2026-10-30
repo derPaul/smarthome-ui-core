@@ -111,6 +111,8 @@ def test_blueprint_valid() -> None:
         "light",
         "delay",
         "default_delay",
+        "day_pct",
+        "night_pct",
         "day_brightness",
         "night_brightness",
     }
@@ -204,6 +206,49 @@ async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freez
     hass.states.async_set("binary_sensor.flur_bewegung", "on")
     await hass.async_block_till_done()
     assert on[-1].data["brightness_pct"] == 20
+
+
+async def test_blueprint_own_brightness(
+    hass: HomeAssistant, entry: MockConfigEntry, freezer
+) -> None:
+    """An automation's own day / night brightness wins over the central one; 0 keeps central."""
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 12, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    on = async_mock_service(hass, "light", "turn_on")
+    hass.states.async_set("binary_sensor.kind_bewegung", "off")
+    hass.states.async_set("light.kind", "off")
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "kind",
+                "alias": "Kind Bewegungslicht",
+                "use_blueprint": {
+                    "path": BLUEPRINT,
+                    "input": {
+                        "motion": ["binary_sensor.kind_bewegung"],
+                        "light": ["light.kind"],
+                        "day_pct": 0,
+                        "night_pct": 5,
+                    },
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.kind_bewegung", "on")
+    await hass.async_block_till_done()
+    assert on[-1].data["brightness_pct"] == 100  # day: central
+    hass.states.async_set("binary_sensor.kind_bewegung", "off")
+    await hass.async_block_till_done()
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 23, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    hass.states.async_set("binary_sensor.kind_bewegung", "on")
+    await hass.async_block_till_done()
+    assert on[-1].data["brightness_pct"] == 5  # night: own
 
 
 async def test_blueprint_waits_for_stale_lux(
