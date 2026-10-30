@@ -576,6 +576,7 @@ Seite Automationen und legt auf Knopfdruck eine **Home-Assistant-Automation** au
   eine **Standard-Abklingzeit** am Core-Gerät „Licht“ (`number.lights_delay`, Standard 120 s). Sie gilt für jede
   Automation, deren eigene Zeit auf 0 steht. Eine eigene Zeit über 0 geht vor.
 - Ab 0.37 lässt sich auch die **Helligkeit je Automation überschreiben** (`day_pct`, `night_pct` in %, 0 = zentral).
+- Ab 0.40 geht statt eines Helligkeitssensors auch ein **Dunkel-Sensor** (`dark`, Ein/Aus, „an“ = dunkel, z. B. „Ist dunkel“ einer UniFi-Kamera).
 - Ab 0.38 **blendet das Licht sanft ein und aus**: zentral `number.lights_fade_on` / `number.lights_fade_off` (s, Standard 1 s, 0 = hart schalten), je Automation `fade_on` / `fade_off` (-1 = zentral).
 - Optional nur, wenn ein Helligkeitssensor unter einem Lux-Wert liegt (oder das Licht schon an ist). Ab 0.35 wartet
   die Automation dann bis zu 30 s auf einen neuen Messwert: Direkt nach dem Ausschalten meldet der Sensor oft noch die

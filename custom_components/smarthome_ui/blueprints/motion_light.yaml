@@ -42,6 +42,16 @@ blueprint:
           filter:
             domain: sensor
             device_class: illuminance
+    dark:
+      name: Dunkel-Sensor (optional)
+      description: >-
+        Ein/Aus-Sensor, der bei Dunkelheit „an“ meldet (z. B. „Ist dunkel“ einer Kamera). Leer
+        lassen, wenn das Licht immer angehen soll.
+      default: ""
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
     lux_max:
       name: Nur unter … Lux
       default: 30
@@ -150,6 +160,7 @@ variables:
   light_ids: !input light
   lux_entity: !input illuminance
   lux_max: !input lux_max
+  dark_entity: !input dark
   day_entity: !input day_brightness
   night_entity: !input night_brightness
   start_entity: !input night_start
@@ -191,10 +202,11 @@ actions:
         sequence:
           # dunkel genug oder Licht schon an? Sonst bis zu 30 s auf einen neuen Messwert warten: direkt nach
           # dem Ausschalten meldet der Sensor oft noch die Helligkeit mit Licht (das Licht bliebe sonst aus)
+          # mit Dunkel-Sensor: nur wenn er „an“ meldet (oder das Licht schon an ist)
           - wait_template: >-
-              {{ not lux_entity
-                 or states(lux_entity) | float(0) <= lux_max | float(30)
-                 or expand(light_ids) | selectattr('state', 'eq', 'on') | list | count > 0 }}
+              {% set lit = expand(light_ids) | selectattr('state', 'eq', 'on') | list | count > 0 %}
+              {{ lit or ((not lux_entity or states(lux_entity) | float(0) <= lux_max | float(30))
+                         and (not dark_entity or is_state(dark_entity, 'on'))) }}
             timeout: "00:00:30"
             continue_on_timeout: false
           - variables:

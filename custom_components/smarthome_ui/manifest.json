@@ -20,5 +20,5 @@
   "issue_tracker": "https://github.com/derPaul/smarthome-ui-core/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.39.0"
+  "version": "0.40.0"
 }

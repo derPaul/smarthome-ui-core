@@ -99,6 +99,7 @@ class LightSettings:
             "entities": ENTITIES,
             "blueprint": BLUEPRINT,
             "own_brightness": True,
+            "dark_sensor": True,
         }
 
 

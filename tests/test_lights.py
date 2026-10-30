@@ -155,6 +155,7 @@ def test_blueprint_valid() -> None:
         "default_delay",
         "day_pct",
         "night_pct",
+        "dark",
         "fade_on",
         "fade_off",
         "day_brightness",
@@ -447,3 +448,46 @@ async def test_label_and_category(hass: HomeAssistant, entry: MockConfigEntry) -
     flur_room = next(r for r in suggest(hass, []) if r["area"] == "Flur")
     assert flur_room["automation"]["ours"] is True
     assert flur_room["automation"]["input"]["light"] == ["light.flur"]
+
+
+async def test_blueprint_dark_sensor(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
+    """With a dark sensor the light only goes on while it reports dark."""
+
+    async def _settle() -> None:
+        for _ in range(20):
+            await asyncio.sleep(0)
+
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 18, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    on = async_mock_service(hass, "light", "turn_on")
+    hass.states.async_set("binary_sensor.person", "off")
+    hass.states.async_set("binary_sensor.ist_dunkel", "off")
+    hass.states.async_set("light.einfahrt", "off")
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "einfahrt",
+                "alias": "Einfahrt",
+                "use_blueprint": {
+                    "path": BLUEPRINT,
+                    "input": {
+                        "motion": ["binary_sensor.person"],
+                        "light": ["light.einfahrt"],
+                        "dark": "binary_sensor.ist_dunkel",
+                        "day_pct": 100,
+                    },
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.person", "on")
+    await _settle()
+    assert not on  # still bright
+    hass.states.async_set("binary_sensor.ist_dunkel", "on")
+    await _settle()
+    assert on[-1].data["entity_id"] == ["light.einfahrt"]
+    assert on[-1].data["brightness_pct"] == 100
