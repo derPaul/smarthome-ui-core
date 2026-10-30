@@ -200,6 +200,12 @@ KEYS: dict[str, dict[str, Key]] = {
         "salt_select": Key(("select",), r"(salzmenge|salt)"),
         "state": Key(("sensor",), r"(regeneration status|regenerationsstatus|getrgs)"),
         "flow": Key(("sensor",), r"(wasserdurchfluss|durchfluss|flow|getflo)"),
+        # remaining capacity in litres: counts down with every litre (the water usage sensor)
+        "capacity": Key(
+            ("sensor",),
+            r"(restkapazität|remaining capacity|getres)",
+            r"(harz|resin|getcs|%)",
+        ),
         "alarm": Key(("sensor",), r"(letzte alarme|(^|\s)alarm|getala)"),
         "warn": Key(("sensor",), r"(warnung|warning|getwrn)"),
         "notif": Key(("sensor",), r"(benachrichtigung|notification|getnot)"),
@@ -660,7 +666,7 @@ class Catalog:
                 reach["Heizkreis"] = e["climate"]
         if water := first.get("water"):
             e = water["entities"]
-            for key in ("salt", "flow"):
+            for key in ("salt", "flow", "capacity"):
                 if e.get(key):
                     out[key] = e[key]
             syr = {

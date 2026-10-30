@@ -180,6 +180,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "sensor.technik_dhw_next",
         "sensor.technik_hints",
         "sensor.technik_solar_window",
+        "sensor.technik_water_usage",
         "switch.notifications",
         "switch.security_alarm_clear",
         "switch.security_alarm_critical",

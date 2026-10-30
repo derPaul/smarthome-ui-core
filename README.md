@@ -556,6 +556,15 @@ Bereichen zuordnen“, sonst `vacuum.start`), Mäher über seine Bereichs-Schalt
 eine Aufgabe mit dem Namen der Fläche). Höchstens ein automatischer Start je Roboter und Tag. Fällig heißt: Mähplan
 (Mäher) bzw. Putz-Intervall des Raums (Sauger, wie im Dashboard).
 
+## Wasserverbrauch aus dem Enthärter
+
+Ab 0.39: `sensor.technik_water_usage` (Gerät „Haustechnik“) zählt den Wasserverbrauch aus der **Restkapazität** des
+Enthärters (Gerät mit Rolle „Enthärter“, z. B. SYR `getres`). Jede Abnahme um einen Liter ist Verbrauch, eine
+Regeneration füllt die Restkapazität wieder auf und zählt nicht. Das ist genauer als den Durchfluss hochzurechnen:
+Die SYR-Cloud liefert den Durchfluss nur etwa einmal pro Minute als Momentaufnahme, hochgerechnet zählt jeder Treffer
+eine ganze Minute, und was zwischen zwei Abfragen fließt, fehlt. Der Sensor ist `total_increasing` in Litern und kann
+im Energie-Dashboard als Wasserquelle eingetragen werden.
+
 ## Bewegungslicht (Vorschläge)
 
 Ab 0.32: Core schlägt je Raum ein **Bewegungslicht** vor, wenn es dort Bewegungs- oder Präsenzmelder und Lichter gibt,

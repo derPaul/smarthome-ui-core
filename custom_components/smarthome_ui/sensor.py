@@ -5,11 +5,18 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    RestoreSensor,
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util, slugify
 
 from . import CoreConfigEntry, durations
@@ -21,6 +28,7 @@ from .const import (
     SIGNAL_SECURITY,
     SIGNAL_SENT,
     SIGNAL_TASKS,
+    SIGNAL_TECHNIK,
     SIGNAL_VACUUM,
     SIGNAL_WASTE,
 )
@@ -114,6 +122,7 @@ async def async_setup_entry(
     waste = entry.runtime_data.waste
     async_add_entities([WasteNextSensor(entry.entry_id, waste)])
     async_add_entities([TechnikHints(entry.entry_id, entry.runtime_data.technik)])
+    async_add_entities([WaterUsage(entry.entry_id, entry.runtime_data.technik)])
     async_add_entities([SystemProblems(entry.entry_id, entry.runtime_data.system)])
     forecasts = entry.runtime_data.forecasts
     async_add_entities(
@@ -944,3 +953,93 @@ class ForecastSensor(TechnikEntity, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_FORECAST, self.async_write_ha_state)
         )
+
+
+# a rise of the remaining capacity by more than this is a regeneration (smaller ones: rounding)
+WATER_REFILL = 20
+
+
+class WaterUsage(TechnikEntity, RestoreSensor):
+    """Water usage from the softener's remaining capacity (sensor.technik_water_usage).
+
+    The remaining capacity counts down by every litre that flows through the softener, so the sum
+    of its drops is the usage, to the litre, short draws included. The flow sensor is only a
+    snapshot about once a minute: integrated, it counts a whole minute for every hit and misses
+    what flows between two readings. A regeneration fills the capacity up again (not counted).
+    """
+
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfVolume.LITERS
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, entry_id: str, technik: Any) -> None:
+        """Initialize (sensor.technik_water_usage)."""
+        super().__init__(entry_id, technik, "water_usage", "sensor")
+        self._total = 0.0
+        self._last: float | None = None
+        self._source: str | None = None
+        self._unsub: Any = None
+
+    @property
+    def available(self) -> bool:
+        """Available once a softener with its remaining capacity is known."""
+        return self._source is not None
+
+    @property
+    def native_value(self) -> float:
+        """Return the litres counted so far."""
+        return round(self._total, 1)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the source and its last value (to go on after a restart)."""
+        return {"source": self._source, "last_capacity": self._last}
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the total and follow the remaining capacity."""
+        if (data := await self.async_get_last_sensor_data()) and data.native_value is not None:
+            try:
+                self._total = float(data.native_value)
+            except (TypeError, ValueError):
+                self._total = 0.0
+        if (state := await self.async_get_last_state()) and state.attributes.get("last_capacity"):
+            self._last = float(state.attributes["last_capacity"])
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_TECHNIK, self._follow))
+        self.async_on_remove(lambda: self._unsub and self._unsub())
+        self._follow()
+
+    @callback
+    def _follow(self) -> None:
+        """Track the remaining capacity of the softener linked in the catalog."""
+        source = self._technik.settings().get("capacity")
+        if source != self._source:
+            if self._unsub:
+                self._unsub()
+                self._unsub = None
+            if self._source is not None:
+                self._last = None  # another device: start again from its value
+            self._source = source
+            if source:
+                self._unsub = async_track_state_change_event(self.hass, [source], self._changed)
+                self._take(self.hass.states.get(source))
+        self.async_write_ha_state()
+
+    @callback
+    def _changed(self, event: Any) -> None:
+        self._take(event.data.get("new_state"))
+        self.async_write_ha_state()
+
+    def _take(self, state: Any) -> None:
+        try:
+            value = float(state.state) if state else None
+        except (TypeError, ValueError):
+            value = None  # unavailable: wait for the next value, keep the last one
+        if value is None:
+            return
+        if self._last is not None:
+            if value < self._last:
+                self._total += self._last - value
+            elif value - self._last <= WATER_REFILL:
+                return  # small rise (rounding): keep the lower value, so it is not counted twice
+        self._last = value

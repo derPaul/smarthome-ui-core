@@ -67,6 +67,7 @@ DEFAULTS: dict[str, Any] = {
     "salt_max": 25,
     "syr": {},  # {"Alarm": entity, "Warnung": entity, "Hinweis": entity}
     "flow": None,
+    "capacity": None,  # remaining capacity of the softener (L): source of the water usage sensor
     "valve": None,
     "water_minutes": 40,
     "compressor": None,

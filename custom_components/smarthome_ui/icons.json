@@ -53,6 +53,9 @@
       "technik_hints": {
         "default": "mdi:home-alert-outline"
       },
+      "technik_water_usage": {
+        "default": "mdi:water"
+      },
       "technik_battery_empty": {
         "default": "mdi:battery-clock-outline"
       },

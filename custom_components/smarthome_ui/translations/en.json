@@ -409,6 +409,9 @@
       "technik_hints": {
         "name": "Hints"
       },
+      "technik_water_usage": {
+        "name": "Water usage"
+      },
       "technik_battery_empty": {
         "name": "Battery empty at"
       },

@@ -133,6 +133,8 @@ async def test_link_battery_water_router(
             ("sensor", "syr_getsv1", "12", {"friendly_name": "Salzmenge"}),
             ("sensor", "syr_getflo", "0", {"friendly_name": "Wasserdurchfluss"}),
             ("sensor", "syr_getala", "no_alarm", {"friendly_name": "Alarm"}),
+            ("sensor", "syr_getcs1", "86", {"friendly_name": "Restkapazität des Harzes 1"}),
+            ("sensor", "syr_getres", "950", {"friendly_name": "Restkapazität"}),
         ],
     )
     fritz = _device(
@@ -163,6 +165,7 @@ async def test_link_battery_water_router(
     assert settings["battery"]["capacity"] == 13.0  # from the capacity sensor (Wh)
     assert settings["salt"] == "sensor.syr_getsv1"
     assert settings["syr"]["Alarm"] == "sensor.syr_getala"
+    assert settings["capacity"] == "sensor.syr_getres"  # not the resin percentage
     assert entry.runtime_data.system.internet() == "binary_sensor.fritz_box_verbindung"
 
 
@@ -548,3 +551,39 @@ async def test_devices_searched_once_per_turn(hass: HomeAssistant, entry: MockCo
     await hass.async_block_till_done()
     catalog.devices()
     assert calls == 2
+
+
+async def test_water_usage_from_capacity(
+    hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client
+) -> None:
+    """Every litre the remaining capacity drops is usage; a regeneration (refill) is not."""
+    syr = _device(
+        hass,
+        "syr_connect",
+        "SYR",
+        [
+            ("sensor", "syr_getsv1", "12", {"friendly_name": "Salzmenge"}),
+            ("sensor", "syr_getres", "950", {"friendly_name": "Restkapazität"}),
+        ],
+    )
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {"id": 1, "type": "smarthome_ui/catalog/link", "device_id": syr, "role": "water"}
+    )
+    assert (await client.receive_json())["success"]
+    await hass.async_block_till_done()
+    usage = "sensor.technik_water_usage"
+    assert hass.states.get(usage).state == "0.0"
+    assert hass.states.get(usage).attributes["source"] == "sensor.syr_getres"
+    for value, total in (
+        ("940", "10.0"),
+        ("unavailable", "10.0"),  # keeps the last value
+        ("945", "10.0"),  # small rise (rounding): not counted, nor the drop back
+        ("930", "20.0"),
+        ("1100", "20.0"),  # regeneration
+        ("1090", "30.0"),
+    ):
+        hass.states.async_set("sensor.syr_getres", value, {"friendly_name": "Restkapazität"})
+        await hass.async_block_till_done()
+        assert hass.states.get(usage).state == total, value
+    assert hass.states.get(usage).attributes["unit_of_measurement"] == "L"
