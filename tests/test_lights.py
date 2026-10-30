@@ -156,6 +156,7 @@ def test_blueprint_valid() -> None:
         "day_pct",
         "night_pct",
         "dark",
+        "off_pct",
         "fade_on",
         "fade_off",
         "day_brightness",
@@ -491,3 +492,54 @@ async def test_blueprint_dark_sensor(hass: HomeAssistant, entry: MockConfigEntry
     await _settle()
     assert on[-1].data["entity_id"] == ["light.einfahrt"]
     assert on[-1].data["brightness_pct"] == 100
+
+
+async def test_blueprint_dim_instead_of_off(
+    hass: HomeAssistant, entry: MockConfigEntry, freezer
+) -> None:
+    """With off_pct the light stays on dimmed after the delay while it is dark, else goes off."""
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 20, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    on = async_mock_service(hass, "light", "turn_on")
+    off = async_mock_service(hass, "light", "turn_off")
+    hass.states.async_set("binary_sensor.person", "off")
+    hass.states.async_set("binary_sensor.ist_dunkel", "on")
+    hass.states.async_set("light.tuer", "off")
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "tuer",
+                "alias": "Tuer",
+                "use_blueprint": {
+                    "path": BLUEPRINT,
+                    "input": {
+                        "motion": ["binary_sensor.person"],
+                        "light": ["light.tuer"],
+                        "dark": "binary_sensor.ist_dunkel",
+                        "delay": 30,
+                        "off_pct": 10,
+                    },
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+    for dark, expect in (("on", "dim"), ("off", "off")):
+        on.clear()
+        off.clear()
+        hass.states.async_set("binary_sensor.ist_dunkel", "on")
+        hass.states.async_set("binary_sensor.person", "on")
+        await hass.async_block_till_done()
+        hass.states.async_set("binary_sensor.ist_dunkel", dark)
+        hass.states.async_set("binary_sensor.person", "off")
+        await hass.async_block_till_done()
+        freezer.tick(timedelta(seconds=31))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        if expect == "dim":
+            assert on[-1].data["brightness_pct"] == 10 and not off
+        else:
+            assert off and off[-1].data["entity_id"] == ["light.tuer"]

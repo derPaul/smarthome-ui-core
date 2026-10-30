@@ -78,6 +78,17 @@ blueprint:
           min: 0
           max: 100
           unit_of_measurement: "%"
+    off_pct:
+      name: Statt aus dimmen auf
+      description: >-
+        0 = ausschalten. Sonst bleibt das Licht nach der Abklingzeit mit dieser Helligkeit an, z. B.
+        als Grundlicht am Eingang (nur solange es dunkel ist: Dunkel-Sensor bzw. Helligkeitssensor).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
     fade_on:
       name: Eigenes Einblenden
       description: -1 = Einblenden aus Smarthome UI Core, 0 = sofort an.
@@ -167,6 +178,7 @@ variables:
   end_entity: !input night_end
   own_day: !input day_pct
   own_night: !input night_pct
+  off_pct: !input off_pct
   own_fade_on: !input fade_on
   own_fade_off: !input fade_off
   fade_on_entity: !input default_fade_on
@@ -232,8 +244,23 @@ actions:
             value_template: >-
               {{ expand(motion_ids) | selectattr('state', 'eq', 'on') | list | count == 0 }}
         sequence:
-          - action: light.turn_off
-            target:
-              entity_id: "{{ light_ids }}"
-            data:
-              transition: "{{ fade_out }}"
+          # gedimmt statt aus: nur im Dunkeln (sonst bliebe das Grundlicht tagsüber an)
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ off_pct | int(0) > 0
+                     and (not dark_entity or is_state(dark_entity, 'on'))
+                     and (not lux_entity or states(lux_entity) | float(0) <= lux_max | float(30)) }}
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ light_ids }}"
+                data:
+                  brightness_pct: "{{ off_pct | int }}"
+                  transition: "{{ fade_out }}"
+            else:
+              - action: light.turn_off
+                target:
+                  entity_id: "{{ light_ids }}"
+                data:
+                  transition: "{{ fade_out }}"
