@@ -68,6 +68,26 @@ blueprint:
           min: 0
           max: 100
           unit_of_measurement: "%"
+    fade_on:
+      name: Eigenes Einblenden
+      description: -1 = Einblenden aus Smarthome UI Core, 0 = sofort an.
+      default: -1
+      selector:
+        number:
+          min: -1
+          max: 10
+          step: 0.5
+          unit_of_measurement: s
+    fade_off:
+      name: Eigenes Ausblenden
+      description: -1 = Ausblenden aus Smarthome UI Core, 0 = sofort aus.
+      default: -1
+      selector:
+        number:
+          min: -1
+          max: 10
+          step: 0.5
+          unit_of_measurement: s
     day_brightness:
       name: Taghelligkeit (zentral)
       default: number.lights_brightness_day
@@ -103,6 +123,20 @@ blueprint:
         entity:
           filter:
             domain: number
+    default_fade_on:
+      name: Einblenden (zentral)
+      default: number.lights_fade_on
+      selector:
+        entity:
+          filter:
+            domain: number
+    default_fade_off:
+      name: Ausblenden (zentral)
+      default: number.lights_fade_off
+      selector:
+        entity:
+          filter:
+            domain: number
 
 mode: restart
 max_exceeded: silent
@@ -122,6 +156,17 @@ variables:
   end_entity: !input night_end
   own_day: !input day_pct
   own_night: !input night_pct
+  own_fade_on: !input fade_on
+  own_fade_off: !input fade_off
+  fade_on_entity: !input default_fade_on
+  fade_off_entity: !input default_fade_off
+  # eigenes Ein-/Ausblenden dieser Automation (ab 0 s), sonst das zentrale
+  fade_in: >-
+    {{ own_fade_on | float(-1) if own_fade_on | float(-1) >= 0
+       else states(fade_on_entity) | float(1) if fade_on_entity else 1 }}
+  fade_out: >-
+    {{ own_fade_off | float(-1) if own_fade_off | float(-1) >= 0
+       else states(fade_off_entity) | float(1) if fade_off_entity else 1 }}
 
 triggers:
   - trigger: state
@@ -167,6 +212,7 @@ actions:
               entity_id: "{{ light_ids }}"
             data:
               brightness_pct: "{{ pct }}"
+              transition: "{{ fade_in }}"
       - conditions:
           - condition: trigger
             id: "off"
@@ -177,3 +223,5 @@ actions:
           - action: light.turn_off
             target:
               entity_id: "{{ light_ids }}"
+            data:
+              transition: "{{ fade_out }}"

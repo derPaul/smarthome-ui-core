@@ -326,6 +326,12 @@
       },
       "lights_delay": {
         "default": "mdi:timer-sand"
+      },
+      "lights_fade_on": {
+        "default": "mdi:transition"
+      },
+      "lights_fade_off": {
+        "default": "mdi:transition"
       }
     },
     "time": {

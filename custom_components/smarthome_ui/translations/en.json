@@ -657,6 +657,12 @@
       },
       "lights_delay": {
         "name": "Standard delay"
+      },
+      "lights_fade_on": {
+        "name": "Fade in"
+      },
+      "lights_fade_off": {
+        "name": "Fade out"
       }
     },
     "time": {

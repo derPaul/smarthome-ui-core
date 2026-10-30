@@ -66,6 +66,9 @@ async def test_settings_and_entities(
     assert (await client.receive_json())["result"]["delay"] == 45
     await hass.async_block_till_done()
     assert hass.states.get("number.lights_delay").state == "45.0"
+    assert hass.states.get("number.lights_fade_on").state == "1.0"
+    await client.send_json({"id": 4, "type": "smarthome_ui/lights/settings", "fade_off": 2.3})
+    assert (await client.receive_json())["result"]["fade_off"] == 2.5
 
 
 async def test_suggest_rooms(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
@@ -101,6 +104,45 @@ async def test_suggest_rooms(hass: HomeAssistant, entry: MockConfigEntry, hass_w
     assert res["settings"]["blueprint"] == BLUEPRINT
 
 
+async def test_suggest_prefers_motion_light(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """An old automation left disabled next to the new motion light: the room shows ours."""
+    _room(hass, "Flur", "flur_bewegung", ["flur_decke"])
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": [
+                {
+                    "id": "alt",
+                    "alias": "Flur alt",
+                    "triggers": [{"trigger": "state", "entity_id": "binary_sensor.flur_bewegung"}],
+                    "actions": [
+                        {"action": "light.turn_on", "target": {"entity_id": "light.flur_decke"}}
+                    ],
+                },
+                {
+                    "id": "neu",
+                    "alias": "Flur Bewegungslicht",
+                    "use_blueprint": {
+                        "path": BLUEPRINT,
+                        "input": {
+                            "motion": ["binary_sensor.flur_bewegung"],
+                            "light": ["light.flur_decke"],
+                        },
+                    },
+                },
+            ]
+        },
+    )
+    await hass.async_block_till_done()
+    await hass.services.async_call(
+        "automation", "turn_off", {"entity_id": "automation.flur_alt"}, blocking=True
+    )
+    rooms = {r["area"]: r for r in suggest(hass)}
+    assert rooms["Flur"]["automation"]["name"] == "Flur Bewegungslicht"
+    assert rooms["Flur"]["automation"]["ours"] is True
+
+
 def test_blueprint_valid() -> None:
     path = (
         Path(__file__).parent.parent / "custom_components/smarthome_ui/blueprints/motion_light.yaml"
@@ -113,6 +155,8 @@ def test_blueprint_valid() -> None:
         "default_delay",
         "day_pct",
         "night_pct",
+        "fade_on",
+        "fade_off",
         "day_brightness",
         "night_brightness",
     }
@@ -192,6 +236,7 @@ async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freez
     await hass.async_block_till_done()
     assert on[-1].data["brightness_pct"] == 100
     assert on[-1].data["entity_id"] == ["light.flur"]
+    assert on[-1].data["transition"] == 1  # central fade
     hass.states.async_set("binary_sensor.flur_bewegung", "off")
     await hass.async_block_till_done()
     assert not off
@@ -199,6 +244,7 @@ async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freez
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert off[-1].data["entity_id"] == ["light.flur"]
+    assert off[-1].data["transition"] == 1
     # at night the night brightness
     freezer.move_to(
         dt_util.as_utc(datetime(2026, 10, 24, 23, 0, tzinfo=dt_util.get_default_time_zone()))
@@ -232,6 +278,7 @@ async def test_blueprint_own_brightness(
                         "light": ["light.kind"],
                         "day_pct": 0,
                         "night_pct": 5,
+                        "fade_on": 0,
                     },
                 },
             }
@@ -241,6 +288,7 @@ async def test_blueprint_own_brightness(
     hass.states.async_set("binary_sensor.kind_bewegung", "on")
     await hass.async_block_till_done()
     assert on[-1].data["brightness_pct"] == 100  # day: central
+    assert on[-1].data["transition"] == 0  # own fade: switch hard
     hass.states.async_set("binary_sensor.kind_bewegung", "off")
     await hass.async_block_till_done()
     freezer.move_to(

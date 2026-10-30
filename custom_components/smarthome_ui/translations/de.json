@@ -657,6 +657,12 @@
       },
       "lights_delay": {
         "name": "Standard-Abklingzeit"
+      },
+      "lights_fade_on": {
+        "name": "Einblenden"
+      },
+      "lights_fade_off": {
+        "name": "Ausblenden"
       }
     },
     "time": {

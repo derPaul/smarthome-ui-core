@@ -29,6 +29,9 @@ DEFAULTS: dict[str, Any] = {
     "night_end": "06:30",
     # standard delay (s) before the light goes off without motion; an automation may set its own
     "delay": 120,
+    # soft fade (s) when the light goes on / off; an automation may set its own
+    "fade_on": 1.0,
+    "fade_off": 1.0,
 }
 # the entities the blueprint reads (so a suggestion can fill them in)
 ENTITIES = {
@@ -37,6 +40,8 @@ ENTITIES = {
     "night_start": "time.lights_night_start",
     "night_end": "time.lights_night_end",
     "default_delay": "number.lights_delay",
+    "default_fade_on": "number.lights_fade_on",
+    "default_fade_off": "number.lights_fade_off",
 }
 
 
@@ -62,6 +67,8 @@ class LightSettings:
             value = max(1, min(100, int(value)))
         elif key == "delay":
             value = max(10, min(3600, int(value)))
+        elif key in ("fade_on", "fade_off"):
+            value = max(0.0, min(10.0, round(float(value) * 2) / 2))
         else:
             hour, _, minute = str(value).partition(":")
             value = f"{int(hour) % 24:02d}:{int(minute[:2] or 0) % 60:02d}"
@@ -121,6 +128,7 @@ def _automations(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "blueprint": getattr(ent, "referenced_blueprint", None) or bp.get("path"),
                 "input": bp.get("input"),
                 "refs": refs,
+                "on": getattr(ent, "is_on", True) is not False,
             }
         )
     return out
@@ -201,17 +209,20 @@ def suggest(hass: HomeAssistant, ignored: Any = None) -> list[dict[str, Any]]:
             | {h for h, members in holders if members & lights}
         )
         covered = None
-        for a in autos:
-            if _mentions(a, motion_refs) and _mentions(a, light_refs):
-                ours = a["blueprint"] == BLUEPRINT
-                covered = {
-                    "entity_id": a["entity_id"],
-                    "name": a["name"],
-                    "id": a["id"],
-                    "ours": ours,
-                    "input": a["input"] if ours else None,
-                }
-                break
+        # several automations may match (an old one left disabled next to the new motion light):
+        # ours first, then one that is on
+        matches = [a for a in autos if _mentions(a, motion_refs) and _mentions(a, light_refs)]
+        matches.sort(key=lambda a: (a["blueprint"] != BLUEPRINT, not a["on"]))
+        if matches:
+            a = matches[0]
+            ours = a["blueprint"] == BLUEPRINT
+            covered = {
+                "entity_id": a["entity_id"],
+                "name": a["name"],
+                "id": a["id"],
+                "ours": ours,
+                "input": a["input"] if ours else None,
+            }
         out.append(
             {
                 "area_id": area_id,

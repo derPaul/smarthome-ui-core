@@ -56,6 +56,7 @@ async def async_setup_entry(
     lights = entry.runtime_data.lights
     async_add_entities(LightBrightness(entry.entry_id, lights, key) for key in ("day", "night"))
     async_add_entities([LightDelay(entry.entry_id, lights)])
+    async_add_entities(LightFade(entry.entry_id, lights, key) for key in ("on", "off"))
 
 
 class CleanInterval(CoreEntity, NumberEntity):
@@ -265,6 +266,38 @@ class LightDelay(CoreEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the delay."""
         self._lights.set("delay", value)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_LIGHTS, self.async_write_ha_state)
+        )
+
+
+class LightFade(CoreEntity, NumberEntity):
+    """Soft fade of the motion lights when they go on / off (s, 0 = switch hard)."""
+
+    _attr_native_min_value = 0
+    _attr_native_max_value = 10
+    _attr_native_step = 0.5
+    _attr_mode = NumberMode.BOX
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+
+    def __init__(self, entry_id: str, lights: LightSettings, key: str) -> None:
+        """Initialize (number.lights_fade_on / _off)."""
+        super().__init__(entry_id, f"lights_fade_{key}", DEVICE_LIGHTS, "number", f"fade_{key}")
+        self._attr_translation_key = f"lights_fade_{key}"
+        self._lights = lights
+        self._key = f"fade_{key}"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the fade."""
+        return float(self._lights.settings()[self._key])
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the fade."""
+        self._lights.set(self._key, value)
 
     async def async_added_to_hass(self) -> None:
         """Update when the settings change."""
