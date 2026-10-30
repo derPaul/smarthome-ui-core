@@ -4,8 +4,8 @@ Rooms (areas) with a motion or presence sensor and lights but no automation that
 lights by that sensor are suggested. Accepting one creates a Home Assistant automation from the
 blueprint ``motion_light.yaml`` (light on with motion, off after a delay without). The brightness
 comes from Core's entities ``number.lights_brightness_day`` / ``number.lights_brightness_night``
-and the night from ``time.lights_night_start`` / ``time.lights_night_end`` – one place for every
-room.
+and the night from ``time.lights_night_start`` / ``time.lights_night_end``, the standard delay from
+``number.lights_delay`` – one place for every room.
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ DEFAULTS: dict[str, Any] = {
     "night": 20,
     "night_start": "22:00",
     "night_end": "06:30",
+    # standard delay (s) before the light goes off without motion; an automation may set its own
+    "delay": 120,
 }
 # the entities the blueprint reads (so a suggestion can fill them in)
 ENTITIES = {
@@ -34,6 +36,7 @@ ENTITIES = {
     "night_brightness": "number.lights_brightness_night",
     "night_start": "time.lights_night_start",
     "night_end": "time.lights_night_end",
+    "default_delay": "number.lights_delay",
 }
 
 
@@ -57,6 +60,8 @@ class LightSettings:
             raise ValueError(key)
         if key in ("day", "night"):
             value = max(1, min(100, int(value)))
+        elif key == "delay":
+            value = max(10, min(3600, int(value)))
         else:
             hour, _, minute = str(value).partition(":")
             value = f"{int(hour) % 24:02d}:{int(minute[:2] or 0) % 60:02d}"

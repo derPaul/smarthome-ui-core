@@ -61,6 +61,11 @@ async def test_settings_and_entities(
         blocking=True,
     )
     assert entry.runtime_data.lights.settings()["day"] == 80
+    assert hass.states.get("number.lights_delay").state == "120.0"
+    await client.send_json({"id": 3, "type": "smarthome_ui/lights/settings", "delay": 45})
+    assert (await client.receive_json())["result"]["delay"] == 45
+    await hass.async_block_till_done()
+    assert hass.states.get("number.lights_delay").state == "45.0"
 
 
 async def test_suggest_rooms(hass: HomeAssistant, entry: MockConfigEntry, hass_ws_client) -> None:
@@ -101,7 +106,56 @@ def test_blueprint_valid() -> None:
         Path(__file__).parent.parent / "custom_components/smarthome_ui/blueprints/motion_light.yaml"
     )
     bp = models.Blueprint(load_yaml(path), expected_domain="automation", schema=BLUEPRINT_SCHEMA)
-    assert set(bp.inputs) >= {"motion", "light", "delay", "day_brightness", "night_brightness"}
+    assert set(bp.inputs) >= {
+        "motion",
+        "light",
+        "delay",
+        "default_delay",
+        "day_brightness",
+        "night_brightness",
+    }
+
+
+async def test_blueprint_central_delay(
+    hass: HomeAssistant, entry: MockConfigEntry, freezer
+) -> None:
+    """Without an own delay the light goes off after Core's standard delay."""
+    freezer.move_to(
+        dt_util.as_utc(datetime(2026, 10, 24, 12, 0, tzinfo=dt_util.get_default_time_zone()))
+    )
+    entry.runtime_data.lights.set("delay", 30)
+    await hass.async_block_till_done()
+    async_mock_service(hass, "light", "turn_on")
+    off = async_mock_service(hass, "light", "turn_off")
+    hass.states.async_set("binary_sensor.bad_bewegung", "off")
+    hass.states.async_set("light.bad", "off")
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "bad",
+                "alias": "Bad Bewegungslicht",
+                "use_blueprint": {
+                    "path": BLUEPRINT,
+                    "input": {"motion": ["binary_sensor.bad_bewegung"], "light": ["light.bad"]},
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.bad_bewegung", "on")
+    await hass.async_block_till_done()
+    hass.states.async_set("binary_sensor.bad_bewegung", "off")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=25))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert not off
+    freezer.tick(timedelta(seconds=6))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert off[-1].data["entity_id"] == ["light.bad"]
 
 
 async def test_blueprint_runs(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:

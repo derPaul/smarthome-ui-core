@@ -55,6 +55,7 @@ async def async_setup_entry(
     async_add_entities(AlarmOptionNumber(entry.entry_id, alarm, *o) for o in OPTION_NUMBERS)
     lights = entry.runtime_data.lights
     async_add_entities(LightBrightness(entry.entry_id, lights, key) for key in ("day", "night"))
+    async_add_entities([LightDelay(entry.entry_id, lights)])
 
 
 class CleanInterval(CoreEntity, NumberEntity):
@@ -233,6 +234,37 @@ class LightBrightness(CoreEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the brightness."""
         self._lights.set(self._key, value)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when the settings change."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_LIGHTS, self.async_write_ha_state)
+        )
+
+
+class LightDelay(CoreEntity, NumberEntity):
+    """Standard delay of the motion lights (seconds without motion until the light goes off)."""
+
+    _attr_native_min_value = 10
+    _attr_native_max_value = 3600
+    _attr_native_step = 10
+    _attr_mode = NumberMode.BOX
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_translation_key = "lights_delay"
+
+    def __init__(self, entry_id: str, lights: LightSettings) -> None:
+        """Initialize (number.lights_delay)."""
+        super().__init__(entry_id, "lights_delay", DEVICE_LIGHTS, "number", "delay")
+        self._lights = lights
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the delay."""
+        return float(self._lights.settings()["delay"])
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the delay."""
+        self._lights.set("delay", value)
 
     async def async_added_to_hass(self) -> None:
         """Update when the settings change."""

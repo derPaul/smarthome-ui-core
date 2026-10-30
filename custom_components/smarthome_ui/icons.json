@@ -323,6 +323,9 @@
       },
       "lights_brightness_night": {
         "default": "mdi:brightness-4"
+      },
+      "lights_delay": {
+        "default": "mdi:timer-sand"
       }
     },
     "time": {

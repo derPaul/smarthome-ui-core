@@ -155,6 +155,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "button.security_nightwalk_open",
         "number.lights_brightness_day",
         "number.lights_brightness_night",
+        "number.lights_delay",
         "number.security_guests_away",
         "number.security_nightwalk_ask_delay",
         "number.security_nightwalk_quiet",

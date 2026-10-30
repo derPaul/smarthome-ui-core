@@ -654,6 +654,9 @@
       },
       "lights_brightness_night": {
         "name": "Nachthelligkeit"
+      },
+      "lights_delay": {
+        "name": "Standard-Abklingzeit"
       }
     },
     "time": {

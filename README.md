@@ -563,7 +563,9 @@ aber noch keine Automation, die diese Lichter über diese Melder schaltet. Das D
 Seite Automationen und legt auf Knopfdruck eine **Home-Assistant-Automation** aus der Blaupause
 `smarthome_ui/motion_light.yaml` an. Sie steht danach unter *Einstellungen → Automationen* und lässt sich dort ändern.
 
-- Licht an bei Bewegung, aus nach einer einstellbaren Zeit ohne Bewegung (alle Melder des Raums ruhig).
+- Licht an bei Bewegung, aus nach einer einstellbaren Zeit ohne Bewegung (alle Melder des Raums ruhig). Ab 0.35 gibt es
+  eine **Standard-Abklingzeit** am Core-Gerät „Licht“ (`number.lights_delay`, Standard 120 s). Sie gilt für jede
+  Automation, deren eigene Zeit auf 0 steht. Eine eigene Zeit über 0 geht vor.
 - Optional nur, wenn ein Helligkeitssensor unter einem Lux-Wert liegt (oder das Licht schon an ist). Ab 0.35 wartet
   die Automation dann bis zu 30 s auf einen neuen Messwert: Direkt nach dem Ausschalten meldet der Sensor oft noch die
   Helligkeit mit Licht, sonst bliebe das Licht bei schneller Rückkehr aus.
@@ -657,7 +659,7 @@ actions:
 | `smarthome_ui/lists/value` | eine einzelne Entität setzen (`path`, `value` – `null` = automatisch) |
 | `smarthome_ui/lights/suggest` | Räume mit Bewegungsmeldern und Lichtern, die abdeckende Automation (`automation`, `ours` = aus der Blaupause) und die zentralen Einstellungen |
 | `smarthome_ui/lights/ignore` | Vorschlag eines Raums ausblenden oder wieder zeigen (`area_id`, `ignore`, Standard `true`) |
-| `smarthome_ui/lights/settings` | Tag-/Nachthelligkeit (`day`, `night` in %) und Nachtzeiten (`night_start`, `night_end`, „HH:MM“) |
+| `smarthome_ui/lights/settings` | Tag-/Nachthelligkeit (`day`, `night` in %), Nachtzeiten (`night_start`, `night_end`, „HH:MM“) und Standard-Abklingzeit (`delay` in s) |
 | `smarthome_ui/ui/check` | neue Dashboard-Version suchen (Antwort mit `notes` seit der installierten) |
 | `smarthome_ui/ui/install` | neueste Dashboard-Version installieren (nur Admins) |
 | `smarthome_ui/ui/dashboard` | YAML-Datei eines Dashboards (`url_path`); mit `update: true` holt Core `dashboards/smarthome.yaml` neu aus GitHub (nur Admins) |

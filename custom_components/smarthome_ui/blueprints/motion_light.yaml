@@ -2,7 +2,8 @@ blueprint:
   name: Bewegungslicht (Smarthome UI Core)
   description: >-
     Licht an, sobald ein Bewegungs- oder Präsenzmelder etwas erkennt, und aus, wenn
-    für die eingestellte Zeit keiner mehr etwas meldet. Die Helligkeit kommt zentral
+    für die eingestellte Zeit keiner mehr etwas meldet (ohne eigene Zeit gilt die
+    Standard-Abklingzeit aus Smarthome UI Core). Die Helligkeit kommt zentral
     aus Smarthome UI Core: tagsüber die Taghelligkeit, nachts die Nachthelligkeit
     (Gerät „Licht“). Optional nur, wenn es dunkel genug ist.
   domain: automation
@@ -24,10 +25,11 @@ blueprint:
             domain: light
     delay:
       name: Aus nach … ohne Bewegung
-      default: 120
+      description: 0 = Standard-Abklingzeit aus Smarthome UI Core (Gerät „Licht“).
+      default: 0
       selector:
         number:
-          min: 10
+          min: 0
           max: 3600
           step: 10
           unit_of_measurement: s
@@ -76,9 +78,20 @@ blueprint:
         entity:
           filter:
             domain: time
+    default_delay:
+      name: Standard-Abklingzeit (zentral)
+      default: number.lights_delay
+      selector:
+        entity:
+          filter:
+            domain: number
 
 mode: restart
 max_exceeded: silent
+
+trigger_variables:
+  own_delay: !input delay
+  delay_entity: !input default_delay
 
 variables:
   motion_ids: !input motion
@@ -98,8 +111,11 @@ triggers:
   - trigger: state
     entity_id: !input motion
     to: "off"
+    # eigene Zeit, sonst die zentrale (beim Ausschalten des Melders gelesen)
     for:
-      seconds: !input delay
+      seconds: >-
+        {{ own_delay | int(0) if own_delay | int(0) > 0
+           else states(delay_entity) | int(120) if delay_entity else 120 }}
     id: "off"
 
 actions:

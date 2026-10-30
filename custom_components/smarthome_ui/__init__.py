@@ -1473,6 +1473,7 @@ def ws_lights_suggest(
         vol.Optional("night"): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
         vol.Optional("night_start"): str,
         vol.Optional("night_end"): str,
+        vol.Optional("delay"): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
     }
 )
 @callback
@@ -1482,7 +1483,7 @@ def ws_lights_settings(
     """Change the central brightness and night times of the motion lights."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         try:
-            for key in ("day", "night", "night_start", "night_end"):
+            for key in ("day", "night", "night_start", "night_end", "delay"):
                 if key in msg:
                     runtime.lights.set(key, msg[key])
         except ValueError as err:
