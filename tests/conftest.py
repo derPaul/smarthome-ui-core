@@ -22,7 +22,7 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def github_offline():
     """GitHub is not reached in tests (the dashboard card); test_ui replaces this."""
 
-    async def offline(self, path: str) -> str:
+    async def offline(self, path: str, raw: bool = False) -> str:
         raise UiError("offline")
 
     with patch.object(UiManager, "_get", offline):

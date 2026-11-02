@@ -39,6 +39,8 @@ DASHBOARD_YAML = "examples/dashboard-komplett.yaml"
 # the dashboard file the old update script kept up to date (before Core served the card)
 MANAGED_YAML = "dashboards/smarthome.yaml"
 FILE = "smarthome-dashboard-card.js"
+# images the card uses, downloaded with it and served next to it (missing ones are skipped)
+ASSETS = ("dist/theme-abend.jpg",)
 URL_BASE = "/smarthome_ui_ui"
 DEFAULT_REF = "main"
 CHECK_INTERVAL = timedelta(hours=6)
@@ -177,7 +179,8 @@ class UiManager:
         path = Path(self.hass.config.path(".smarthome_ui_token"))
         return path.read_text(encoding="utf-8").strip() if path.is_file() else ""
 
-    async def _get(self, path: str) -> str:
+    async def _get(self, path: str, raw: bool = False) -> Any:
+        """Return a file from the repository (text, or bytes with ``raw``)."""
         token = await self.hass.async_add_executor_job(self._read_token)
         headers = {"Accept": "application/vnd.github.raw"}
         if token:
@@ -197,7 +200,7 @@ class UiManager:
                     )
                 if res.status != 200:
                     raise UiError(f"GitHub antwortet mit {res.status}")
-                return await res.text()
+                return await res.read() if raw else await res.text()
         except (ClientError, TimeoutError) as err:
             raise UiError(f"GitHub nicht erreichbar ({err})") from err
 
@@ -235,6 +238,7 @@ class UiManager:
             if not version:
                 raise UiError("Karte unvollständig (keine Versionsnummer)")
             await self.hass.async_add_executor_job(self._write, card)
+            await self._install_assets()
             self.data.update(installed=version, error=None)
             if version_newer(version, self.data.get("latest")):
                 self.data["latest"] = version
@@ -247,6 +251,24 @@ class UiManager:
             self._serve()
             self._changed()
         return self.info()
+
+    async def _install_assets(self) -> None:
+        """Download the images of the card; a missing one does not stop the installation."""
+        for path in ASSETS:
+            try:
+                data = await self._get(path, raw=True)
+            except UiError as err:
+                _LOGGER.debug("Smarthome UI: %s nicht geladen: %s", path, err)
+                continue
+            if isinstance(data, bytes) and data:
+                await self.hass.async_add_executor_job(self._write_asset, path, data)
+
+    def _write_asset(self, path: str, data: bytes) -> None:
+        self.folder.mkdir(parents=True, exist_ok=True)
+        name = Path(path).name
+        tmp = self.folder / (name + ".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(self.folder / name)
 
     def _write(self, card: str) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)

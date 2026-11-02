@@ -8,7 +8,7 @@ from unittest.mock import patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.smarthome_ui.ui import API, CARD, UiManager, notes_since
+from custom_components.smarthome_ui.ui import API, ASSETS, CARD, UiManager, notes_since
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
@@ -34,6 +34,7 @@ def _mock(aioclient_mock: AiohttpClientMocker, version: str, ref: str = "main") 
     aioclient_mock.clear_requests()
     aioclient_mock.get(API + CARD, params={"ref": ref}, text=_card(version))
     aioclient_mock.get(API + "CHANGELOG.md", params={"ref": ref}, text=CHANGELOG)
+    aioclient_mock.get(API + ASSETS[0], params={"ref": ref}, content=b"\xff\xd8bild")
 
 
 async def test_check_install_update(
@@ -52,6 +53,8 @@ async def test_check_install_update(
         assert aioclient_mock.mock_calls[0][3]["Authorization"] == "Bearer geheim"
         card = Path(hass.config.path("smarthome_ui", "smarthome-dashboard-card.js"))
         assert "1.281.0" in await hass.async_add_executor_job(card.read_text)
+        img = Path(hass.config.path("smarthome_ui", "theme-abend.jpg"))
+        assert await hass.async_add_executor_job(img.read_bytes) == b"\xff\xd8bild"
         assert ui.info()["url"] == "/smarthome_ui_ui/smarthome-dashboard-card.js?v=1.281.0"
         assert hass.states.get("update.system_dashboard").state == "off"
 
