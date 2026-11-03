@@ -40,7 +40,7 @@ DASHBOARD_YAML = "examples/dashboard-komplett.yaml"
 MANAGED_YAML = "dashboards/smarthome.yaml"
 FILE = "smarthome-dashboard-card.js"
 # images the card uses, downloaded with it and served next to it (missing ones are skipped)
-ASSETS = ("dist/theme-abend.jpg",)
+ASSETS = ("dist/theme-abend.jpg", "dist/theme-tag.jpg")
 URL_BASE = "/smarthome_ui_ui"
 DEFAULT_REF = "main"
 CHECK_INTERVAL = timedelta(hours=6)

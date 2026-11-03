@@ -35,6 +35,7 @@ def _mock(aioclient_mock: AiohttpClientMocker, version: str, ref: str = "main") 
     aioclient_mock.get(API + CARD, params={"ref": ref}, text=_card(version))
     aioclient_mock.get(API + "CHANGELOG.md", params={"ref": ref}, text=CHANGELOG)
     aioclient_mock.get(API + ASSETS[0], params={"ref": ref}, content=b"\xff\xd8bild")
+    aioclient_mock.get(API + ASSETS[1], params={"ref": ref}, status=404)
 
 
 async def test_check_install_update(
@@ -55,6 +56,9 @@ async def test_check_install_update(
         assert "1.281.0" in await hass.async_add_executor_job(card.read_text)
         img = Path(hass.config.path("smarthome_ui", "theme-abend.jpg"))
         assert await hass.async_add_executor_job(img.read_bytes) == b"\xff\xd8bild"
+        # ein fehlendes Bild hält die Installation nicht auf
+        missing = Path(hass.config.path("smarthome_ui", "theme-tag.jpg"))
+        assert not await hass.async_add_executor_job(missing.exists)
         assert ui.info()["url"] == "/smarthome_ui_ui/smarthome-dashboard-card.js?v=1.281.0"
         assert hass.states.get("update.system_dashboard").state == "off"
 
