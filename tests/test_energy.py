@@ -27,7 +27,11 @@ def test_energy_from_prefs() -> None:
             {"type": "water", "stat_energy_from": "sensor.wasserzaehler"},
         ],
         "device_consumption": [
-            {"stat_consumption": "sensor.waschmaschine_energie", "name": "Waschmaschine"},
+            {
+                "stat_consumption": "sensor.waschmaschine_energie",
+                "name": "Waschmaschine",
+                "stat_rate": "sensor.waschmaschine_leistung",
+            },
             {"stat_consumption": "sensor.kuehlschrank_energie"},
         ],
     }
@@ -41,8 +45,12 @@ def test_energy_from_prefs() -> None:
     assert out["battery_discharge"] == ["sensor.akku_entladen"]
     assert out["water"] == ["sensor.wasserzaehler"]
     assert out["consumers"] == [
-        {"entity": "sensor.waschmaschine_energie", "name": "Waschmaschine"},
-        {"entity": "sensor.kuehlschrank_energie", "name": None},
+        {
+            "entity": "sensor.waschmaschine_energie",
+            "name": "Waschmaschine",
+            "power": "sensor.waschmaschine_leistung",
+        },
+        {"entity": "sensor.kuehlschrank_energie", "name": None, "power": None},
     ]
     # newer format: the grid meters on the source itself
     new = energy_from_prefs(

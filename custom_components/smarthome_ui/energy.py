@@ -60,7 +60,11 @@ def energy_from_prefs(prefs: dict[str, Any]) -> dict[str, Any]:
             out[kind] += _ids([src.get("stat_energy_from")])
     for dev in prefs.get("device_consumption") or []:
         if eid := next(iter(_ids([dev.get("stat_consumption")])), None):
-            out["consumers"].append({"entity": eid, "name": dev.get("name") or None})
+            # the power sensor set for the device (stat_rate), so the card does not have to guess it
+            power = next(iter(_ids([dev.get("stat_rate")])), None)
+            out["consumers"].append(
+                {"entity": eid, "name": dev.get("name") or None, "power": power}
+            )
     return out
 
 
