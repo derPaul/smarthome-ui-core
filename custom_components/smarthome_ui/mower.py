@@ -47,6 +47,11 @@ _SKIP = re.compile(
 _MODE_VALUE = re.compile(
     r"^(mow|mowing|border|edge|grid|zone|working|chessboard|spot|kanten|rand|mähen)", re.IGNORECASE
 )
+# collecting leaves or clippings (mowers with a bin, e.g. Yuka) is not mowing. Between two loads the
+# mower drives with state ``mowing``, so a job counts as collecting until 15 minutes after the
+# switches went off.
+COLLECT_KEYS = ("manual_grass_collection", "manual_grass_dump")
+COLLECT_GRACE_MS = 15 * 60 * 1000
 _NO_ZONE = re.compile(r"not working|keine|none|unknown|unavailable", re.IGNORECASE)
 _MODES = {
     "mowing": "Mähen",
@@ -107,6 +112,8 @@ class MowerTracker:
         self.name = subentry.title
         self.device_id: str = subentry.data[CONF_DEVICE]
         self._seen: dict[str, int] = {}
+        self._collect_seen = 0
+        self.collecting = False
         self.active: dict[str, dict[str, Any]] = {}
         self.areas: list[str] = []
         self.on_unusual: Callable[[Any, str, dict[str, Any]], None] | None = None
@@ -326,11 +333,25 @@ class MowerTracker:
                 add(name)
         return names
 
+    def _collecting(self) -> bool:
+        """Return True while the mower collects (leaves) instead of mowing."""
+        now = now_ms()
+        for entry in self.entities():
+            if entry.domain == "switch" and entry.translation_key in COLLECT_KEYS:
+                state = self.hass.states.get(entry.entity_id)
+                if state is not None and state.state == "on":
+                    self._collect_seen = now
+        return bool(self._collect_seen) and now - self._collect_seen < COLLECT_GRACE_MS
+
     def current(self, names: list[str]) -> dict[str, dict[str, Any]]:
         """Return the areas being mowed right now (per-area sensor or position)."""
         out: dict[str, dict[str, Any]] = {}
         mower = self.hass.states.get(self.entity_id or "")
+        self.collecting = False
         if mower is None or mower.state not in ("mowing", "paused", "returning"):
+            return out
+        if self._collecting():
+            self.collecting = True
             return out
         lower = {n.lower(): n for n in names}
         zone = self.zone_entity
@@ -401,7 +422,9 @@ class MowerTracker:
             seen = self._seen.get(name, 0)
             end = seen if seen > cur["start"] else now
             mins = round(max(0, end - cur["start"]) / 60000)
-            if cur.get("task") or mins >= MOW_MIN_MINUTES:
+            if self.collecting:  # the job turned out to collect leaves: keep the previous result
+                nxt[name] = {**(cur.get("prev") or {}), "mower": self.id}
+            elif cur.get("task") or mins >= MOW_MIN_MINUTES:
                 nxt[name] = {
                     "last": end,
                     "mode": cur.get("mode") or "",

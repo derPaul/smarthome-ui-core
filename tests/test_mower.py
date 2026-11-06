@@ -262,3 +262,49 @@ async def test_entities_on_mower_device(hass: HomeAssistant, notify_calls) -> No
     ):
         assert registry.async_get(entity_id).device_id == device_id, entity_id
     assert not [d for d in dr.async_get(hass).devices.values() if d.name == "Smarthome UI Core"]
+
+
+async def test_collecting_leaves_is_not_mowing(hass: HomeAssistant, notify_calls, freezer) -> None:
+    freezer.move_to("2026-11-06 10:00:00")
+    device_id = _mower_device(hass)
+    ents = er.async_get(hass)
+    other = next(e for e in hass.config_entries.async_entries("mammotion"))
+    for uid, oid, key in (
+        ("gc", "luba_collect", "manual_grass_collection"),
+        ("gd", "luba_dump", "manual_grass_dump"),
+    ):
+        ents.async_get_or_create(
+            "switch",
+            "mammotion",
+            uid,
+            device_id=device_id,
+            suggested_object_id=oid,
+            translation_key=key,
+            config_entry=other,
+        )
+        hass.states.async_set(f"switch.{oid}", "off", {"friendly_name": oid})
+    entry = await _setup(hass, device_id)
+
+    # the job starts in an area, a moment later the bin collects
+    hass.states.async_set("lawn_mower.luba", "mowing", {"friendly_name": "Luba"})
+    hass.states.async_set("sensor.luba_work_area", "Luba Bereich Hinten", {"friendly_name": "x"})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=30))
+    hass.states.async_set("switch.luba_collect", "on", {"friendly_name": "c"})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=40))
+    hass.states.async_set("switch.luba_collect", "off", {"friendly_name": "c"})
+    hass.states.async_set("switch.luba_dump", "on", {"friendly_name": "d"})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=5))
+    # between two loads: driving with "mowing", switches off – still collecting
+    hass.states.async_set("switch.luba_dump", "off", {"friendly_name": "d"})
+    hass.states.async_set("sensor.luba_work_area", "Luba Bereich Hinten", {"friendly_name": "y"})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=10))
+    hass.states.async_set("lawn_mower.luba", "returning", {"friendly_name": "Luba"})
+    hass.states.async_set("sensor.luba_work_area", "not working", {"friendly_name": "x"})
+    await hass.async_block_till_done()
+    log = entry.runtime_data.store.data["data"]["mow_log"]
+    assert not log.get("Hinten", {}).get("last")
+    assert hass.states.get("sensor.garden_hinten_last_mowed").state == "unknown"

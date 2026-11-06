@@ -174,7 +174,8 @@ findet Core am Gerät selbst (z. B. bei Mammotion, Husqvarna, Gardena):
 - **Mähflächen:** aus den Bereichs-Schaltern des Mähers und dem, was er mäht (Flächen-Sensor während einer
   Aufgabe oder Positions-Sensor). Core merkt sich je Fläche, wann sie zuletzt gemäht wurde, wie lange und wie
   (z. B. „Kanten“) – **auch ohne offenes Dashboard**. Eine kurze Durchfahrt (unter 10 Minuten, nur laut Position)
-  zählt nicht.
+  zählt nicht. **Laub sammeln** (Mäher mit Sammelbehälter wie Yuka: Schalter „Sammeln“/„Entleeren“ an, bis
+  15 Minuten danach) zählt ebenfalls nicht als Mähen.
 - **Entitäten am Mäher-Gerät:** je Fläche `sensor.garden_<fläche>_last_mowed` (Zeitstempel, Attribute `mode`,
   `minutes`, `mowing`). Sie erscheinen auf der Geräteseite des Mähers.
 - **Mitteilungen** (Quelle „Mähroboter“ im Dashboard, Push an): Fehler, Selbsttest meldet ein Problem
