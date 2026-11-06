@@ -607,6 +607,23 @@ Gehen (Standard 5 min), Auslassen, wenn kürzlich gesaugt (4 h), Zeitfenster (7�
 `zone.home` auf 0 fällt – also wenn der Letzte das Haus verlässt. Im Dashboard lässt sich die Automation in der
 Saugroboter-Kachel anlegen, ein- und ausschalten.
 
+## Heizung: Thermostat-Displays und PV-Überschuss
+
+Drei weitere **Vorlagen (Blueprints)** unter *Einstellungen → Automationen & Szenen → Blueprints*:
+
+- **Thermostat-Display nach Uhrzeit** – dimmt die Displays der Raumthermostate (Meross LAN: Helligkeit „Bedienung“
+  und „Standby“) nachts und macht sie morgens wieder hell. Eingaben: Thermostate (Geräte), Nacht ab / Morgens ab,
+  Helligkeit tagsüber und nachts (Schritte von 12,5 %; Standby 0 = aus).
+- **Thermostat-Display nach Anwesenheit** – hell, sobald jemand da ist (Präsenz-/Bewegungsmelder an, Person oder
+  Gerät zuhause, Schalter an – eins reicht), dunkel, wenn eine Weile niemand mehr da ist (Standard 10 min).
+  Optional eine Nachtruhe, in der es immer dunkel bleibt (beide Zeiten gleich = keine).
+- **Estrich mit PV-Überschuss laden** – für Fußbodenheizung mit Wärmepumpe: speist die Anlage eine Weile mehr als
+  eingestellt ein (Netzleistung unter z. B. −1500 W für 10 min, Batterie optional mindestens 80 %, Startfenster
+  10–14:30 Uhr), hebt sie die Sollwerte der Raumthermostate **und** der Wärmepumpe (z. B. „Tagbetrieb Temperatursoll“
+  – eine Wärmepumpe mit Heizkurve heizt sonst nicht mehr) um 1 K an. Zur Endzeit (16:30) oder bei Netzbezug über
+  800 W für 15 min stellt sie die vorherigen Werte wieder her (Momentaufnahme; nach einem Neustart um den gleichen
+  Betrag zurück). Ein Merker-Schalter (`input_boolean`) hält fest, dass gerade geladen wird – einmal am Tag.
+
 ## Bildschirme
 
 Jedes Gerät, auf dem das Dashboard offen ist (Wandtablet, Handy, Browser), erscheint automatisch als

@@ -1,0 +1,111 @@
+blueprint:
+  name: Thermostat-Display nach Uhrzeit (Smarthome UI Core)
+  description: >-
+    Dimmt die Displays der Raumthermostate nachts und macht sie morgens wieder hell.
+    Für Thermostate über Meross LAN (Helligkeit „Bedienung“ und „Standby“).
+    Helligkeit in Prozent – Meross kennt Schritte von 12,5 %.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/thermostat_display_time.yaml
+  input:
+    thermostats:
+      name: Thermostate
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: meross_lan
+    night_start:
+      name: Nachts ab
+      default: "22:00:00"
+      selector:
+        time:
+    night_end:
+      name: Morgens ab
+      default: "06:30:00"
+      selector:
+        time:
+    day_standby:
+      name: Tagsüber – Standby
+      description: Helligkeit, wenn niemand das Thermostat bedient.
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    day_operation:
+      name: Tagsüber – beim Bedienen
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    night_standby:
+      name: Nachts – Standby
+      description: 0 = Display aus.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    night_operation:
+      name: Nachts – beim Bedienen
+      default: 25
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+
+triggers:
+  - trigger: time
+    at: !input night_start
+  - trigger: time
+    at: !input night_end
+  - trigger: homeassistant
+    event: start
+
+variables:
+  thermostats: !input thermostats
+  standby: >-
+    {{ thermostats | map('device_entities') | sum(start=[])
+       | select('search', 'screenbrightness_standby') | list }}
+  operation: >-
+    {{ thermostats | map('device_entities') | sum(start=[])
+       | select('search', 'screenbrightness_operation') | list }}
+
+actions:
+  - if:
+      - condition: time
+        after: !input night_start
+        before: !input night_end
+    then:
+      - action: number.set_value
+        target:
+          entity_id: "{{ standby }}"
+        data:
+          value: !input night_standby
+      - action: number.set_value
+        target:
+          entity_id: "{{ operation }}"
+        data:
+          value: !input night_operation
+    else:
+      - action: number.set_value
+        target:
+          entity_id: "{{ standby }}"
+        data:
+          value: !input day_standby
+      - action: number.set_value
+        target:
+          entity_id: "{{ operation }}"
+        data:
+          value: !input day_operation
+
+mode: restart

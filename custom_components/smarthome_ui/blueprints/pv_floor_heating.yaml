@@ -1,0 +1,237 @@
+blueprint:
+  name: Estrich mit PV-Überschuss laden (Smarthome UI Core)
+  description: >-
+    Bei Sonnenstrom-Überschuss hebt die Automation die Sollwerte der Fußbodenheizung an
+    (Raumthermostate und – wichtig bei Wärmepumpen mit Heizkurve – den Tag-Sollwert des
+    Heizkreises), damit der Estrich die Wärme für den Abend speichert. Zur Endzeit oder
+    wenn länger Strom aus dem Netz kommt, stellt sie alles auf die vorherigen Werte zurück.
+    Einmal am Tag. Der Merker (ein Schalter-Helfer) hält fest, dass gerade geladen wird –
+    so wird auch nach einem Neustart zurückgestellt.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/pv_floor_heating.yaml
+  input:
+    grid_power:
+      name: Netzleistung
+      description: Positiv = Bezug aus dem Netz, negativ = Einspeisung.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+    export_below:
+      name: Starten bei Netzleistung unter
+      description: Negativ = so viel wird mindestens eingespeist (z. B. -1500 W).
+      default: -1500
+      selector:
+        number:
+          min: -20000
+          max: 0
+          step: 100
+          unit_of_measurement: W
+    start_for:
+      name: … für mindestens
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: min
+    import_above:
+      name: Vorzeitig zurück bei Netzbezug über
+      default: 800
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 100
+          unit_of_measurement: W
+    import_for:
+      name: … für mindestens
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+    battery:
+      name: Batterie-Ladestand (optional)
+      description: Erst laden, wenn die Batterie so voll ist.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    min_soc:
+      name: Batterie mindestens
+      default: 80
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    thermostats:
+      name: Raumthermostate
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: climate
+    setpoints:
+      name: Sollwerte der Wärmepumpe (optional)
+      description: z. B. „Tagbetrieb Temperatursoll HK 1“ – ohne das heizt eine Wärmepumpe mit Heizkurve nicht mehr.
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: number
+    boost:
+      name: Anheben um
+      default: 1
+      selector:
+        number:
+          min: 0.5
+          max: 3
+          step: 0.5
+          unit_of_measurement: K
+    start_after:
+      name: Starten frühestens um
+      default: "10:00:00"
+      selector:
+        time:
+    start_before:
+      name: Starten spätestens um
+      default: "14:30:00"
+      selector:
+        time:
+    end_at:
+      name: Zurückstellen um
+      default: "16:30:00"
+      selector:
+        time:
+    flag:
+      name: Merker
+      description: Ein Schalter-Helfer (input_boolean), z. B. „Estrich wird geladen“.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input grid_power
+    below: !input export_below
+    for:
+      minutes: !input start_for
+    id: start
+  - trigger: numeric_state
+    entity_id: !input grid_power
+    above: !input import_above
+    for:
+      minutes: !input import_for
+    id: stop
+  - trigger: time
+    at: !input end_at
+    id: stop
+
+variables:
+  thermostats: !input thermostats
+  setpoints: !input setpoints
+  boost: !input boost
+  battery: !input battery
+  min_soc: !input min_soc
+  scene_id: "{{ 'pv_estrich_' ~ this.entity_id.split('.')[1] }}"
+
+actions:
+  - choose:
+      - alias: Überschuss → Sollwerte anheben
+        conditions:
+          - condition: trigger
+            id: start
+          - condition: state
+            entity_id: !input flag
+            state: "off"
+          - condition: time
+            after: !input start_after
+            before: !input start_before
+          - condition: template
+            value_template: "{{ not battery or states(battery) | float(0) >= min_soc }}"
+        sequence:
+          - action: scene.create
+            data:
+              scene_id: "{{ scene_id }}"
+              snapshot_entities: "{{ thermostats + setpoints }}"
+          - action: input_boolean.turn_on
+            target:
+              entity_id: !input flag
+          - repeat:
+              for_each: "{{ thermostats }}"
+              sequence:
+                - condition: template
+                  value_template: "{{ state_attr(repeat.item, 'temperature') is number }}"
+                - action: climate.set_temperature
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    temperature: >-
+                      {{ [state_attr(repeat.item, 'temperature') + boost,
+                          state_attr(repeat.item, 'max_temp') | float(35)] | min }}
+          - repeat:
+              for_each: "{{ setpoints }}"
+              sequence:
+                - condition: template
+                  value_template: "{{ states(repeat.item) | is_number }}"
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    value: >-
+                      {{ [states(repeat.item) | float + boost,
+                          state_attr(repeat.item, 'max') | float(99)] | min }}
+      - alias: Zurückstellen
+        conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: !input flag
+            state: "on"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ expand('scene.' ~ scene_id) | count > 0 }}"
+            then:
+              - action: scene.turn_on
+                target:
+                  entity_id: "{{ 'scene.' ~ scene_id }}"
+              - action: scene.delete
+                target:
+                  entity_id: "{{ 'scene.' ~ scene_id }}"
+            else:
+              # nach einem Neustart fehlt die Momentaufnahme: um den gleichen Betrag absenken
+              - repeat:
+                  for_each: "{{ thermostats }}"
+                  sequence:
+                    - condition: template
+                      value_template: "{{ state_attr(repeat.item, 'temperature') is number }}"
+                    - action: climate.set_temperature
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        temperature: "{{ state_attr(repeat.item, 'temperature') - boost }}"
+              - repeat:
+                  for_each: "{{ setpoints }}"
+                  sequence:
+                    - condition: template
+                      value_template: "{{ states(repeat.item) | is_number }}"
+                    - action: number.set_value
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        value: "{{ states(repeat.item) | float - boost }}"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input flag
+
+mode: queued
+max: 3

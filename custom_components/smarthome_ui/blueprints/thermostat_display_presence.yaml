@@ -1,0 +1,173 @@
+blueprint:
+  name: Thermostat-Display nach Anwesenheit (Smarthome UI Core)
+  description: >-
+    Macht die Displays der Raumthermostate hell, sobald jemand da ist, und dunkel, wenn
+    eine Weile niemand mehr da ist. „Da“ heißt: ein Präsenz- oder Bewegungsmelder an,
+    eine Person bzw. ein Gerät zuhause oder ein Schalter an – eins reicht.
+    Optional bleiben die Displays in einer Nachtruhe immer dunkel.
+    Für Thermostate über Meross LAN (Helligkeit „Bedienung“ und „Standby“).
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/thermostat_display_presence.yaml
+  input:
+    thermostats:
+      name: Thermostate
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: meross_lan
+    presence:
+      name: Anwesenheit
+      description: >-
+        Präsenzmelder im Raum (nur dieses Zimmer) oder Personen (ganzes Haus).
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+            - domain: person
+            - domain: device_tracker
+            - domain: input_boolean
+    delay:
+      name: Dunkel nach
+      description: So lange muss niemand mehr da sein.
+      default: 10
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: min
+    present_standby:
+      name: Jemand da – Standby
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    present_operation:
+      name: Jemand da – beim Bedienen
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    absent_standby:
+      name: Niemand da – Standby
+      description: 0 = Display aus.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    absent_operation:
+      name: Niemand da – beim Bedienen
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 12.5
+          unit_of_measurement: "%"
+    quiet_start:
+      name: Nachtruhe ab
+      description: In der Nachtruhe bleibt es dunkel, auch wenn jemand da ist. Beide Zeiten gleich = keine Nachtruhe.
+      default: "00:00:00"
+      selector:
+        time:
+    quiet_end:
+      name: Nachtruhe bis
+      default: "00:00:00"
+      selector:
+        time:
+
+triggers:
+  - trigger: state
+    entity_id: !input presence
+    to: ["on", "home"]
+    id: arrive
+  - trigger: state
+    entity_id: !input presence
+    from: ["on", "home"]
+    for:
+      minutes: !input delay
+    id: leave
+  - trigger: time
+    at: !input quiet_start
+    id: check
+  - trigger: time
+    at: !input quiet_end
+    id: check
+  - trigger: homeassistant
+    event: start
+    id: check
+
+variables:
+  thermostats: !input thermostats
+  quiet_start: !input quiet_start
+  quiet_end: !input quiet_end
+  standby: >-
+    {{ thermostats | map('device_entities') | sum(start=[])
+       | select('search', 'screenbrightness_standby') | list }}
+  operation: >-
+    {{ thermostats | map('device_entities') | sum(start=[])
+       | select('search', 'screenbrightness_operation') | list }}
+
+actions:
+  - choose:
+      - alias: Nachtruhe oder niemand da → dunkel
+        conditions:
+          - condition: or
+            conditions:
+              - condition: and
+                conditions:
+                  - condition: template
+                    value_template: "{{ quiet_start != quiet_end }}"
+                  - condition: time
+                    after: !input quiet_start
+                    before: !input quiet_end
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: [leave, check]
+                  - condition: not
+                    conditions:
+                      - condition: state
+                        entity_id: !input presence
+                        state: ["on", "home"]
+                        match: any
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: "{{ standby }}"
+            data:
+              value: !input absent_standby
+          - action: number.set_value
+            target:
+              entity_id: "{{ operation }}"
+            data:
+              value: !input absent_operation
+      - alias: Jemand da → hell
+        conditions:
+          - condition: state
+            entity_id: !input presence
+            state: ["on", "home"]
+            match: any
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: "{{ standby }}"
+            data:
+              value: !input present_standby
+          - action: number.set_value
+            target:
+              entity_id: "{{ operation }}"
+            data:
+              value: !input present_operation
+
+mode: restart
