@@ -254,3 +254,17 @@ async def test_battery_forecast_with_heat_pump_runs(hass: HomeAssistant, hass_ws
     assert with_runs["hp_runs"] > 0
     # 1.2 kW for a third of the time = 400 W instead of the 300 W average: empty sooner
     assert with_runs["empty"] < base["empty"]
+
+
+async def test_inverter_night_state_is_no_fault(
+    hass: HomeAssistant, hass_ws_client, notify_calls
+) -> None:
+    """Fronius reports "too little DC power" every evening: normal, not a fault."""
+    entry = await _setup(hass, hass_ws_client)
+    technik = entry.runtime_data.technik
+    for state in ("too_little_dc_power_for_feed_in_operation", "Zu geringe DC-Leistung"):
+        hass.states.async_set("sensor.wr_status", state, {})
+        technik.evaluate()
+        await hass.async_block_till_done()
+        assert "inv_error" not in technik.hints
+    assert notify_calls == []

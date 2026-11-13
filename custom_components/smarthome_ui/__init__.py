@@ -706,6 +706,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "ui",
             "lights",
             "dashboard_yaml",
+            "notify_mute",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -718,6 +719,12 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "enabled": store.data["notify"].get("enabled", True),
             "rules": len(store.data["notify"].get("rules") or []),
             "targets": runtime.engine.targets(),
+            "mute": len(store.data["notify"].get("mute") or {}),
+            # last pushes, so a message that only comes now and then can be muted
+            "recent": [
+                {k: r.get(k) for k in ("t", "title", "message", "src")}
+                for r in (store.data.get("recent") or [])[:15]
+            ],
         },
     }
 
@@ -850,6 +857,7 @@ def ws_tasks_sync(
         vol.Optional("quiet"): vol.Any(None, dict),
         vol.Optional("task_hour"): vol.Any(None, vol.All(int, vol.Range(min=0, max=23))),
         vol.Optional("enabled"): bool,
+        vol.Optional("mute"): {str: vol.In(["off", "nopush"])},
     }
 )
 @callback

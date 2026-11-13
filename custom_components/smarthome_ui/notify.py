@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, time as dtime, timedelta
 import logging
+import re
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
@@ -70,6 +71,11 @@ def in_quiet(quiet: dict[str, Any] | None, now: datetime) -> bool:
     end = _parse_hhmm(quiet["to"], dtime(7, 0))
     t = now.time()
     return (start <= t or t < end) if start > end else (start <= t < end)
+
+
+def mute_key(src: str, message: str) -> str:
+    """Key of one message to mute: source and text, numbers and times left out (as in the card)."""
+    return f"{src or ''}|{re.sub(r'[\d.,:]+', '#', str(message or '')).strip()}"
 
 
 def urgent_data(urgent: bool) -> dict[str, Any]:
@@ -460,6 +466,11 @@ class NotifyEngine:
             return [t for t in own if t in services]
         return [t for t in services if t.startswith("mobile_app_")]
 
+    def muted(self, src: str, message: str) -> bool:
+        """Whether the user muted exactly this message (in the card: "Kein Push" or "Aus")."""
+        mute = self.config.get("mute") or {}
+        return bool(mute) and mute.get(mute_key(src, message)) in ("off", "nopush")
+
     @callback
     def send(
         self,
@@ -474,8 +485,11 @@ class NotifyEngine:
         actions: list[dict[str, str]] | None = None,
         camera: str | None = None,
     ) -> bool:
-        """Send a notification to all targets (unless paused or in quiet hours)."""
+        """Send a notification to all targets (unless paused, muted or in quiet hours)."""
         if not force and not self.config.get("enabled", True):
+            return False
+        if not force and self.muted(src, message):
+            _LOGGER.debug("Muted notification: %s", message)
             return False
         item = {
             "title": title,

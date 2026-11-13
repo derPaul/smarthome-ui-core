@@ -78,6 +78,9 @@ Außerdem:
 - **Fällige Aufgaben** (siehe unten) – am Fälligkeitstag zur eingestellten Uhrzeit (Standard 9 Uhr).
 - **Dringlich** – iPhone: zeitkritisch (kommt auch im Fokus-Modus), Android: hohe Priorität.
 - **Ruhezeiten** – nicht dringliche Mitteilungen werden bis zum Ende der Ruhezeit zurückgehalten.
+- **Einzelne Meldungen stumm** – im Dashboard (Mitteilungen → Einzelne Meldungen) lässt sich genau eine
+  Meldung auf „Kein Push“ oder „Aus“ stellen, z. B. eine, die jeden Abend kommt. Zahlen und Uhrzeiten im Text
+  zählen dabei nicht; Test-Mitteilungen kommen immer.
 - **Empfänger** – die im Dashboard gewählten `notify`-Dienste, sonst alle `notify.mobile_app_…`.
 
 | Entität / Aktion | |

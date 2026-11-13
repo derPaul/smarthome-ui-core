@@ -281,3 +281,24 @@ async def test_calendar_rule(hass: HomeAssistant, entry, notify_calls, freezer) 
     assert [c.data["message"] for c in notify_calls][-1] == "09:00 · Zahnarzt"
     await _tick(hass, freezer, 30 * 60)
     assert len(notify_calls) == 2
+
+
+async def test_muted_message_is_not_sent(hass: HomeAssistant, entry, notify_calls) -> None:
+    """One message muted in the card (numbers do not count) is not pushed; others still are."""
+    from custom_components.smarthome_ui.notify import mute_key
+
+    engine = entry.runtime_data.engine
+    key = mute_key("ht.energy", "Wechselrichter: Fehler 12")
+    assert key == "ht.energy|Wechselrichter# Fehler #"
+    await _config(hass, entry, mute={key: "nopush"})
+    assert not engine.send("Wechselrichter", "Wechselrichter: Fehler 37", src="ht.energy")
+    await hass.async_block_till_done()
+    assert notify_calls == []
+    # another source with the same text, or another text: sent
+    assert engine.send("Wechselrichter", "Wechselrichter: Fehler 37", src="ht.heating")
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 1
+    # a test notification (force) always goes out
+    assert engine.send("Test", "Wechselrichter: Fehler 1", src="ht.energy", force=True)
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 2

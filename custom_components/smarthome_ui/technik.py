@@ -83,8 +83,8 @@ DEFAULTS: dict[str, Any] = {
     "checks": {"pressure": True, "water": True, "cycling": True, "baseload": True},
 }
 _BENIGN = re.compile(
-    r"(zu geringe dc|dc.?leistung.*gering|low dc|insufficient dc|schlaf|sleep|standby|nacht|night|"
-    r"keine sonne|no sun)",
+    r"(zu geringe dc|dc.?leistung.*gering|low dc|insufficient dc|too.?little.?dc|schlaf|sleep|"
+    r"standby|nacht|night|keine sonne|no sun)",
     re.IGNORECASE,
 )
 _NO_ERROR = re.compile(
