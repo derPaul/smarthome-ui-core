@@ -16,6 +16,10 @@ Then it announces the start (push with "Not today", N minutes ahead) and starts 
 areas: vacuum ``vacuum.clean_area`` (else ``vacuum.start``), mower: area switches on/off and
 ``lawn_mower.start_mowing`` (else a job button with the area's name). At most one automatic
 start per robot and day.
+
+Mower midday rest (e.g. weekends and holidays 13:00–15:00, only for chosen modes): at the start the
+mower is sent to its station (``lawn_mower.dock``), afterwards it carries on ("continue last job"
+button, else ``lawn_mower.start_mowing``). The planner does not start during the rest.
 """
 
 from __future__ import annotations
@@ -42,7 +46,7 @@ from .const import (
     SIGNAL_VACUUM,
 )
 from .entity import attach_device
-from .mower import MowerTracker, area_name
+from .mower import MowerTracker, area_name, noon_settings
 from .notify import NotifyEngine, in_quiet
 from .store import CoreStore, now_ms
 from .tasks import task_states
@@ -85,6 +89,7 @@ STATUS = [
     "nothing_due",
     "waiting_window",
     "waiting_quiet",
+    "waiting_noon",
     "waiting_home",
     "waiting_rain",
     "waiting_solar",
@@ -145,6 +150,7 @@ class RobotPlanner:
         self.mop_due: list[str] = []
         self.unreachable: list[str] = []
         self.start_at: int | None = None
+        self.noon: str | None = None  # midday rest: None, "active" (window) or "paused" (docked)
 
     # ---------------------------------------------------------------- stored switches
 
@@ -268,6 +274,8 @@ class RobotPlanner:
         inside = (start <= t < end) if start <= end else (t >= start or t < end)
         if not inside:
             return "waiting_window"
+        if self.noon is not None:
+            return "waiting_noon"
         if s.get("cond_quiet") and in_quiet(self.store.data["notify"].get("quiet"), local):
             return "waiting_quiet"
         if s.get("cond_away") and any(
@@ -313,7 +321,9 @@ class RobotPlanner:
         local = dt_util.now()
         today = local.date().isoformat()
         st = self._state()
-        before = (self.status, tuple(self.due), tuple(self.mop_due), self.start_at)
+        before = (self.status, tuple(self.due), tuple(self.mop_due), self.start_at, self.noon)
+        if self.kind == KIND_MOWER:
+            self._midday(local, st)
         self.due = self.due_areas() if self.is_on else []
         self.mop_due = self.mop_due_areas() if self.is_on else []
         # rooms on another floor than the vacuum: not started, but mentioned (carry it up/down?)
@@ -350,8 +360,68 @@ class RobotPlanner:
             st["started"] = today
             self.status, self.start_at = "started", None
             self._changed(save=True)
-        if (self.status, tuple(self.due), tuple(self.mop_due), self.start_at) != before:
+        if (self.status, tuple(self.due), tuple(self.mop_due), self.start_at, self.noon) != before:
             self._changed()
+
+    # ---------------------------------------------------------------- midday rest
+
+    def _free_day(self, local: datetime) -> bool:
+        """Return True on weekends and public holidays (workday sensor, else Sat/Sun)."""
+        for entry in er.async_get(self.hass).entities.values():
+            if entry.domain == "binary_sensor" and entry.platform == "workday":
+                state = self.hass.states.get(entry.entity_id)
+                if state is not None and state.state in ("on", "off"):
+                    return state.state == "off"
+        return local.weekday() >= 5
+
+    def noon_window(self, local: datetime) -> bool:
+        """Return True while the midday rest of the mower applies."""
+        if not isinstance(self.tracker, MowerTracker):
+            return False
+        cfg = noon_settings(self.tracker.settings().get("noon"))
+        if not cfg["on"]:
+            return False
+        if cfg["days"] == "weekend" and local.weekday() < 5:
+            return False
+        if cfg["days"] == "free" and not self._free_day(local):
+            return False
+        start, end = _hhmm(cfg["from"], dtime(13, 0)), _hhmm(cfg["to"], dtime(15, 0))
+        t = local.time()
+        return (start <= t < end) if start <= end else (t >= start or t < end)
+
+    def _midday(self, local: datetime, st: dict[str, Any]) -> None:
+        """Midday rest: send the mower home at the start, let it carry on afterwards."""
+        assert isinstance(self.tracker, MowerTracker)
+        today = local.date().isoformat()
+        entity = self.tracker.entity_id
+        mower = self.hass.states.get(entity or "")
+        paused = st.get("noon_paused")
+        if self.noon_window(local):
+            cfg = noon_settings(self.tracker.settings().get("noon"))
+            mode = self.tracker.job_mode()
+            # once per day: started again by hand during the rest → leave it alone
+            if not paused and mode in cfg["modes"] and st.get("noon_day") != today and entity:
+                self._call("lawn_mower", "dock", {"entity_id": entity})
+                st["noon_paused"] = {"day": today, "mode": mode, "at": now_ms()}
+                st["noon_day"] = today
+                self._changed(save=True)
+            self.noon = "paused" if st.get("noon_paused") else "active"
+            return
+        self.noon = None
+        if not paused:
+            return
+        state = mower.state if mower is not None else "unavailable"
+        if paused.get("day") != today or state in ("mowing", "error", "unavailable"):
+            st.pop("noon_paused", None)  # already going again, broken or a day old: forget it
+            self._changed(save=True)
+        elif state in ("docked", "idle", "paused"):
+            if button := self.tracker.resume_button():
+                self._call("button", "press", {"entity_id": button})
+            elif entity:
+                self._call("lawn_mower", "start_mowing", {"entity_id": entity})
+            st.pop("noon_paused", None)
+            self._changed(save=True)
+        # still on the way home ("returning"): try again next minute
 
     def _mop_pass(self, st: dict[str, Any]) -> None:
         """Second pass: mop the rooms once vacuuming has finished and the robot is back."""
@@ -569,6 +639,7 @@ class RobotPlanner:
             "mop": self.can_mop(),
             "unreachable": self.unreachable,
             "start_at": self.start_at,
+            "noon": self.noon,
             "switch": entity_id_for(self.hass, "switch", f"planner_{self.id}"),
         }
 

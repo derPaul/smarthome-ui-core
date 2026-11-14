@@ -335,6 +335,7 @@
           "nothing_due": "Nothing due",
           "waiting_window": "Waiting for the time window",
           "waiting_quiet": "Quiet hours",
+          "waiting_noon": "Midday rest",
           "waiting_home": "Waiting until nobody is home",
           "waiting_rain": "Waiting: rain",
           "waiting_solar": "Waiting for solar power",

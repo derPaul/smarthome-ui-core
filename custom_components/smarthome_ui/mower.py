@@ -76,6 +76,35 @@ FREQ_FACTOR = {"often": 0.67, "normal": 1.0, "rare": 1.5}
 FREQ_OPTIONS = ["often", "normal", "rare", "pause"]
 CHECK_OK = ["ok", "OK", "unknown", "unavailable", "", "none", "normal", "rain"]
 CHECK_OK += ["non_working_hours", "low_battery"]
+# midday rest (e.g. weekends and holidays 13–15): the mower docks and resumes afterwards
+NOON_MODES = ["mow", "collect", "leaf", "edge"]
+NOON_DAYS = ["free", "weekend", "daily"]
+NOON_DEFAULT: dict[str, Any] = {
+    "on": False,
+    "from": "13:00",
+    "to": "15:00",
+    "days": "free",
+    "modes": list(NOON_MODES),
+}
+# job settings of the mower (Mammotion: unique ID ends with is_dump / is_edge)
+COLLECT_JOB_KEYS = ("is_dump", "collect_clippings")
+EDGE_JOB_KEYS = ("is_edge", "cut_edge")
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def noon_settings(raw: Any) -> dict[str, Any]:
+    """Return complete, valid midday rest settings."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {**NOON_DEFAULT}
+    out["on"] = bool(raw.get("on", False))
+    for key in ("from", "to"):
+        if isinstance(raw.get(key), str) and _HHMM.match(raw[key]):
+            out[key] = raw[key]
+    if raw.get("days") in NOON_DAYS:
+        out["days"] = raw["days"]
+    if isinstance(raw.get("modes"), list):
+        out["modes"] = [m for m in NOON_MODES if m in raw["modes"]]
+    return out
 
 
 def _is_number(value: str) -> bool:
@@ -163,6 +192,7 @@ class MowerTracker:
             "plan": dict(settings.get("plan") or {}),
             "interval": settings.get("interval"),
             "freq": dict(settings.get("freq") or {}),
+            "noon": noon_settings(settings.get("noon")),
             "configured": bool(settings),
         }
 
@@ -188,6 +218,8 @@ class MowerTracker:
             settings["freq"] = {
                 str(a): v for a, v in (changes["freq"] or {}).items() if v in FREQ_OPTIONS
             }
+        if "noon" in changes:
+            settings["noon"] = noon_settings(changes["noon"])
         self.store.data["mowing"][self.id] = settings
         self.store.save(SIGNAL_DATA, SIGNAL_TASKS)
         async_dispatcher_send(self.hass, SIGNAL_MOWER, self.id)
@@ -342,6 +374,44 @@ class MowerTracker:
                 if state is not None and state.state == "on":
                     self._collect_seen = now
         return bool(self._collect_seen) and now - self._collect_seen < COLLECT_GRACE_MS
+
+    def _job_switch(self, keys: tuple[str, ...]) -> bool:
+        """Return True if a job setting switch of the mower (e.g. collect clippings) is on."""
+        for entry in self.entities():
+            if entry.domain == "switch" and (
+                entry.translation_key in keys or entry.unique_id.endswith(keys)
+            ):
+                state = self.hass.states.get(entry.entity_id)
+                if state is not None and state.state == "on":
+                    return True
+        return False
+
+    def job_mode(self) -> str | None:
+        """Return what the mower is doing (mow / collect / leaf / edge), None if it is not out."""
+        state = self.hass.states.get(self.entity_id or "")
+        if state is None or state.state != "mowing":
+            return None
+        if self._collecting():
+            return "leaf"
+        if self._job_switch(EDGE_JOB_KEYS) or any(
+            a.get("mode") == "Kanten" for a in self.active.values()
+        ):
+            return "edge"
+        if self._job_switch(COLLECT_JOB_KEYS):
+            return "collect"
+        return "mow"
+
+    def resume_button(self) -> str | None:
+        """Return the "continue last job" button if it can be pressed now."""
+        for entry in self.entities():
+            if entry.domain == "button" and (
+                entry.translation_key in ("continue_last_job", "resume")
+                or entry.unique_id.endswith("continue_last_job")
+            ):
+                state = self.hass.states.get(entry.entity_id)
+                if state is not None and state.state != "unavailable":
+                    return entry.entity_id
+        return None
 
     def current(self, names: list[str]) -> dict[str, dict[str, Any]]:
         """Return the areas being mowed right now (per-area sensor or position)."""

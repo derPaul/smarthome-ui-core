@@ -193,6 +193,14 @@ Bearbeitet wird im Mähplan-Popup des Dashboards; die Häufigkeit je Fläche gib
 - fällige Flächen in `todo.garden` („Vorgarten mähen“ – abhaken = von Hand gemäht),
 - eine Mitteilung am Fälligkeitstag zur Uhrzeit für fällige Aufgaben (Quelle „Mähroboter“, Push an).
 
+**Mittagsruhe** (ab 0.47): je Mäher ein Zeitfenster (z. B. 13:00–15:00), an Wochenenden und Feiertagen
+(Feiertage über den Arbeitstag-Sensor der Integration *Workday*, ohne ihn nur Sa/So), nur am Wochenende oder
+täglich – und für welche Modi (Mähen, Grasschnitt sammeln, Laub sammeln, Kanten). Ist der Mäher zu Beginn in einem
+dieser Modi unterwegs, schickt Core ihn in die Ladestation (`lawn_mower.dock`); nach dem Fenster setzt er die Aufgabe
+fort (Taste „Letzte Aufgabe fortsetzen“, sonst `lawn_mower.start_mowing`). Startet man ihn in der Pause von Hand,
+bleibt er draußen. Der Planer startet in der Mittagsruhe nicht (Status „Mittagsruhe“). Eingestellt wird im
+Mähplan-Popup des Dashboards (Websocket `smarthome_ui/mower/settings` mit `noon`).
+
 Das Dashboard nimmt die Mähroboter dann aus Core – bei mehreren mit Umschalter in der Kachel. Dort lässt sich nur
 noch einstellen, welche Entitäten die Kachel zeigt und wie sie heißen.
 

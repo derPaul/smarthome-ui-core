@@ -248,6 +248,23 @@ async def test_mower_settings_websocket(hass: HomeAssistant, notify_calls, hass_
     await client.send_json_auto_id({"type": "smarthome_ui/get"})
     msg = await client.receive_json()
     assert msg["result"]["mowers"][0]["plan"] == {"6": 6}
+    assert msg["result"]["mowers"][0]["noon"]["on"] is False
+    assert "mower_noon" in msg["result"]["features"]
+    await client.send_json_auto_id(
+        {
+            "type": "smarthome_ui/mower/settings",
+            "mower": mower_id,
+            "noon": {"on": True, "from": "12:30", "to": "bad", "modes": ["leaf"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["result"]["noon"] == {
+        "on": True,
+        "from": "12:30",
+        "to": "15:00",
+        "days": "free",
+        "modes": ["leaf"],
+    }
 
 
 async def test_entities_on_mower_device(hass: HomeAssistant, notify_calls) -> None:

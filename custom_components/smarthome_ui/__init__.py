@@ -707,6 +707,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "lights",
             "dashboard_yaml",
             "notify_mute",
+            "mower_noon",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -949,6 +950,13 @@ def ws_display_update(
         vol.Optional("plan"): vol.Any(None, {vol.Coerce(str): vol.Coerce(int)}),
         vol.Optional("interval"): vol.Any(None, vol.Coerce(int)),
         vol.Optional("freq"): vol.Any(None, {str: str}),
+        vol.Optional("noon"): {
+            vol.Optional("on"): bool,
+            vol.Optional("from"): str,
+            vol.Optional("to"): str,
+            vol.Optional("days"): vol.In(["free", "weekend", "daily"]),
+            vol.Optional("modes"): [vol.In(["mow", "collect", "leaf", "edge"])],
+        },
     }
 )
 @callback
@@ -962,7 +970,7 @@ def ws_mower_settings(
     if tracker is None:
         connection.send_error(msg["id"], "not_found", "Unknown mower")
         return
-    tracker.update_settings({k: msg[k] for k in ("plan", "interval", "freq") if k in msg})
+    tracker.update_settings({k: msg[k] for k in ("plan", "interval", "freq", "noon") if k in msg})
     connection.send_result(msg["id"], tracker.info())
 
 

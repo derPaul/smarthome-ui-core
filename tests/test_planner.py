@@ -14,6 +14,7 @@ from custom_components.smarthome_ui.const import DOMAIN
 from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 
 from .test_mower import _mower_device
 from .test_vacuum import _vacuum_device
@@ -208,3 +209,103 @@ async def test_reconfigure_planner(hass: HomeAssistant, notify_calls) -> None:
     planner = entry.runtime_data.planners.planners[subentry_id]
     assert planner.settings["cond_solar"] is True
     assert planner.settings["cond_away"] is False
+
+
+async def test_mower_midday_rest(
+    hass: HomeAssistant, notify_calls, freezer, hass_ws_client
+) -> None:
+    # Saturday, 12:58 local time (test time zone US/Pacific, UTC-7 in June)
+    freezer.move_to("2026-06-13 19:58:00")
+    device_id = _mower_device(hass)
+    ents = er.async_get(hass)
+    other = next(e for e in hass.config_entries.async_entries("mammotion"))
+    ents.async_get_or_create(
+        "button",
+        "mammotion",
+        "luba1_continue_last_job",
+        device_id=device_id,
+        suggested_object_id="luba_continue",
+        config_entry=other,
+    )
+    hass.states.async_set("button.luba_continue", "unavailable", {"friendly_name": "weiter"})
+    entry = await _setup(hass, "mower", device_id)
+    dock = async_mock_service(hass, "lawn_mower", "dock")
+    press = async_mock_service(hass, "button", "press")
+    tracker = next(iter(entry.runtime_data.mowers.trackers.values()))
+    planner = entry.runtime_data.planners.planners[tracker.id]
+
+    tracker.update_settings(
+        {"noon": {"on": True, "from": "13:00", "to": "15:00", "days": "weekend"}}
+    )
+    result = tracker.info()
+    assert result["noon"] == {
+        "on": True,
+        "from": "13:00",
+        "to": "15:00",
+        "days": "weekend",
+        "modes": ["mow", "collect", "leaf", "edge"],
+    }
+
+    async def minute(n: int = 1) -> None:
+        freezer.tick(timedelta(minutes=n))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    hass.states.async_set("lawn_mower.luba", "mowing", {"friendly_name": "Luba"})
+    await minute()
+    assert not dock and planner.noon is None
+
+    # 13:00 → home to the station
+    await minute(2)
+    assert [c.data["entity_id"] for c in dock] == ["lawn_mower.luba"]
+    assert planner.info()["noon"] == "paused"
+    hass.states.async_set("lawn_mower.luba", "returning", {"friendly_name": "Luba"})
+    await minute()
+    hass.states.async_set("lawn_mower.luba", "docked", {"friendly_name": "Luba"})
+    hass.states.async_set("button.luba_continue", "unknown", {"friendly_name": "weiter"})
+    # started by hand during the rest: left alone (only once a day)
+    hass.states.async_set("lawn_mower.luba", "mowing", {"friendly_name": "Luba"})
+    await minute()
+    hass.states.async_set("lawn_mower.luba", "docked", {"friendly_name": "Luba"})
+    await minute()
+    assert len(dock) == 1
+    # planner may not start during the rest
+    planner.set_on(True)
+    await hass.async_block_till_done()
+    assert planner.status in ("nothing_due", "waiting_noon")
+
+    # 15:00 → carries on with the last job
+    await minute(120)
+    assert planner.noon is None
+    assert [c.data["entity_id"] for c in press] == ["button.luba_continue"]
+    await minute()
+    assert len(press) == 1
+
+
+async def test_midday_rest_only_free_days_and_modes(
+    hass: HomeAssistant, notify_calls, freezer
+) -> None:
+    # Wednesday 13:30 local
+    freezer.move_to("2026-06-10 20:30:00")
+    device_id = _mower_device(hass)
+    entry = await _setup(hass, "mower", device_id)
+    dock = async_mock_service(hass, "lawn_mower", "dock")
+    tracker = next(iter(entry.runtime_data.mowers.trackers.values()))
+    planner = entry.runtime_data.planners.planners[tracker.id]
+    tracker.update_settings({"noon": {"on": True, "days": "free", "modes": ["edge"]}})
+    hass.states.async_set("lawn_mower.luba", "mowing", {"friendly_name": "Luba"})
+    await hass.async_block_till_done()
+    planner.tick()
+    assert planner.noon is None  # workday
+
+    # a public holiday (workday sensor off)
+    workday = MockConfigEntry(domain="workday")
+    workday.add_to_hass(hass)
+    er.async_get(hass).async_get_or_create(
+        "binary_sensor", "workday", "wd", suggested_object_id="workday_sensor", config_entry=workday
+    )
+    hass.states.async_set("binary_sensor.workday_sensor", "off")
+    planner.tick()
+    assert planner.noon == "active"
+    await hass.async_block_till_done()
+    assert not dock  # mowing, but only edges are paused
