@@ -92,6 +92,8 @@ def _default() -> dict[str, Any]:
         "forecast": {},
         # system and network: what the dashboard watches (internet, devices, status, services)
         "system": {},
+        # history per device: {device_id: days} kept shorter than the recorder default
+        "history": {},
         # the dashboard's device settings were taken over into the catalog (device subentries)
         "catalog_migrated": False,
         # later takeovers of the catalog (step 3: home, rooms, household, garden)

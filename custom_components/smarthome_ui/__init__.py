@@ -55,6 +55,7 @@ from .energy import EnergyPrefs
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
+from .history import HistoryKeeper
 from .lights import LightSettings, suggest as suggest_lights, tag_automations
 from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
 from .mailbox import Mailbox
@@ -119,6 +120,7 @@ class CoreRuntime:
     energy: EnergyPrefs
     ui: UiManager
     lights: LightSettings
+    history: HistoryKeeper
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -316,6 +318,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_lights_suggest,
         ws_lights_settings,
         ws_lights_ignore,
+        ws_history_set,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -426,6 +429,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         EnergyPrefs(hass, store),
         UiManager(hass, store, dict(entry.options)),
         LightSettings(hass, store),
+        HistoryKeeper(hass, store),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
@@ -524,6 +528,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     technik.on_settings = technik_settings
     forecasts.async_setup()
     entry.runtime_data.system.async_setup()
+    entry.runtime_data.history.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -623,6 +628,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.technik.async_stop()
     entry.runtime_data.forecasts.async_stop()
     entry.runtime_data.system.async_stop()
+    entry.runtime_data.history.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -671,6 +677,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "technik": runtime.technik.info(),
         "forecast": runtime.forecasts.info(),
         "system": runtime.system.info(),
+        "history": runtime.history.info(),
         "catalog": runtime.catalog.info(
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
@@ -708,6 +715,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "dashboard_yaml",
             "notify_mute",
             "mower_noon",
+            "history_keep",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -772,6 +780,7 @@ def ws_subscribe(
                     "technik": runtime.technik.info(),
                     "forecast": runtime.forecasts.info(),
                     "system": runtime.system.info(),
+                    "history": runtime.history.info(),
                     "catalog": runtime.catalog.info(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
@@ -1215,6 +1224,23 @@ def ws_system_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.system.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
         connection.send_result(msg["id"], runtime.system.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/history/set",
+        vol.Required("device_id"): str,
+        vol.Required("days"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=0, max=365))),
+    }
+)
+@callback
+def ws_history_set(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Keep the history of one device shorter (days) or as by default (None)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.history.set_days(msg["device_id"], msg["days"])
+        connection.send_result(msg["id"], runtime.history.info())
 
 
 @websocket_api.websocket_command(

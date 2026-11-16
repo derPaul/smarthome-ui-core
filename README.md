@@ -471,6 +471,16 @@ offenes Dashboard:
 - **Stromversorgung** („Stromversorgung (Raspberry Pi)“): Unterspannung (`rpi_power`).
 - **Automationen** („Fehler in Automationen“): Der letzte Lauf einer Automation endete mit einem Fehler.
 
+
+### Verlauf je Gerät (ab 0.48)
+
+Home Assistant hebt den Verlauf aller Entitäten gleich lange auf (`purge_keep_days`, Standard 10 Tage). Auf
+der Dashboard-Seite *System* lässt sich je Gerät eine **kürzere** Dauer wählen (1–30 Tage). Core ruft dafür
+jede Nacht um 04:17 (und kurz nach einer Änderung) `recorder.purge_entities` mit den Entitäten des Geräts auf.
+Langzeitstatistiken (Stundenwerte, Energie-Dashboard) bleiben erhalten. Länger als der Standard geht so nicht –
+dafür `purge_keep_days` des Recorders erhöhen und die übrigen Geräte kürzer stellen. Websocket:
+`smarthome_ui/history/set` (`device_id`, `days`, `null` = Standard).
+
 ## Haushaltsgeräte
 
 **„Haushaltsgerät hinzufügen“** (beliebig viele): Gerät eines Geschirrspülers, einer Waschmaschine, eines Trockners oder
