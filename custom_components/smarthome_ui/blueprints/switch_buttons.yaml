@@ -1,0 +1,260 @@
+blueprint:
+  name: Schalter-Tasten (Smarthome UI Core)
+  description: >-
+    Jede Taste eines Schalters frei belegen – getrennt für kurz drücken, lang drücken und gedrückt
+    halten (wiederholt, z. B. zum Dimmen). Gedacht für den Hue Dimmer Switch (Ein, Heller, Dunkler,
+    Aus), passt aber zu jedem Schalter, dessen Tasten in Home Assistant als Ereignis-Entität
+    erscheinen (Hue, Matter, Shelly …). Je Taste lassen sich auch mehrere Entitäten wählen, z. B.
+    dieselbe Taste an zwei Schaltern.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/switch_buttons.yaml
+  input:
+    taste_1:
+      name: "Taste 1 (Hue Dimmer: Ein)"
+      icon: mdi:numeric-1-box-outline
+      input:
+        button_1:
+          name: Taste
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: event
+        short_1:
+          name: Kurz drücken
+          default: []
+          selector:
+            action:
+        long_1:
+          name: Lang drücken
+          description: Einmal, sobald die Taste etwa eine Sekunde gehalten wird.
+          default: []
+          selector:
+            action:
+        hold_1:
+          name: Gedrückt halten (wiederholt)
+          description: Läuft immer wieder, solange die Taste gehalten wird – z. B. heller dimmen.
+          default: []
+          selector:
+            action:
+    taste_2:
+      name: "Taste 2 (Hue Dimmer: Heller)"
+      icon: mdi:numeric-2-box-outline
+      input:
+        button_2:
+          name: Taste
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: event
+        short_2:
+          name: Kurz drücken
+          default: []
+          selector:
+            action:
+        long_2:
+          name: Lang drücken
+          default: []
+          selector:
+            action:
+        hold_2:
+          name: Gedrückt halten (wiederholt)
+          default: []
+          selector:
+            action:
+    taste_3:
+      name: "Taste 3 (Hue Dimmer: Dunkler)"
+      icon: mdi:numeric-3-box-outline
+      input:
+        button_3:
+          name: Taste
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: event
+        short_3:
+          name: Kurz drücken
+          default: []
+          selector:
+            action:
+        long_3:
+          name: Lang drücken
+          default: []
+          selector:
+            action:
+        hold_3:
+          name: Gedrückt halten (wiederholt)
+          default: []
+          selector:
+            action:
+    taste_4:
+      name: "Taste 4 (Hue Dimmer: Aus)"
+      icon: mdi:numeric-4-box-outline
+      input:
+        button_4:
+          name: Taste
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: event
+        short_4:
+          name: Kurz drücken
+          default: []
+          selector:
+            action:
+        long_4:
+          name: Lang drücken
+          default: []
+          selector:
+            action:
+        hold_4:
+          name: Gedrückt halten (wiederholt)
+          default: []
+          selector:
+            action:
+    erweitert:
+      name: Erweitert
+      icon: mdi:tune-variant
+      collapsed: true
+      input:
+        short_types:
+          name: Ereignisse für „kurz“
+          description: Hue meldet short_release; andere Schalter z. B. press oder single.
+          default: [short_release]
+          selector:
+            text:
+              multiple: true
+        long_types:
+          name: Ereignisse für „lang“
+          default: [long_press]
+          selector:
+            text:
+              multiple: true
+        hold_types:
+          name: Ereignisse für „gedrückt halten“
+          default: [repeat]
+          selector:
+            text:
+              multiple: true
+
+mode: queued
+max: 10
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input button_1
+    not_from: unavailable
+    id: "1"
+  - trigger: state
+    entity_id: !input button_2
+    not_from: unavailable
+    id: "2"
+  - trigger: state
+    entity_id: !input button_3
+    not_from: unavailable
+    id: "3"
+  - trigger: state
+    entity_id: !input button_4
+    not_from: unavailable
+    id: "4"
+
+variables:
+  short_types: !input short_types
+  long_types: !input long_types
+  hold_types: !input hold_types
+  # welches Ereignis die Taste gerade gemeldet hat (initial_press, short_release, long_press …)
+  press: "{{ trigger.to_state.attributes.event_type | default('') }}"
+  kind: >-
+    {{ 'short' if press in short_types else 'long' if press in long_types
+       else 'hold' if press in hold_types else '' }}
+  # nur frische Ereignisse (der Zustand ist der Zeitpunkt): ein Neustart stellt den letzten wieder her
+  fresh: >-
+    {% set t = as_datetime(trigger.to_state.state) %}
+    {{ t is not none and (now() - t).total_seconds() < 10 }}
+
+conditions:
+  - condition: template
+    value_template: "{{ kind != '' and fresh }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "1"
+          - condition: template
+            value_template: "{{ kind == 'short' }}"
+        sequence: !input short_1
+      - conditions:
+          - condition: trigger
+            id: "1"
+          - condition: template
+            value_template: "{{ kind == 'long' }}"
+        sequence: !input long_1
+      - conditions:
+          - condition: trigger
+            id: "1"
+          - condition: template
+            value_template: "{{ kind == 'hold' }}"
+        sequence: !input hold_1
+      - conditions:
+          - condition: trigger
+            id: "2"
+          - condition: template
+            value_template: "{{ kind == 'short' }}"
+        sequence: !input short_2
+      - conditions:
+          - condition: trigger
+            id: "2"
+          - condition: template
+            value_template: "{{ kind == 'long' }}"
+        sequence: !input long_2
+      - conditions:
+          - condition: trigger
+            id: "2"
+          - condition: template
+            value_template: "{{ kind == 'hold' }}"
+        sequence: !input hold_2
+      - conditions:
+          - condition: trigger
+            id: "3"
+          - condition: template
+            value_template: "{{ kind == 'short' }}"
+        sequence: !input short_3
+      - conditions:
+          - condition: trigger
+            id: "3"
+          - condition: template
+            value_template: "{{ kind == 'long' }}"
+        sequence: !input long_3
+      - conditions:
+          - condition: trigger
+            id: "3"
+          - condition: template
+            value_template: "{{ kind == 'hold' }}"
+        sequence: !input hold_3
+      - conditions:
+          - condition: trigger
+            id: "4"
+          - condition: template
+            value_template: "{{ kind == 'short' }}"
+        sequence: !input short_4
+      - conditions:
+          - condition: trigger
+            id: "4"
+          - condition: template
+            value_template: "{{ kind == 'long' }}"
+        sequence: !input long_4
+      - conditions:
+          - condition: trigger
+            id: "4"
+          - condition: template
+            value_template: "{{ kind == 'hold' }}"
+        sequence: !input hold_4

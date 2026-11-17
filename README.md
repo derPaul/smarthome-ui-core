@@ -587,6 +587,15 @@ Die SYR-Cloud liefert den Durchfluss nur etwa einmal pro Minute als Momentaufnah
 eine ganze Minute, und was zwischen zwei Abfragen fließt, fehlt. Der Sensor ist `total_increasing` in Litern und kann
 im Energie-Dashboard als Wasserquelle eingetragen werden.
 
+## Schalter-Tasten (Blueprint, ab 0.48)
+
+`smarthome_ui/switch_buttons.yaml` belegt bis zu vier Tasten eines Schalters frei – je Taste getrennt für
+**kurz drücken**, **lang drücken** und **gedrückt halten** (wiederholt, z. B. zum Dimmen). Gedacht für den
+Hue Dimmer Switch (Hue-Integration: Ereignisse `short_release`, `long_press`, `repeat`), passt aber zu jedem
+Schalter mit Ereignis-Entitäten; unter *Erweitert* lassen sich die Ereignisnamen anpassen. Je Taste können
+mehrere Entitäten gewählt werden (dieselbe Taste an mehreren Schaltern). Nur frische Ereignisse lösen aus,
+ein Neustart von Home Assistant also nicht.
+
 ## Bewegungslicht (Vorschläge)
 
 Ab 0.32: Core schlägt je Raum ein **Bewegungslicht** vor, wenn es dort Bewegungs- oder Präsenzmelder und Lichter gibt,
