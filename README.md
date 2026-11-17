@@ -592,7 +592,10 @@ im Energie-Dashboard als Wasserquelle eingetragen werden.
 `smarthome_ui/switch_buttons.yaml` belegt bis zu vier Tasten eines Schalters frei – je Taste getrennt für
 **kurz drücken**, **lang drücken** und **gedrückt halten** (wiederholt, z. B. zum Dimmen). Gedacht für den
 Hue Dimmer Switch (Hue-Integration: Ereignisse `short_release`, `long_press`, `repeat`), passt aber zu jedem
-Schalter mit Ereignis-Entitäten; unter *Erweitert* lassen sich die Ereignisnamen anpassen. Je Taste können
+Schalter mit Ereignis-Entitäten; unter *Erweitert* lassen sich die Ereignisnamen anpassen. Schalter in
+**Zigbee2MQTT** (dort gibt es standardmäßig keine Ereignis-Entitäten): unter *Zigbee2MQTT* den Namen des
+Schalters eintragen – Core hört dann auf `zigbee2mqtt/<Name>/action` (`on_press_release` = kurz,
+`*_hold_release` = lang, `*_hold` = gedrückt halten). Je Taste können
 mehrere Entitäten gewählt werden (dieselbe Taste an mehreren Schaltern). Nur frische Ereignisse lösen aus,
 ein Neustart von Home Assistant also nicht.
 

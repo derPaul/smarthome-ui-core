@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_mqtt_message,
+    async_mock_service,
+)
 
 from homeassistant.components.blueprint import models
 from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
@@ -70,3 +74,46 @@ async def test_switch_buttons(hass: HomeAssistant, entry: MockConfigEntry) -> No
     hass.states.async_set(on, "2026-01-01T10:00:00+00:00", {"event_type": "short_release"})
     await hass.async_block_till_done()
     assert len(toggle) == 1
+
+
+async def test_switch_buttons_zigbee2mqtt(
+    hass: HomeAssistant, entry: MockConfigEntry, mqtt_mock
+) -> None:
+    toggle = async_mock_service(hass, "light", "toggle")
+    turn_on = async_mock_service(hass, "light", "turn_on")
+    turn_off = async_mock_service(hass, "light", "turn_off")
+    await _automation(
+        hass,
+        "switch_buttons",
+        {
+            "z2m_name": "Office - Switch",
+            "short_1": [{"action": "light.toggle", "target": {"entity_id": "light.a"}}],
+            "hold_2": [
+                {
+                    "action": "light.turn_on",
+                    "target": {"entity_id": "light.a"},
+                    "data": {"brightness_step_pct": 10},
+                }
+            ],
+            "long_4": [{"action": "light.turn_off", "target": {"entity_id": "all"}}],
+        },
+    )
+    topic = "zigbee2mqtt/Office - Switch/action"
+    for payload in (
+        "on_press",
+        "on_press_release",
+        "up_hold",
+        "up_hold",
+        "up_hold_release",
+        "off_press",
+        "off_hold",
+        "off_hold_release",
+        "down_press_release",
+    ):
+        async_fire_mqtt_message(hass, topic, payload)
+        await hass.async_block_till_done()
+    async_fire_mqtt_message(hass, "zigbee2mqtt/Other/action", "on_press_release")
+    await hass.async_block_till_done()
+    assert len(toggle) == 1
+    assert [c.data.get("brightness_step_pct") for c in turn_on] == [10, 10]
+    assert len(turn_off) == 1
