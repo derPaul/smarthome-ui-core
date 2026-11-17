@@ -174,9 +174,11 @@ trigger_variables:
   z2m_base: !input z2m_base
 
 triggers:
+  # nur mit Namen: ohne MQTT-Integration (nur Hue) bleibt dieser Auslöser aus
   - trigger: mqtt
     topic: "{{ z2m_base }}/{{ z2m_name if z2m_name else '-' }}/action"
     id: z2m
+    enabled: "{{ z2m_name | length > 0 }}"
   - trigger: state
     entity_id: !input button_1
     not_from: unavailable
