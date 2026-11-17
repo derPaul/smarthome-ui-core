@@ -472,14 +472,20 @@ offenes Dashboard:
 - **Automationen** („Fehler in Automationen“): Der letzte Lauf einer Automation endete mit einem Fehler.
 
 
-### Verlauf je Gerät (ab 0.48)
+### Verlauf je Gerät (ab 0.48, länger ab 0.49)
 
 Home Assistant hebt den Verlauf aller Entitäten gleich lange auf (`purge_keep_days`, Standard 10 Tage). Auf
-der Dashboard-Seite *System* lässt sich je Gerät eine **kürzere** Dauer wählen (1–30 Tage). Core ruft dafür
-jede Nacht um 04:17 (und kurz nach einer Änderung) `recorder.purge_entities` mit den Entitäten des Geräts auf.
-Langzeitstatistiken (Stundenwerte, Energie-Dashboard) bleiben erhalten. Länger als der Standard geht so nicht –
-dafür `purge_keep_days` des Recorders erhöhen und die übrigen Geräte kürzer stellen. Websocket:
-`smarthome_ui/history/set` (`device_id`, `days`, `null` = Standard).
+der Dashboard-Seite *System* lässt sich ein **Standard für alle Geräte** und je Gerät eine eigene Dauer
+wählen (1–365 Tage):
+
+- **kürzer:** Core ruft jede Nacht um 04:17 (und kurz nach einer Änderung) `recorder.purge_entities` mit den
+  Entitäten des Geräts auf,
+- **länger:** Core hebt die Aufbewahrung des Recorders auf den längsten gewählten Wert an (zur Laufzeit; nach
+  einem Neustart gilt kurz der konfigurierte Wert, Core hebt ihn gleich wieder an) und kürzt alle übrigen
+  Entitäten nachts auf den Standard. Was schon gelöscht ist, kommt nicht zurück – längere Zeiten wirken ab jetzt.
+
+Langzeitstatistiken (Stundenwerte, Energie-Dashboard) bleiben erhalten. Websocket: `smarthome_ui/history/set`
+(`device_id`, `days`, `null` = Standard) und `smarthome_ui/history/default` (`days`, `null` = wie konfiguriert).
 
 ## Haushaltsgeräte
 

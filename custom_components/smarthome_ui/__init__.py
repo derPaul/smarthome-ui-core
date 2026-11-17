@@ -319,6 +319,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_lights_settings,
         ws_lights_ignore,
         ws_history_set,
+        ws_history_default,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -716,6 +717,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "notify_mute",
             "mower_noon",
             "history_keep",
+            "history_longer",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1240,6 +1242,22 @@ def ws_history_set(
     """Keep the history of one device shorter (days) or as by default (None)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.history.set_days(msg["device_id"], msg["days"])
+        connection.send_result(msg["id"], runtime.history.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/history/default",
+        vol.Required("days"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=0, max=365))),
+    }
+)
+@callback
+def ws_history_default(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Set how long the history of all devices is kept (None: as configured in the recorder)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.history.set_default(msg["days"])
         connection.send_result(msg["id"], runtime.history.info())
 
 
