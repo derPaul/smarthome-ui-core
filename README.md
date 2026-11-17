@@ -453,6 +453,14 @@ und Pause des Heizbetriebs, nicht im Sommerbetrieb) und den nächsten Warmwasser
 die Wärmepumpe im Lauf aufnimmt (Attribut `hp_runs` = Läufe bis leer). Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
 jedem Aufheizen (bis dahin Soll − 5 K).
 
+## Wochenbericht (ab 0.50)
+
+Jeden Sonntag um 18:12 schickt Core eine kurze Zusammenfassung der letzten sieben Tage (Quelle „Wochenbericht“,
+Push an): Strom verbraucht und aus dem Netz mit Kosten, Solarertrag, Einspeisung mit Vergütung und Autarkie,
+gemähte Flächen, gesaugte Räume und was nächste Woche fällig wird. Zähler und Preise kommen aus dem
+Energie-Dashboard von Home Assistant (fester Preis oder Preis-Entität). Das Dashboard zeigt den Bericht bis
+Montagabend bei den Mitteilungen. Websocket `smarthome_ui/report/run` erstellt ihn sofort (`push` optional).
+
 ## System & Netzwerk
 
 Gerät **„System“** mit `sensor.system_problems` (Anzahl, Attribut `problems`). Was überwacht wird, schickt das

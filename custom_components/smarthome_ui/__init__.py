@@ -65,6 +65,7 @@ from .notify import NotifyEngine
 from .planner import PlannerManager
 from .plants import PlantManager
 from .presence_sim import PresenceSim
+from .report import WeeklyReport
 from .security import Security
 from .setup_devices import TYPES as SETUP_TYPES, add_device, suggest_devices
 from .store import CoreStore
@@ -121,6 +122,7 @@ class CoreRuntime:
     ui: UiManager
     lights: LightSettings
     history: HistoryKeeper
+    report: WeeklyReport
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -320,6 +322,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_lights_ignore,
         ws_history_set,
         ws_history_default,
+        ws_report_run,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -431,6 +434,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         UiManager(hass, store, dict(entry.options)),
         LightSettings(hass, store),
         HistoryKeeper(hass, store),
+        WeeklyReport(
+            hass,
+            store,
+            engine,
+            lambda: entry.runtime_data.energy.info(),
+            lambda: entry.runtime_data.tasks(),
+        ),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
@@ -530,6 +540,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     forecasts.async_setup()
     entry.runtime_data.system.async_setup()
     entry.runtime_data.history.async_setup()
+    entry.runtime_data.report.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -630,6 +641,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.forecasts.async_stop()
     entry.runtime_data.system.async_stop()
     entry.runtime_data.history.async_stop()
+    entry.runtime_data.report.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -679,6 +691,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "forecast": runtime.forecasts.info(),
         "system": runtime.system.info(),
         "history": runtime.history.info(),
+        "report": runtime.report.info(),
         "catalog": runtime.catalog.info(
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
@@ -718,6 +731,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "mower_noon",
             "history_keep",
             "history_longer",
+            "weekly_report",
+            "energy_prices",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -783,6 +798,7 @@ def ws_subscribe(
                     "forecast": runtime.forecasts.info(),
                     "system": runtime.system.info(),
                     "history": runtime.history.info(),
+                    "report": runtime.report.info(),
                     "catalog": runtime.catalog.info(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
@@ -1259,6 +1275,21 @@ def ws_history_default(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.history.set_default(msg["days"])
         connection.send_result(msg["id"], runtime.history.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/report/run",
+        vol.Optional("push", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_report_run(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Make the weekly report now (preview in the dashboard, push only on request)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], await runtime.report.async_run(push=msg["push"]))
 
 
 @websocket_api.websocket_command(

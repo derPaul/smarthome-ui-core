@@ -38,6 +38,11 @@ def energy_from_prefs(prefs: dict[str, Any]) -> dict[str, Any]:
         "pv_power": [],
         "battery_power": [],
         "consumers": [],
+        # prices of the grid source (€ per kWh): fixed number or an entity with the current price
+        "price_import": None,
+        "price_import_entity": None,
+        "price_export": None,
+        "price_export_entity": None,
     }
     for src in prefs.get("energy_sources") or []:
         kind = src.get("type")
@@ -49,6 +54,26 @@ def energy_from_prefs(prefs: dict[str, Any]) -> dict[str, Any]:
             out["export"] += _ids([src.get("stat_energy_to")])
             out["grid_power"] += _ids([p.get("stat_rate") for p in src.get("power") or []])
             out["grid_power"] += _ids([src.get("stat_rate")])
+            for f in [src, *(src.get("flow_from") or [])]:
+                if out["price_import"] is None and f.get("number_energy_price") is not None:
+                    out["price_import"] = f.get("number_energy_price")
+                out["price_import_entity"] = out["price_import_entity"] or f.get(
+                    "entity_energy_price"
+                )
+            for f in [src, *(src.get("flow_to") or [])]:
+                if out["price_export"] is None and f.get("number_energy_price_export") is not None:
+                    out["price_export"] = f.get("number_energy_price_export")
+                if (
+                    out["price_export"] is None
+                    and f is not src
+                    and f.get("number_energy_price") is not None
+                ):
+                    out["price_export"] = f.get(
+                        "number_energy_price"
+                    )  # older format: price per flow
+                out["price_export_entity"] = out["price_export_entity"] or f.get(
+                    "entity_energy_price_export"
+                )
         elif kind == "solar":
             out["pv"] += _ids([src.get("stat_energy_from")])
             out["pv_power"] += _ids([src.get("stat_rate")])
