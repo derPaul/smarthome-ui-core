@@ -440,6 +440,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
             engine,
             lambda: entry.runtime_data.energy.info(),
             lambda: entry.runtime_data.tasks(),
+            lambda: {
+                "outdoor": entry.runtime_data.catalog.outdoor(),
+                "technik": entry.runtime_data.technik.settings(),
+            },
         ),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
