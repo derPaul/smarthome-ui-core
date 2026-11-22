@@ -1135,6 +1135,7 @@ def _first_panel(hass: HomeAssistant) -> str | None:
         vol.Optional("flap"): vol.Any(None, str),
         vol.Optional("door"): vol.Any(None, str),
         vol.Optional("enabled"): bool,
+        vol.Optional("keep_days"): vol.All(vol.Coerce(int), vol.Range(min=1, max=365)),
     }
 )
 @callback
@@ -1143,7 +1144,8 @@ def ws_mailbox_settings(
 ) -> None:
     """Take the mailbox sensors chosen in the dashboard."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
-        runtime.mailbox.set_settings({k: msg[k] for k in ("flap", "door", "enabled") if k in msg})
+        keys = ("flap", "door", "enabled", "keep_days")
+        runtime.mailbox.set_settings({k: msg[k] for k in keys if k in msg})
         connection.send_result(msg["id"], runtime.mailbox.info())
 
 

@@ -13,7 +13,8 @@ Without a door "emptied" is pressed (button, or the dashboard's done record ``ma
 Notifications (source "Briefkasten", ``hh.mail``): "Post ist da" with the first delivery after
 emptying, "Briefkasten: Klappe/Tür steht offen" after ``OPEN_MINUTES``.
 
-Stored in ``mailbox``: ``{"flap", "door", "enabled", "ins": [ms], "doors": [ms]}`` (7 days).
+Stored in ``mailbox``: ``{"flap", "door", "enabled", "keep_days", "ins": [ms], "doors": [ms]}`` –
+deliveries and emptyings are kept ``keep_days`` days (default 30, chosen in the dashboard).
 """
 
 from __future__ import annotations
@@ -36,7 +37,8 @@ from homeassistant.helpers.event import async_call_later
 from .const import SIGNAL_DATA, SIGNAL_MAILBOX
 from .store import CoreStore, now_ms
 
-KEEP_MS = 7 * 86_400_000
+KEEP_DAYS = 30
+KEEP_MAX_DAYS = 365
 BOUNCE_MS = 60_000
 DOOR_MIN_MS = 2_000
 SHAKE_MS = 90_000
@@ -126,6 +128,10 @@ class Mailbox:
         for key in ("flap", "door", "enabled"):
             if key in settings:
                 self.data[key] = settings[key]
+        if "keep_days" in settings:
+            self.data["keep_days"] = max(1, min(KEEP_MAX_DAYS, int(settings["keep_days"])))
+            self.data["ins"] = self._prune(self.data.get("ins") or [])
+            self.data["doors"] = self._prune(self.data.get("doors") or [])
         self._listen()
         self._save()
 
@@ -228,8 +234,13 @@ class Mailbox:
             self.hass.bus.async_listen(EVENT_STATE_CHANGED, changed, event_filter=relevant)
         )
 
+    @property
+    def keep_days(self) -> int:
+        """Return how many days deliveries and emptyings are kept."""
+        return int(self.data.get("keep_days") or KEEP_DAYS)
+
     def _prune(self, items: list[int]) -> list[int]:
-        start = now_ms() - KEEP_MS
+        start = now_ms() - self.keep_days * 86_400_000
         return [t for t in items if t >= start]
 
     @callback
@@ -297,4 +308,5 @@ class Mailbox:
             "last_empty": at or None,
             "empty_by": how,
             "open": self.open_now(),
+            "keep_days": self.keep_days,
         }

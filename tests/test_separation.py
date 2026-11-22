@@ -176,6 +176,16 @@ async def test_mailbox(hass: HomeAssistant, notify_calls, freezer) -> None:
     await hass.async_block_till_done()
     assert notify_calls[-1].data["message"] == "Briefkasten: Klappe steht offen"
 
+    # kept 30 days by default, adjustable (older entries go at once)
+    assert mailbox.info()["keep_days"] == 30
+    day = 86_400_000
+    now = int(dt_util.utcnow().timestamp() * 1000)
+    mailbox.data["ins"] = [now - 20 * day, now - 9 * day, now - day]
+    mailbox.set_settings({"keep_days": 10})
+    assert mailbox.info()["keep_days"] == 10 and len(mailbox.deliveries()) == 2
+    mailbox.set_settings({"keep_days": 999})
+    assert mailbox.keep_days == 365
+
 
 async def test_presence_sim(hass: HomeAssistant, hass_ws_client, freezer) -> None:
     client = await hass_ws_client(hass)

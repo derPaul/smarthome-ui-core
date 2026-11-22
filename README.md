@@ -356,6 +356,9 @@ Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **En
   `button.household_mail_emptied`.
 - Mitteilungen (Quelle „Briefkasten“, Push an): „Post ist da“ beim ersten Einwurf nach dem Leeren,
   „Briefkasten: Klappe/Tür steht offen“ nach 3 Minuten.
+- Verlauf: Einwürfe und Leerungen bleiben 30 Tage gespeichert (ab 0.51.1, vorher 7). Die Dauer (1–365 Tage) wählst
+  du im Dashboard im Briefkasten-Fenster („Verlauf speichern“); Websocket `smarthome_ui/mailbox/settings` mit
+  `keep_days`. Der Wochenbericht vergleicht die Post damit auch mit der Vorwoche.
 
 ## Geräte zuordnen (Geräte-Katalog)
 
