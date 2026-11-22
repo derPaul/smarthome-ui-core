@@ -471,7 +471,17 @@ jeweils mit Vergleich zur Vorwoche:
 - Was nächste Woche fällig wird.
 
 Das Dashboard zeigt den Bericht bis Montagabend bei den Mitteilungen; antippen öffnet alle Zahlen. Websocket
-`smarthome_ui/report/run` erstellt ihn sofort (`push` optional).
+`smarthome_ui/report/run` erstellt ihn sofort (`push` optional, `month: true` für die Monatsbilanz).
+
+**Arbeitszahl der Wärmepumpe** (ab 0.52): Mit den Zählern für erzeugte Wärme und verbrauchten Strom (Heizen und
+Warmwasser, wie die Haustechnik-Seite sie findet) steht im Bericht die Arbeitszahl der Woche mit Vorwoche. Core merkt
+sich jeden Sonntag die Arbeitszahl mit der mittleren Außentemperatur (ein Jahr). Liegt sie deutlich (0,4) unter
+Wochen mit ähnlichem Wetter (±2 °C), steht im Bericht „Achtung Wärmepumpe“ mit dem Hinweis, Heizkurve, Filter und
+Abtauung zu prüfen.
+
+**Monatsbilanz** (ab 0.52): Am 1. jedes Monats um 9:12 kommt dieselbe Zusammenfassung für den Vormonat, verglichen
+mit dem Monat davor und dem gleichen Monat im Vorjahr (Quelle „Wochenbericht“, Titel „Monatsbilanz November 2026“).
+Das Dashboard zeigt sie drei Tage lang bei den Mitteilungen.
 
 ## System & Netzwerk
 

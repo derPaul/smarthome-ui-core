@@ -696,6 +696,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "system": runtime.system.info(),
         "history": runtime.history.info(),
         "report": runtime.report.info(),
+        "report_month": runtime.report.info_month(),
         "catalog": runtime.catalog.info(
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
@@ -736,6 +737,8 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "history_keep",
             "history_longer",
             "weekly_report",
+            "monthly_report",
+            "heatpump_cop",
             "energy_prices",
         ],
         "own_tasks": store.own_tasks,
@@ -803,6 +806,7 @@ def ws_subscribe(
                     "system": runtime.system.info(),
                     "history": runtime.history.info(),
                     "report": runtime.report.info(),
+                    "report_month": runtime.report.info_month(),
                     "catalog": runtime.catalog.info(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
@@ -1216,6 +1220,7 @@ def ws_grocery_settings(
         vol.Optional("dhw"): vol.Any(None, str),
         vol.Optional("dhw_target"): vol.Any(None, str),
         vol.Optional("hp_power"): vol.Any(None, str),
+        vol.Optional("hp_meters"): {str: vol.Any(None, str)},
         vol.Optional("heat_mode"): vol.Any(None, str),
         vol.Optional("summer_mode"): vol.Any(None, str),
     }
@@ -1287,6 +1292,7 @@ def ws_history_default(
     {
         vol.Required("type"): "smarthome_ui/report/run",
         vol.Optional("push", default=False): bool,
+        vol.Optional("month", default=False): bool,
     }
 )
 @websocket_api.async_response
@@ -1295,7 +1301,9 @@ async def ws_report_run(
 ) -> None:
     """Make the weekly report now (preview in the dashboard, push only on request)."""
     if (runtime := _ws_runtime(connection, msg)) is not None:
-        connection.send_result(msg["id"], await runtime.report.async_run(push=msg["push"]))
+        report = runtime.report
+        run = report.async_run_month if msg["month"] else report.async_run
+        connection.send_result(msg["id"], await run(push=msg["push"]))
 
 
 @websocket_api.websocket_command(

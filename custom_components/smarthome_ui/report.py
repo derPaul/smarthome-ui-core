@@ -14,6 +14,14 @@ Content (whatever is available):
 Each value comes with the week before (``prev``). Sent as a push (source ``home.report``,
 "Wochenbericht" in the dashboard's notifications, push on by default) every Sunday at 18:12 and kept
 as ``report`` for the dashboard (shown until Monday evening).
+
+Heat pump: with the meters of heat produced and electricity used (``hp_meters`` from Haustechnik)
+the report shows the coefficient of performance (Arbeitszahl) of the week. Each Sunday Core keeps it
+with the mean outdoor temperature (``hp_weeks``, one year); if it is clearly worse than in weeks
+with similar weather, the report says so.
+
+Monthly balance: on the 1st of each month at 09:12 the same numbers for the month before, compared
+with the month before that and the same month a year ago (``report_month``, title "Monatsbilanz").
 """
 
 from __future__ import annotations
@@ -38,6 +46,24 @@ _LOGGER = logging.getLogger(__name__)
 SRC = "home.report"
 WEEKDAY = 6  # Sunday
 RUN_AT = (18, 12)
+MONTH_AT = (9, 12)
+MONTHS = [
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+]
+HP_WEEKS = 53
+COP_WORSE = 0.4  # this much below weeks with similar weather → hint
+SIMILAR_DEG = 2.0
 DAY_MS = 86_400_000
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 _HEATPUMP = re.compile(r"(wärmepumpe|waermepumpe|heat ?pump|\bwp\b|lwz|luft.?wasser)", re.I)
@@ -59,14 +85,18 @@ def _liters(value: float) -> str:
     return f"{value:,.0f} L".replace(",", ".")
 
 
-def _delta(cur: float | None, prev: float | None) -> str:
-    """Return the change against the week before ("+12 %", "−8 %", "gleich"); empty if unknown."""
+def _delta(cur: float | None, prev: float | None, to: str = "zur Vorwoche") -> str:
+    """Return the change against the period before ("+12 % zur Vorwoche"); empty if unknown."""
     if cur is None or not prev or prev < 0.5:
         return ""
     pct = round((cur - prev) / prev * 100)
     if pct == 0:
-        return "gleich wie Vorwoche"
-    return f"{'+' if pct > 0 else '−'}{abs(pct)} % zur Vorwoche"
+        return f"gleich {to.replace('zur ', 'wie ').replace('zum ', 'wie ')}"
+    return f"{'+' if pct > 0 else '−'}{abs(pct)} % {to}"
+
+
+def _cop(value: float) -> str:
+    return f"{value:.1f}".replace(".", ",")
 
 
 class WeeklyReport:
@@ -99,6 +129,11 @@ class WeeklyReport:
                 self.hass, self._tick, hour=RUN_AT[0], minute=RUN_AT[1], second=0
             )
         )
+        self._unsub.append(
+            async_track_time_change(
+                self.hass, self._tick_month, hour=MONTH_AT[0], minute=MONTH_AT[1], second=0
+            )
+        )
 
     @callback
     def async_stop(self) -> None:
@@ -110,7 +145,12 @@ class WeeklyReport:
     @callback
     def _tick(self, now: datetime) -> None:
         if dt_util.as_local(now).weekday() == WEEKDAY:
-            self.hass.async_create_task(self.async_run())
+            self.hass.async_create_task(self.async_run(remember=True))
+
+    @callback
+    def _tick_month(self, now: datetime) -> None:
+        if dt_util.as_local(now).day == 1:
+            self.hass.async_create_task(self.async_run_month())
 
     # ---------------------------------------------------------------- collecting
 
@@ -155,8 +195,9 @@ class WeeklyReport:
         return float(res.get("change") or 0)
 
     async def _daily(self, ids: list[str], start: datetime, end: datetime) -> list[float]:
-        """Return the daily sums of meters (kWh) for the seven days from start."""
-        out = [0.0] * 7
+        """Return the daily sums of meters (kWh) for the days from start to end."""
+        n = max(1, round((end - start).total_seconds() / 86400))
+        out = [0.0] * n
         if not ids:
             return out
         try:
@@ -182,7 +223,7 @@ class WeeklyReport:
                 t = row.get("start")
                 t = t if isinstance(t, (int, float)) else getattr(t, "timestamp", lambda: 0)()
                 i = int((float(t) - start.timestamp()) // 86400)
-                if 0 <= i < 7:
+                if 0 <= i < n:
                     out[i] += float(row.get("change") or 0)
         return out
 
@@ -248,6 +289,25 @@ class WeeklyReport:
                 return round(float(res["mean"]) * hours / 1000, 1)
         return None
 
+    def _hp_meters(self) -> dict[str, str]:
+        try:
+            meters = (self.context().get("technik") or {}).get("hp_meters") or {}
+        except Exception:  # noqa: BLE001 - Haustechnik not available
+            return {}
+        return {k: v for k, v in meters.items() if v}
+
+    async def _cop(
+        self, start: datetime, end: datetime, used: float | None
+    ) -> dict[str, Any] | None:
+        """Return heat produced (kWh) and the coefficient of performance of the period."""
+        m = self._hp_meters()
+        heat = sum([await self._change(m.get(k), start, end) for k in ("heat_out", "dhw_out")])
+        el = sum([await self._change(m.get(k), start, end) for k in ("heat_in", "dhw_in")])
+        el = el or used or 0
+        if heat <= 0 or el <= 0:
+            return None
+        return {"heat": round(heat, 1), "cop": round(heat / el, 2)}
+
     async def _water(self, start: datetime, end: datetime) -> float | None:
         ids = self.energy().get("water") or []
         if not ids:
@@ -306,62 +366,142 @@ class WeeklyReport:
         """Return the numbers of the seven days before ``end`` and of the week before."""
         end = end or dt_util.now()
         start = end - timedelta(days=7)
-        p_start = start - timedelta(days=7)
-        out: dict[str, Any] = {}
-        if energy := await self._energy(start, end):
-            energy["prev"] = await self._energy(p_start, start)
-            # best solar day of the week (from the daily sums of the solar meters)
-            days = await self._daily(self.energy().get("pv") or [], start, end)
-            if max(days) > 0:
-                i = days.index(max(days))
-                energy["best_day"] = {
-                    "day": WEEKDAYS[(start + timedelta(days=i)).weekday()],
-                    "kwh": round(days[i], 1),
-                }
-            out["energy"] = energy
-        heat = await self._heat(start, end)
-        if heat is not None:
-            out["heating"] = {"heatpump": heat, "prev": await self._heat(p_start, start)}
-        water = await self._water(start, end)
-        if water:
-            out["water"] = {"liters": water, "prev": await self._water(p_start, start)}
-        if weather := await self._weather(start, end):
-            weather["prev"] = await self._weather(p_start, start)
-            out["weather"] = weather
-        since, until = int(start.timestamp() * 1000), int(end.timestamp() * 1000)
-        ev = self._events(since, until)
-        ev["prev"] = self._events(int(p_start.timestamp() * 1000), since)
-        out["events"] = ev
+        out = await self.collect_period(start, end, start - timedelta(days=7), start)
+        if h := out.get("heating"):
+            self._cop_hint(h, start, out.get("weather"))
         week_end = now_ms() + 7 * DAY_MS
         due = [
             t
             for t in task_states(self.tasks(), self.store.done)
             if t.due is not None and t.due <= week_end
         ]
-        # older fields, kept for the dashboard
-        out["mowed"] = ev["mowed"]
-        out["vacuumed"] = ev["vacuumed"]
         out["due"] = len(due)
         out["due_names"] = [t.name for t in sorted(due, key=lambda t: t.due or 0)[:3]]
         return out
 
+    async def collect_period(
+        self,
+        start: datetime,
+        end: datetime,
+        p_start: datetime,
+        p_end: datetime,
+        y_start: datetime | None = None,
+        y_end: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Return the numbers of a period, of the one before (prev) and a year before (year)."""
+        out: dict[str, Any] = {}
+        year = y_start is not None and y_end is not None
+        if energy := await self._energy(start, end):
+            energy["prev"] = await self._energy(p_start, p_end)
+            if year:
+                energy["year"] = await self._energy(y_start, y_end)
+            # best solar day (from the daily sums of the solar meters)
+            days = await self._daily(self.energy().get("pv") or [], start, end)
+            if days and max(days) > 0:
+                i = days.index(max(days))
+                day = start + timedelta(days=i)
+                energy["best_day"] = {
+                    "day": WEEKDAYS[day.weekday()] if len(days) <= 7 else f"{day.day}.{day.month}.",
+                    "kwh": round(days[i], 1),
+                }
+            out["energy"] = energy
+        heat = await self._heat(start, end)
+        if heat is not None:
+            h: dict[str, Any] = {"heatpump": heat, "prev": await self._heat(p_start, p_end)}
+            if cop := await self._cop(start, end, heat):
+                h.update(cop)
+                h["cop_prev"] = (await self._cop(p_start, p_end, h["prev"]) or {}).get("cop")
+            if year:
+                h["year"] = await self._heat(y_start, y_end)
+            out["heating"] = h
+        water = await self._water(start, end)
+        if water:
+            out["water"] = {"liters": water, "prev": await self._water(p_start, p_end)}
+            if year:
+                out["water"]["year"] = await self._water(y_start, y_end)
+        if weather := await self._weather(start, end):
+            weather["prev"] = await self._weather(p_start, p_end)
+            if year:
+                weather["year"] = await self._weather(y_start, y_end)
+            out["weather"] = weather
+            if out.get("heating"):
+                out["heating"]["outdoor"] = weather["mean"]
+        since, until = int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+        ev = self._events(since, until)
+        ev["prev"] = self._events(int(p_start.timestamp() * 1000), int(p_end.timestamp() * 1000))
+        out["events"] = ev
+        # older fields, kept for the dashboard
+        out["mowed"] = ev["mowed"]
+        out["vacuumed"] = ev["vacuumed"]
+        return out
+
+    # ---------------------------------------------------------------- heat pump history
+
+    @property
+    def hp_weeks(self) -> list[dict[str, Any]]:
+        """Return the kept weeks (coefficient of performance with the mean outdoor temperature)."""
+        return self.store.data.setdefault("hp_weeks", [])
+
+    def _cop_hint(self, h: dict[str, Any], start: datetime, weather: dict[str, Any] | None) -> None:
+        """Add the history and, if the week is clearly worse than similar ones, a warning."""
+        week = int(start.timestamp() * 1000)
+        others = [w for w in self.hp_weeks if abs(w.get("t", 0) - week) > 3 * DAY_MS]
+        cur = [{"t": week, "cop": h["cop"], "out": h.get("outdoor")}] if h.get("cop") else []
+        h["history"] = [*others[-11:], *cur]
+        if not h.get("cop") or not weather:
+            return
+        similar = [
+            w["cop"]
+            for w in others
+            if w.get("cop")
+            and w.get("out") is not None
+            and abs(w["out"] - weather["mean"]) <= SIMILAR_DEG
+        ]
+        if len(similar) >= 2:
+            usual = sum(similar) / len(similar)
+            if usual - h["cop"] >= COP_WORSE:
+                h["warn"] = {"usual": round(usual, 2), "weeks": len(similar)}
+
+    def _remember(self, data: dict[str, Any], start: datetime) -> None:
+        h = data.get("heating") or {}
+        if not h.get("cop"):
+            return
+        week = int(start.timestamp() * 1000)
+        weeks = [w for w in self.hp_weeks if abs(w.get("t", 0) - week) > 3 * DAY_MS]
+        weeks.append(
+            {
+                "t": week,
+                "cop": h["cop"],
+                "out": h.get("outdoor"),
+                "heat": h.get("heat"),
+                "el": h.get("heatpump"),
+            }
+        )
+        self.store.data["hp_weeks"] = weeks[-HP_WEEKS:]
+
     @staticmethod
-    def text(data: dict[str, Any]) -> list[str]:
-        """Return the report as short lines."""
+    def text(data: dict[str, Any], month: bool = False) -> list[str]:
+        """Return the report as short lines (month: compared with the month and year before)."""
         lines: list[str] = []
+        to = "zum Vormonat" if month else "zur Vorwoche"
 
         def vs(cur: float | None, prev: dict[str, Any] | None, key: str) -> str:
-            d = _delta(cur, (prev or {}).get(key))
+            d = _delta(cur, (prev or {}).get(key), to)
+            return f" ({d})" if d else ""
+
+        def yr(cur: float | None, year: Any, key: str | None = None) -> str:
+            ref = (year or {}).get(key) if key else year
+            d = _delta(cur, ref, "zum Vorjahr") if month else ""
             return f" ({d})" if d else ""
 
         if e := data.get("energy"):
             prev = e.get("prev")
             used, grid, paid = _kwh(e["used"]), _kwh(e["import"]), _eur(e["paid"])
-            change = vs(e["used"], prev, "used")
+            change = vs(e["used"], prev, "used") + yr(e["used"], e.get("year"), "used")
             lines.append(f"Strom: {used} verbraucht{change}, {grid} aus dem Netz ({paid})")
             if e["pv"]:
                 fed, earned = _kwh(e["export"]), _eur(e["earned"])
-                change = vs(e["pv"], prev, "pv")
+                change = vs(e["pv"], prev, "pv") + yr(e["pv"], e.get("year"), "pv")
                 pv = f"Solar: {_kwh(e['pv'])}{change}, {fed} eingespeist (+{earned})"
                 if e.get("autarky") is not None:
                     pv += f", Autarkie {e['autarky']} %"
@@ -369,24 +509,37 @@ class WeeklyReport:
                 if best := e.get("best_day"):
                     lines.append(f"Bester Sonnentag: {best['day']} ({_kwh(best['kwh'])})")
         if h := data.get("heating"):
-            d = _delta(h["heatpump"], h.get("prev"))
-            lines.append(
-                f"Heizung: Wärmepumpe {_kwh(h['heatpump'])} Strom" + (f" ({d})" if d else "")
-            )
+            d = _delta(h["heatpump"], h.get("prev"), to)
+            line = f"Heizung: Wärmepumpe {_kwh(h['heatpump'])} Strom" + (f" ({d})" if d else "")
+            line += yr(h["heatpump"], h.get("year"))
+            if h.get("cop"):
+                line += f", {_kwh(h['heat'])} Wärme, Arbeitszahl {_cop(h['cop'])}"
+                if h.get("cop_prev"):
+                    line += f" ({'Vormonat' if month else 'Vorwoche'} {_cop(h['cop_prev'])})"
+            lines.append(line)
+            if w := h.get("warn"):
+                lines.append(
+                    f"Achtung Wärmepumpe: Arbeitszahl {_cop(h['cop'])} – bei ähnlichem Wetter "
+                    f"sonst {_cop(w['usual'])}. Heizkurve, Filter und Abtauung prüfen."
+                )
         if w := data.get("water"):
-            d = _delta(w["liters"], w.get("prev"))
-            lines.append(f"Wasser: {_liters(w['liters'])}" + (f" ({d})" if d else ""))
+            d = _delta(w["liters"], w.get("prev"), to)
+            line = f"Wasser: {_liters(w['liters'])}" + (f" ({d})" if d else "")
+            lines.append(line + yr(w["liters"], w.get("year")))
         if t := data.get("weather"):
             line = f"Wetter: Ø {_deg(t['mean'])}"
             if t.get("min") is not None and t.get("max") is not None:
                 line += f", {_deg(t['min'])} bis {_deg(t['max'])}"
             if (t.get("prev") or {}).get("mean") is not None:
                 diff = t["mean"] - t["prev"]["mean"]
+                ref = "der Vormonat" if month else "die Vorwoche"
                 if abs(diff) >= 0.5:
                     word = "wärmer" if diff > 0 else "kälter"
-                    line += f" ({_deg(abs(diff)).rstrip('°')} Grad {word} als die Vorwoche)"
+                    line += f" ({_deg(abs(diff)).rstrip('°')} Grad {word} als {ref})"
                 else:
-                    line += " (wie die Vorwoche)"
+                    line += f" (wie {ref})"
+            if month and (t.get("year") or {}).get("mean") is not None:
+                line += f", Vorjahr Ø {_deg(t['year']['mean'])}"
             lines.append(line)
         ev = data.get("events") or {}
         happen = []
@@ -411,11 +564,15 @@ class WeeklyReport:
             lines.append(
                 f"Nächste Woche fällig: {names}" + (f" und {more} weitere" if more > 0 else "")
             )
-        return lines
+        # two comparisons in a row in one bracket: "(−8 % zum Vormonat, +5 % zum Vorjahr)"
+        return [line.replace(") (", ", ") for line in lines]
 
-    async def async_run(self, push: bool = True) -> dict[str, Any]:
-        """Collect, keep and send the report."""
-        data = await self.collect()
+    async def async_run(self, push: bool = True, remember: bool = False) -> dict[str, Any]:
+        """Collect, keep and send the report (remember: keep the heat pump's week)."""
+        end = dt_util.now()
+        data = await self.collect(end)
+        if remember:
+            self._remember(data, end - timedelta(days=7))
         lines = self.text(data)
         report = {"at": now_ms(), "title": "Wochenbericht", "lines": lines, "data": data}
         self.store.data["report"] = report
@@ -428,3 +585,27 @@ class WeeklyReport:
     def info(self) -> dict[str, Any] | None:
         """Return the last report for the dashboard."""
         return self.store.data.get("report")
+
+    async def async_run_month(self, push: bool = True) -> dict[str, Any]:
+        """Collect, keep and send the balance of the month before."""
+        now = dt_util.as_local(dt_util.now())
+        end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start = (end - timedelta(days=1)).replace(day=1)
+        p_start = (start - timedelta(days=1)).replace(day=1)
+        y_start = start.replace(year=start.year - 1)
+        y_end = end.replace(year=end.year - 1)
+        data = await self.collect_period(start, end, p_start, start, y_start, y_end)
+        data["month"] = f"{MONTHS[start.month - 1]} {start.year}"
+        lines = self.text(data, month=True)
+        title = f"Monatsbilanz {data['month']}"
+        report = {"at": now_ms(), "title": title, "lines": lines, "data": data, "month": True}
+        self.store.data["report_month"] = report
+        self.store.save(SIGNAL_DATA)
+        cfg = (self.store.data["notify"].get("sources") or {}).get(SRC, {"push": True})
+        if push and lines and cfg.get("push", True):
+            self.engine.send(title, "\n".join(lines), src=SRC, url="/", tag="report_month")
+        return report
+
+    def info_month(self) -> dict[str, Any] | None:
+        """Return the last monthly balance for the dashboard."""
+        return self.store.data.get("report_month")

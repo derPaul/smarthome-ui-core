@@ -78,6 +78,8 @@ DEFAULTS: dict[str, Any] = {
     "dhw": None,
     "dhw_target": None,
     "hp_power": None,  # what the heat pump draws (W)
+    # heat pump meters (kWh): heat produced and electricity used, heating and hot water
+    "hp_meters": {},
     "heat_mode": None,  # heating mode on / off (cycles)
     "summer_mode": None,
     "checks": {"pressure": True, "water": True, "cycling": True, "baseload": True},
