@@ -200,3 +200,78 @@ async def test_weekly_report(hass: HomeAssistant, notify_calls, freezer) -> None
         rm = runtime.report.info_month()
         assert rm["month"] and rm["data"]["energy"]["year"] is not None
         assert "(gleich wie Vormonat, gleich wie Vorjahr)" in rm["lines"][0]
+
+
+async def test_heating_curve(hass: HomeAssistant, freezer) -> None:
+    freezer.move_to("2026-11-15 10:00:00")
+    entry = MockConfigEntry(domain="smarthome_ui", data={}, title="Smarthome UI Core")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    rep = entry.runtime_data.report
+    vac = {"on": False}
+    rep.context = lambda: {"outdoor": {"temperature": "sensor.aussen"}, "vacation": vac["on"]}
+    hass.states.async_set("sensor.aussen", "2.0")
+    room = {"hvac_action": "heating", "current_temperature": 19.8, "temperature": 21}
+    hass.states.async_set("climate.wohnen", "heat", room)
+    hass.states.async_set("climate.bad", "heat", {**room, "current_temperature": 21.1})
+    # bedroom kept cool and a thermostat that is off: ignored
+    hass.states.async_set("climate.schlafen", "heat", {**room, "temperature": 16})
+    hass.states.async_set("climate.keller", "off", room)
+    s = rep.sample_curve()
+    assert s["rooms"] == 2 and s["cold"] == 1 and s["duty"] == 1.0 and s["out"] == 2.0
+    vac["on"] = True
+    assert rep.sample_curve() is None
+    hass.states.async_set("sensor.aussen", "17")
+    vac["on"] = False
+    assert rep.sample_curve() is None
+
+    end = dt_util.now()
+    t0 = int((end - timedelta(days=7)).timestamp() * 1000)
+
+    def fill(cold_out: dict, mild_out: dict) -> None:
+        rep.store.data["hc_samples"] = [
+            {"t": t0 + i * 1_800_000, "rooms": 4, "warm": 0, "d": 0.0, **x}
+            for i, x in enumerate([cold_out] * 40 + [mild_out] * 40)
+        ]
+
+    # too cold only on cold days → slope
+    fill(
+        {"out": 0.0, "cold": 2, "d": -0.8, "duty": 0.9},
+        {"out": 10.0, "cold": 0, "d": 0.0, "duty": 0.6},
+    )
+    c = rep.curve(end - timedelta(days=7), end)
+    assert c["advice"] == "raise" and c["part"] == "slope"
+    assert "kalten Tagen" in rep.curve_text(c) and "Steigung" in rep.curve_text(c)
+    # warm enough everywhere, thermostats hardly heating → base point lower
+    fill(
+        {"out": 1.0, "cold": 0, "d": 0.1, "duty": 0.1},
+        {"out": 9.0, "cold": 0, "d": 0.2, "duty": 0.05},
+    )
+    c = rep.curve(end - timedelta(days=7), end)
+    assert c["advice"] == "lower" and c["part"] == "base"
+    assert "Fußpunkt etwa 1 Grad tiefer" in rep.curve_text(c)
+    # fits → no line
+    fill(
+        {"out": 1.0, "cold": 0, "d": 0.0, "duty": 0.6},
+        {"out": 9.0, "cold": 0, "d": 0.0, "duty": 0.5},
+    )
+    assert rep.curve_text(rep.curve(end - timedelta(days=7), end)) == ""
+    # too few samples
+    rep.store.data["hc_samples"] = rep.store.data["hc_samples"][:10]
+    assert rep.curve(end - timedelta(days=7), end) is None
+    # report line
+    assert any(
+        "Heizkurve" in x
+        for x in WeeklyReport.text(
+            {
+                "heating": {
+                    "curve": {
+                        "advice": "lower",
+                        "part": None,
+                        "all": {"d": 1.0, "duty": 0.1, "cold": 0, "warm": 0.5},
+                    }
+                }
+            }
+        )
+    )

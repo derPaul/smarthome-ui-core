@@ -603,6 +603,9 @@
       "security_presence_sim": {
         "name": "Anwesenheit simulieren"
       },
+      "security_vacation": {
+        "name": "Urlaubsmodus"
+      },
       "security_open_long_check": {
         "name": "Lange offene Fenster melden"
       },

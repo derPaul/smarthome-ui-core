@@ -30,7 +30,8 @@ def _at(hour: int, minute: int = 0) -> datetime:
 
 
 @pytest.mark.parametrize(
-    "name", ["thermostat_display_time", "thermostat_display_presence", "pv_floor_heating"]
+    "name",
+    ["thermostat_display_time", "thermostat_display_presence", "pv_floor_heating", "pv_hot_water"],
 )
 def test_blueprints_valid(name: str) -> None:
     bp = models.Blueprint(
@@ -272,3 +273,55 @@ async def test_pv_floor_heating_after_restart(
     assert temps[-1].data["temperature"] == 22
     assert float(numbers[-1].data["value"]) == 22
     assert hass.states.get("input_boolean.estrich").state == "off"
+
+
+async def test_pv_hot_water(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
+    freezer.move_to(_at(11))
+    assert await async_setup_component(hass, "scene", {})
+    assert await async_setup_component(
+        hass, "input_boolean", {"input_boolean": {"ww": {"name": "Warmwasser wird solar geladen"}}}
+    )
+    numbers = async_mock_service(hass, "number", "set_value")
+    power = {"device_class": "power", "unit_of_measurement": "W"}
+    hass.states.async_set("sensor.netz", "300", power)
+    hass.states.async_set("sensor.akku", "85", {"device_class": "battery"})
+    hass.states.async_set("number.ww_soll", "50", {"min": 10, "max": 65})
+    await hass.async_block_till_done()
+    await _automation(
+        hass,
+        "pv_hot_water",
+        {
+            "grid_power": "sensor.netz",
+            "battery": "sensor.akku",
+            "setpoint": "number.ww_soll",
+            "flag": "input_boolean.ww",
+        },
+    )
+    # export, but the battery is not full enough yet (90 %): nothing
+    hass.states.async_set("sensor.netz", "-1500", power)
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert not numbers
+    # battery full, export again for 10 minutes → hot water to 55 °C
+    hass.states.async_set("sensor.akku", "96", {"device_class": "battery"})
+    hass.states.async_set("sensor.netz", "200", power)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.netz", "-1500", power)
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _values(numbers) == {"number.ww_soll": 55}
+    assert hass.states.get("input_boolean.ww").state == "on"
+    # at 18:00 back to the value before
+    hass.states.async_set("number.ww_soll", "55", {"min": 10, "max": 65})
+    numbers.clear()
+    freezer.move_to(_at(18))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert {c.data["entity_id"]: float(c.data["value"]) for c in numbers} == {
+        "number.ww_soll": 50.0
+    }
+    assert hass.states.get("input_boolean.ww").state == "off"

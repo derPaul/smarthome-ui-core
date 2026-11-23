@@ -12,7 +12,7 @@ from homeassistant.util import slugify
 
 from . import CoreConfigEntry
 from .alarm import OPTION_SWITCHES, AlarmEntity, AlarmOption
-from .const import SIGNAL_NOTIFY, SIGNAL_PRESENCE_SIM, SIGNAL_SECURITY
+from .const import SIGNAL_NOTIFY, SIGNAL_PRESENCE_SIM, SIGNAL_SECURITY, SIGNAL_VACATION
 from .displays import DisplayEntity, async_setup_display_entities
 from .doorbell import DoorbellEntity, DoorbellTracker, async_setup_doorbell_entities
 from .entity import DEVICE_NOTIFY, DEVICE_SECURITY, CoreEntity
@@ -44,6 +44,7 @@ async def async_setup_entry(
         [AlarmLogicSwitch(entry.entry_id, alarm), GuestsSwitch(entry.entry_id, alarm)]
         + [AlarmOptionSwitch(entry.entry_id, alarm, *option) for option in OPTION_SWITCHES]
         + [PresenceSimSwitch(entry.entry_id, entry.runtime_data.presence_sim)]
+        + [VacationSwitch(entry.entry_id, entry.runtime_data.vacation)]
         + [
             TechnikCheck(entry.entry_id, entry.runtime_data.technik, check)
             for check in ("pressure", "water", "cycling", "baseload")
@@ -390,3 +391,44 @@ class TechnikCheck(TechnikOption, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Switch the check off."""
         self._technik.set_option(self._check, False)
+
+
+class VacationSwitch(CoreEntity, SwitchEntity):
+    """Holiday mode: heating down, presence simulation, alarm, only important notifications."""
+
+    _attr_translation_key = "security_vacation"
+
+    def __init__(self, entry_id: str, vacation: Any) -> None:
+        """Initialize (switch.security_vacation)."""
+        super().__init__(entry_id, "security_vacation", DEVICE_SECURITY, "switch", "vacation")
+        self._vac = vacation
+
+    @property
+    def is_on(self) -> bool:
+        """Return True while the holiday mode is on."""
+        return self._vac.on
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return since when, the return date and how many notifications were held back."""
+        info = self._vac.info()
+        return {
+            "since": info["since"],
+            "until": info["settings"].get("until"),
+            "suppressed": info["suppressed"],
+            "preheated": info["preheated"],
+        }
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Switch the holiday mode on."""
+        await self._vac.async_set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Switch the holiday mode off (heating back, summary)."""
+        await self._vac.async_set(False)
+
+    async def async_added_to_hass(self) -> None:
+        """Update when it changes."""
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_VACATION, self.async_write_ha_state)
+        )

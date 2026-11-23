@@ -603,6 +603,9 @@
       "security_presence_sim": {
         "name": "Simulate presence"
       },
+      "security_vacation": {
+        "name": "Holiday mode"
+      },
       "security_open_long_check": {
         "name": "Report windows open for long"
       },

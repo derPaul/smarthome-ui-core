@@ -195,6 +195,7 @@ async def test_english_entity_ids_with_german_names(hass: HomeAssistant, notify_
         "switch.security_open_long_check",
         "switch.security_presence_sim",
         "switch.security_rain_warning",
+        "switch.security_vacation",
         "switch.system_back_online",
         "switch.system_restarts",
         "switch.system_unifi_auto",

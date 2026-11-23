@@ -1,0 +1,207 @@
+blueprint:
+  name: Warmwasser mit Sonnenstrom (Smarthome UI Core)
+  description: >-
+    Bei Sonnenstrom-Überschuss – Batterie voll, es wird eingespeist – hebt die Automation den
+    Warmwasser-Sollwert der Wärmepumpe an, damit sie den Speicher mit eigenem Strom aufheizt statt
+    morgens oder abends mit Netzstrom. Zur Endzeit oder wenn länger Strom aus dem Netz kommt, stellt
+    sie den vorherigen Sollwert wieder ein (das Wasser bleibt warm). Einmal am Tag. Der Merker (ein
+    Schalter-Helfer) hält fest, dass gerade geladen wird – so wird auch nach einem Neustart
+    zurückgestellt.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/pv_hot_water.yaml
+  input:
+    grid_power:
+      name: Netzleistung
+      description: Positiv = Bezug aus dem Netz, negativ = Einspeisung.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+    export_below:
+      name: Starten bei Netzleistung unter
+      description: Negativ = so viel wird mindestens eingespeist (z. B. -1000 W).
+      default: -1000
+      selector:
+        number:
+          min: -20000
+          max: 0
+          step: 100
+          unit_of_measurement: W
+    start_for:
+      name: … für mindestens
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: min
+    import_above:
+      name: Vorzeitig zurück bei Netzbezug über
+      default: 800
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 100
+          unit_of_measurement: W
+    import_for:
+      name: … für mindestens
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+    battery:
+      name: Batterie-Ladestand (optional)
+      description: Erst laden, wenn die Batterie so voll ist.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: battery
+    min_soc:
+      name: Batterie mindestens
+      default: 90
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    setpoint:
+      name: Warmwasser-Sollwert
+      description: z. B. „Komfortbetrieb Warmwasser Temperatursoll“ der Wärmepumpe.
+      selector:
+        entity:
+          filter:
+            - domain: number
+    target:
+      name: Anheben auf
+      description: Höher als sonst, aber unter der Grenze, ab der die Wärmepumpe den Heizstab nimmt.
+      default: 55
+      selector:
+        number:
+          min: 40
+          max: 65
+          step: 1
+          unit_of_measurement: °C
+    normal:
+      name: Sonst (nach einem Neustart)
+      description: Auf diesen Wert stellt die Automation zurück, wenn die Momentaufnahme fehlt.
+      default: 50
+      selector:
+        number:
+          min: 35
+          max: 65
+          step: 1
+          unit_of_measurement: °C
+    start_after:
+      name: Starten frühestens um
+      default: "10:00:00"
+      selector:
+        time:
+    start_before:
+      name: Starten spätestens um
+      default: "15:00:00"
+      selector:
+        time:
+    end_at:
+      name: Zurückstellen um
+      default: "18:00:00"
+      selector:
+        time:
+    flag:
+      name: Merker
+      description: Ein Schalter-Helfer (input_boolean), z. B. „Warmwasser wird solar geladen“.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input grid_power
+    below: !input export_below
+    for:
+      minutes: !input start_for
+    id: start
+  - trigger: numeric_state
+    entity_id: !input grid_power
+    above: !input import_above
+    for:
+      minutes: !input import_for
+    id: stop
+  - trigger: time
+    at: !input end_at
+    id: stop
+
+variables:
+  setpoint: !input setpoint
+  target: !input target
+  normal: !input normal
+  battery: !input battery
+  min_soc: !input min_soc
+  scene_id: "{{ 'pv_ww_' ~ this.entity_id.split('.')[1] }}"
+
+actions:
+  - choose:
+      - alias: Überschuss → Warmwasser-Sollwert anheben
+        conditions:
+          - condition: trigger
+            id: start
+          - condition: state
+            entity_id: !input flag
+            state: "off"
+          - condition: time
+            after: !input start_after
+            before: !input start_before
+          - condition: template
+            value_template: "{{ not battery or states(battery) | float(0) >= min_soc }}"
+          - condition: template
+            value_template: "{{ states(setpoint) | is_number and states(setpoint) | float < target }}"
+        sequence:
+          - action: scene.create
+            data:
+              scene_id: "{{ scene_id }}"
+              snapshot_entities: "{{ [setpoint] }}"
+          - action: input_boolean.turn_on
+            target:
+              entity_id: !input flag
+          - action: number.set_value
+            target:
+              entity_id: "{{ setpoint }}"
+            data:
+              value: "{{ [target, state_attr(setpoint, 'max') | float(99)] | min }}"
+      - alias: Zurückstellen
+        conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: !input flag
+            state: "on"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ expand('scene.' ~ scene_id) | count > 0 }}"
+            then:
+              - action: scene.turn_on
+                target:
+                  entity_id: "{{ 'scene.' ~ scene_id }}"
+              - action: scene.delete
+                target:
+                  entity_id: "{{ 'scene.' ~ scene_id }}"
+            else:
+              # nach einem Neustart fehlt die Momentaufnahme: auf den üblichen Wert
+              - action: number.set_value
+                target:
+                  entity_id: "{{ setpoint }}"
+                data:
+                  value: "{{ normal }}"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input flag
+
+mode: queued
+max: 3

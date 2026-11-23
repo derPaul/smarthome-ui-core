@@ -344,6 +344,22 @@ kommen über die Quellen „Fenster & Türen“ bzw. „Letzte Nacht“ (Push an
   Ende gehen seine Lichter aus. Rollos schließen kurz nach Sonnenuntergang und öffnen morgens, jeweils zufällig
   verzögert. Beim Übernehmen schaltet Core die alte Automation aus.
 
+### Urlaubsmodus (ab 0.53)
+
+`switch.security_vacation` bzw. im Dashboard „Ich gehe – Check“ → „Länger weg? Urlaubsmodus“. Beim Einschalten:
+
+- Heizung absenken: Thermostate im Heizbetrieb und der Tagbetrieb-Sollwert der Wärmepumpe (Heizkreis) um 3 Grad
+  (einstellbar 0–10), Warmwasser auf 40 °C (oder unverändert). Die alten Werte merkt sich Core.
+- Anwesenheit simulieren einschalten (falls eingerichtet) und die Alarmanlage abwesend scharf schalten, wenn sie aus ist.
+- Nur Wichtiges melden: Sicherheit, Wasser, Kühlschrank, Frost, Internet und Stromausfall kommen weiter, alles andere
+  wird zurückgehalten und gezählt.
+
+Mit Rückkehrdatum stellt Core Heizung und Warmwasser 24 Stunden vorher (einstellbar) zurück und meldet das. Kommt
+jemand nach Hause (Person „zuhause“), endet der Modus von selbst: alte Werte zurück, Simulation wie vorher, und eine
+Zusammenfassung „Willkommen zurück“ (Tage, Alarm, Klingeln, Post, zurückgehaltene Mitteilungen). Websocket
+`smarthome_ui/vacation/set` (`on`, `settings`: `offset`, `hot_water`, `sim`, `alarm`, `quiet`, `until` in ms,
+`preheat_h`).
+
 ## Briefkasten
 
 Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **Entnahmetür**. Core erkennt sie am Namen
@@ -478,6 +494,14 @@ Warmwasser, wie die Haustechnik-Seite sie findet) steht im Bericht die Arbeitsza
 sich jeden Sonntag die Arbeitszahl mit der mittleren Außentemperatur (ein Jahr). Liegt sie deutlich (0,4) unter
 Wochen mit ähnlichem Wetter (±2 °C), steht im Bericht „Achtung Wärmepumpe“ mit dem Hinweis, Heizkurve, Filter und
 Abtauung zu prüfen.
+
+**Heizkurven-Assistent** (ab 0.53): Alle 30 Minuten schaut Core, solange es draußen kühler als 15 °C ist, auf die
+Thermostate im Heizbetrieb (Räume mit Soll ab 17 °C): wie weit jeder Raum vom Soll entfernt ist und ob das Thermostat
+gerade heizt (zwei Wochen, nicht im Urlaubsmodus). Bleiben Räume zu kalt, obwohl die Thermostate heizen, ist die
+Heizkurve zu tief; sind sie warm genug, obwohl die Thermostate kaum heizen (oder deutlich zu warm), ist die
+Vorlauftemperatur höher als nötig – das kostet Arbeitszahl. Der Vergleich kalter (unter 3 °C) mit milden Tagen
+(ab 8 °C) unterscheidet Steigung und Fußpunkt. Der Wochenbericht bekommt dann eine Zeile, z. B. „Heizkurve: Räume an
+milden Tagen warm genug, Thermostate heizen nur 12 % der Zeit – Fußpunkt etwa 1 Grad tiefer“.
 
 **Monatsbilanz** (ab 0.52): Am 1. jedes Monats um 9:12 kommt dieselbe Zusammenfassung für den Vormonat, verglichen
 mit dem Monat davor und dem gleichen Monat im Vorjahr (Quelle „Wochenbericht“, Titel „Monatsbilanz November 2026“).
@@ -692,6 +716,12 @@ Drei weitere **Vorlagen (Blueprints)** unter *Einstellungen → Automationen & S
   – eine Wärmepumpe mit Heizkurve heizt sonst nicht mehr) um 1 K an. Zur Endzeit (16:30) oder bei Netzbezug über
   800 W für 15 min stellt sie die vorherigen Werte wieder her (Momentaufnahme; nach einem Neustart um den gleichen
   Betrag zurück). Ein Merker-Schalter (`input_boolean`) hält fest, dass gerade geladen wird – einmal am Tag.
+
+- **Warmwasser mit Sonnenstrom** (ab 0.53) – speist die Anlage eine Weile mehr als eingestellt ein (z. B. −1000 W für
+  10 min, Batterie optional mindestens 90 %, Startfenster 10–15 Uhr), hebt sie den Warmwasser-Sollwert der
+  Wärmepumpe (`number`, z. B. „Tagbetrieb Warmwasser Temperatursoll“) auf das Ziel (55 °C). Zur Endzeit (18 Uhr) oder
+  bei Netzbezug über 800 W für 15 min kommt der vorherige Wert zurück (Momentaufnahme; nach einem Neustart der
+  eingestellte Normalwert, z. B. 50 °C). Ein Merker-Schalter (`input_boolean`) hält fest, dass gerade geladen wird.
 
 ## Bildschirme
 

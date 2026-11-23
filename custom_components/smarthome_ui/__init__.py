@@ -73,6 +73,7 @@ from .system import System
 from .tasks import find_task, task_states
 from .technik import Technik
 from .ui import UiError, UiManager
+from .vacation import Vacation
 from .vacuum import VacuumManager
 from .waste import WasteManager
 from .watchers import Watchers
@@ -123,6 +124,7 @@ class CoreRuntime:
     lights: LightSettings
     history: HistoryKeeper
     report: WeeklyReport
+    vacation: Vacation
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -323,6 +325,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_history_set,
         ws_history_default,
         ws_report_run,
+        ws_vacation_set,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -407,6 +410,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         security_notify,
         lambda: {t.device_id for t in appliances.trackers.values()},
     )
+    presence_sim = PresenceSim(hass, store, lambda: alarm.panel or _first_panel(hass))
     entry.runtime_data = CoreRuntime(
         store,
         engine,
@@ -423,7 +427,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         doorbells,
         alarm,
         Mailbox(hass, store, security_notify),
-        PresenceSim(hass, store, lambda: alarm.panel or _first_panel(hass)),
+        presence_sim,
         Grocery(hass, store),
         technik,
         Forecasts(hass, store, technik),
@@ -443,8 +447,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
             lambda: {
                 "outdoor": entry.runtime_data.catalog.outdoor(),
                 "technik": entry.runtime_data.technik.settings(),
+                "vacation": entry.runtime_data.vacation.on,
             },
         ),
+        Vacation(hass, store, engine, presence_sim, alarm),
     )
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
@@ -545,6 +551,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.system.async_setup()
     entry.runtime_data.history.async_setup()
     entry.runtime_data.report.async_setup()
+    entry.runtime_data.vacation.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -646,6 +653,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.system.async_stop()
     entry.runtime_data.history.async_stop()
     entry.runtime_data.report.async_stop()
+    entry.runtime_data.vacation.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -697,6 +705,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "history": runtime.history.info(),
         "report": runtime.report.info(),
         "report_month": runtime.report.info_month(),
+        "vacation": runtime.vacation.info(),
         "catalog": runtime.catalog.info(
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
@@ -738,6 +747,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "history_longer",
             "weekly_report",
             "monthly_report",
+            "vacation",
             "heatpump_cop",
             "energy_prices",
         ],
@@ -807,6 +817,7 @@ def ws_subscribe(
                     "history": runtime.history.info(),
                     "report": runtime.report.info(),
                     "report_month": runtime.report.info_month(),
+                    "vacation": runtime.vacation.info(),
                     "catalog": runtime.catalog.info(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
@@ -1614,3 +1625,34 @@ def ws_lights_ignore(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.lights.ignore(msg["area_id"], msg["ignore"])
         connection.send_result(msg["id"], {"rooms": suggest_lights(hass, runtime.lights.ignored())})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/vacation/set",
+        vol.Optional("on"): bool,
+        vol.Optional("settings"): {
+            vol.Optional("offset"): vol.All(vol.Coerce(float), vol.Range(min=0, max=10)),
+            vol.Optional("hot_water"): vol.Any(
+                None, vol.All(vol.Coerce(float), vol.Range(min=0, max=65))
+            ),
+            vol.Optional("sim"): bool,
+            vol.Optional("alarm"): bool,
+            vol.Optional("quiet"): bool,
+            vol.Optional("until"): vol.Any(None, vol.Coerce(int)),
+            vol.Optional("preheat_h"): vol.All(vol.Coerce(int), vol.Range(min=0, max=96)),
+        },
+    }
+)
+@websocket_api.async_response
+async def ws_vacation_set(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Switch the holiday mode on or off and change its settings."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        vac = runtime.vacation
+        if "on" in msg:
+            await vac.async_set(msg["on"], msg.get("settings"))
+        elif msg.get("settings"):
+            vac.set_settings(msg["settings"])
+        connection.send_result(msg["id"], vac.info())

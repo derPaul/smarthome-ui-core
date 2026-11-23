@@ -166,6 +166,9 @@
           "off": "mdi:home-outline"
         }
       },
+      "security_vacation": {
+        "default": "mdi:bag-suitcase-outline"
+      },
       "security_open_long_check": {
         "default": "mdi:window-open-variant"
       },

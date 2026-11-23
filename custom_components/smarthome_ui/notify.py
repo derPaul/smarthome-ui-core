@@ -97,6 +97,8 @@ class NotifyEngine:
         """Initialize the engine."""
         self.hass = hass
         self.store = store
+        # set by the holiday mode: which sources still notify
+        self.vacation_allows: Callable[[str], bool] = lambda src: True
         self._unsub: list[CALLBACK_TYPE] = []
         self._rule_unsub: list[CALLBACK_TYPE] = []
         self._pending: dict[str, tuple[datetime, dict[str, Any]]] = {}
@@ -490,6 +492,9 @@ class NotifyEngine:
             return False
         if not force and self.muted(src, message):
             _LOGGER.debug("Muted notification: %s", message)
+            return False
+        # holiday mode: only what needs you even from afar (the rest is counted)
+        if not force and not urgent and not self.vacation_allows(src):
             return False
         item = {
             "title": title,

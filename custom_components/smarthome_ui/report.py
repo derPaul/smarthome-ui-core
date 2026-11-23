@@ -20,6 +20,15 @@ the report shows the coefficient of performance (Arbeitszahl) of the week. Each 
 with the mean outdoor temperature (``hp_weeks``, one year); if it is clearly worse than in weeks
 with similar weather, the report says so.
 
+Heating curve: every 30 minutes, while it is cooler than 15 °C outside, Core looks at the
+thermostats in heat mode (rooms with a target of 17 °C or more): how far each room is from its
+target and whether the thermostat is heating (``hc_samples``, two weeks, not during holiday mode).
+If rooms stay too cold while their thermostats heat, the curve is too low; if they reach their
+target with the thermostats hardly ever heating (or are clearly too warm), the flow temperature is
+higher than needed, which costs efficiency. Comparing cold (below 3 °C) with mild days (8 °C and
+above) tells the slope from the base point. The report adds one line with the suggestion
+(``heating.curve``).
+
 Monthly balance: on the 1st of each month at 09:12 the same numbers for the month before, compared
 with the month before that and the same month a year ago (``report_month``, title "Monatsbilanz").
 """
@@ -65,6 +74,13 @@ HP_WEEKS = 53
 COP_WORSE = 0.4  # this much below weeks with similar weather → hint
 SIMILAR_DEG = 2.0
 DAY_MS = 86_400_000
+CURVE_EVERY = 30  # minutes between heating curve samples
+CURVE_KEEP = 14 * DAY_MS
+CURVE_MAX_OUT = 15.0  # warmer outside: no heating season
+CURVE_MIN_TARGET = 17.0  # rooms kept cooler (bedrooms, eco) say little about the curve
+CURVE_COLD = 0.5  # this much below target while heating → too cold
+CURVE_WARM = 0.8  # this much above target → too warm
+CURVE_MIN_SAMPLES = 48  # one day of samples
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 _HEATPUMP = re.compile(r"(wärmepumpe|waermepumpe|heat ?pump|\bwp\b|lwz|luft.?wasser)", re.I)
 
@@ -134,6 +150,11 @@ class WeeklyReport:
                 self.hass, self._tick_month, hour=MONTH_AT[0], minute=MONTH_AT[1], second=0
             )
         )
+        self._unsub.append(
+            async_track_time_change(
+                self.hass, self._tick_curve, minute=list(range(4, 60, CURVE_EVERY)), second=0
+            )
+        )
 
     @callback
     def async_stop(self) -> None:
@@ -151,6 +172,123 @@ class WeeklyReport:
     def _tick_month(self, now: datetime) -> None:
         if dt_util.as_local(now).day == 1:
             self.hass.async_create_task(self.async_run_month())
+
+    @callback
+    def _tick_curve(self, now: datetime) -> None:
+        self.sample_curve()
+
+    # ---------------------------------------------------------------- heating curve
+
+    def _outdoor_now(self) -> float | None:
+        try:
+            ent = (self.context().get("outdoor") or {}).get("temperature")
+        except Exception:  # noqa: BLE001 - catalog not available
+            return None
+        st = self.hass.states.get(ent) if ent else None
+        try:
+            return float(st.state) if st else None
+        except (TypeError, ValueError):
+            return None
+
+    @callback
+    def sample_curve(self) -> dict[str, Any] | None:
+        """Look at the thermostats in heat mode and keep one sample (None: nothing to keep)."""
+        try:
+            if self.context().get("vacation"):
+                return None
+        except Exception:  # noqa: BLE001 - context not available
+            pass
+        out = self._outdoor_now()
+        if out is None or out >= CURVE_MAX_OUT:
+            return None
+        rooms = cold = warm = heating = known = 0
+        deltas: list[float] = []
+        for st in self.hass.states.async_all("climate"):
+            a = st.attributes
+            if st.state != "heat":
+                continue
+            try:
+                cur, target = float(a["current_temperature"]), float(a["temperature"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if target < CURVE_MIN_TARGET:
+                continue
+            rooms += 1
+            d = cur - target
+            deltas.append(d)
+            action = a.get("hvac_action")
+            if action in ("heating", "idle", "off"):
+                known += 1
+                heating += action == "heating"
+            if d <= -CURVE_COLD and action != "idle":
+                cold += 1
+            elif d >= CURVE_WARM:
+                warm += 1
+        if not rooms:
+            return None
+        sample = {
+            "t": now_ms(),
+            "out": round(out, 1),
+            "rooms": rooms,
+            "cold": cold,
+            "warm": warm,
+            "d": round(sum(deltas) / rooms, 2),
+            "duty": round(heating / known, 2) if known else None,
+        }
+        keep = [
+            x for x in self.store.data.get("hc_samples") or [] if x["t"] > now_ms() - CURVE_KEEP
+        ]
+        self.store.data["hc_samples"] = [*keep, sample]
+        self.store.save()
+        return sample
+
+    def curve(self, start: datetime, end: datetime) -> dict[str, Any] | None:
+        """Return what the samples of the period say about the heating curve."""
+        since, until = int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+        samples = [x for x in self.store.data.get("hc_samples") or [] if since <= x["t"] < until]
+        if len(samples) < CURVE_MIN_SAMPLES:
+            return None
+
+        def part(xs: list[dict[str, Any]]) -> dict[str, Any] | None:
+            n = sum(x["rooms"] for x in xs)
+            if len(xs) < 12 or not n:
+                return None
+            duties = [x["duty"] for x in xs if x.get("duty") is not None]
+            return {
+                "cold": round(sum(x["cold"] for x in xs) / n, 2),
+                "warm": round(sum(x["warm"] for x in xs) / n, 2),
+                "d": round(sum(x["d"] * x["rooms"] for x in xs) / n, 2),
+                "duty": round(sum(duties) / len(duties), 2) if duties else None,
+                "n": len(xs),
+            }
+
+        res: dict[str, Any] = {"all": part(samples)}
+        res["cold_days"] = part([x for x in samples if x["out"] < 3])
+        res["mild_days"] = part([x for x in samples if x["out"] >= 8])
+        res["rooms"] = max(x["rooms"] for x in samples)
+
+        def verdict(p: dict[str, Any] | None) -> str | None:
+            if not p:
+                return None
+            if p["cold"] >= 0.2:
+                return "raise"
+            low_duty = p["duty"] is not None and p["duty"] < 0.25 and p["d"] >= -0.2
+            if p["cold"] < 0.05 and (p["warm"] >= 0.3 or low_duty):
+                return "lower"
+            return None
+
+        advice = verdict(res["all"])
+        cold, mild = verdict(res["cold_days"]), verdict(res["mild_days"])
+        part_name = None
+        if cold and cold != mild and res["mild_days"]:
+            advice, part_name = cold, "slope"
+        elif mild and mild != cold and res["cold_days"]:
+            advice, part_name = mild, "base"
+        elif advice:
+            part_name = "slope" if res["cold_days"] and not res["mild_days"] else "base"
+        res["advice"] = advice
+        res["part"] = part_name if advice else None
+        return res
 
     # ---------------------------------------------------------------- collecting
 
@@ -369,6 +507,8 @@ class WeeklyReport:
         out = await self.collect_period(start, end, start - timedelta(days=7), start)
         if h := out.get("heating"):
             self._cop_hint(h, start, out.get("weather"))
+        if curve := self.curve(start, end):
+            out.setdefault("heating", {})["curve"] = curve
         week_end = now_ms() + 7 * DAY_MS
         due = [
             t
@@ -480,6 +620,35 @@ class WeeklyReport:
         self.store.data["hp_weeks"] = weeks[-HP_WEEKS:]
 
     @staticmethod
+    def curve_text(c: dict[str, Any] | None) -> str:
+        """Return the heating curve suggestion as one line ("" if the curve fits or is unknown)."""
+        if not c or not c.get("advice"):
+            return ""
+        p = c.get("cold_days") if c.get("part") == "slope" else c.get("mild_days")
+        p = p or c["all"]
+        when = {"slope": "an kalten Tagen", "base": "an milden Tagen"}.get(c.get("part"), "")
+        when = f" {when}" if when and p is not c["all"] else ""
+        if c["advice"] == "raise":
+            why = f"{round(p['cold'] * 100)} % der Zeit zu kalt, obwohl die Thermostate heizen"
+            what = (
+                "Steigung etwas erhöhen (z. B. +0,05)"
+                if c.get("part") == "slope"
+                else "Fußpunkt etwa 1 Grad höher"
+            )
+            return f"Heizkurve: Räume{when} {why} – {what}."
+        if p["d"] >= CURVE_WARM / 2:
+            why = f"im Schnitt {_deg(p['d']).rstrip('°')} Grad über Soll"
+        else:
+            duty = round((p.get("duty") or 0) * 100)
+            why = f"warm genug, Thermostate heizen nur {duty} % der Zeit"
+        what = (
+            "Steigung etwas senken (z. B. −0,05)"
+            if c.get("part") == "slope"
+            else "Fußpunkt etwa 1 Grad tiefer"
+        )
+        return f"Heizkurve: Räume{when} {why} – {what}, das verbessert die Arbeitszahl."
+
+    @staticmethod
     def text(data: dict[str, Any], month: bool = False) -> list[str]:
         """Return the report as short lines (month: compared with the month and year before)."""
         lines: list[str] = []
@@ -508,7 +677,7 @@ class WeeklyReport:
                 lines.append(pv)
                 if best := e.get("best_day"):
                     lines.append(f"Bester Sonnentag: {best['day']} ({_kwh(best['kwh'])})")
-        if h := data.get("heating"):
+        if (h := data.get("heating")) and h.get("heatpump") is not None:
             d = _delta(h["heatpump"], h.get("prev"), to)
             line = f"Heizung: Wärmepumpe {_kwh(h['heatpump'])} Strom" + (f" ({d})" if d else "")
             line += yr(h["heatpump"], h.get("year"))
@@ -522,6 +691,8 @@ class WeeklyReport:
                     f"Achtung Wärmepumpe: Arbeitszahl {_cop(h['cop'])} – bei ähnlichem Wetter "
                     f"sonst {_cop(w['usual'])}. Heizkurve, Filter und Abtauung prüfen."
                 )
+        if line := WeeklyReport.curve_text((data.get("heating") or {}).get("curve")):
+            lines.append(line)
         if w := data.get("water"):
             d = _delta(w["liters"], w.get("prev"), to)
             line = f"Wasser: {_liters(w['liters'])}" + (f" ({d})" if d else "")
