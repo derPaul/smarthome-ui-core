@@ -75,7 +75,7 @@ async def test_faults_pressure_softener(hass: HomeAssistant, hass_ws_client, not
     technik.evaluate()
     await hass.async_block_till_done()
     msgs = _messages(notify_calls)
-    assert "Wärmepumpe: Fehler 712 Hochdruck" in msgs
+    assert any(m.startswith("Wärmepumpe meldet eine Störung: Fehler 712 Hochdruck") for m in msgs)
     assert "Wechselrichter: Isolationsfehler" in msgs
     assert "Heizungswasser nachfüllen (0,90 bar)" in msgs
     assert "Salz nachfüllen (4 kg)" in msgs
@@ -98,6 +98,43 @@ async def test_faults_pressure_softener(hass: HomeAssistant, hass_ws_client, not
     technik.set_settings({**SETTINGS, "pressure_min": 1.5})
     assert technik.settings()["pressure_min"] == 0.8
     assert "pressure" not in technik.hints
+
+
+async def test_heatpump_error_code_and_standstill(
+    hass: HomeAssistant, hass_ws_client, notify_calls, freezer
+) -> None:
+    entry = await _setup(hass, hass_ws_client)
+    technik = entry.runtime_data.technik
+    # error status says nothing, only the error code sensor knows
+    hass.states.async_set("sensor.wp_aktiver_fehler", "no error", {})
+    hass.states.async_set("sensor.ww_ist", "34.6", {})
+    technik.set_settings(
+        {**SETTINGS, "heatpump_faults": ["sensor.wp_aktiver_fehler"], "dhw": "sensor.ww_ist"}
+    )
+    await hass.async_block_till_done()
+    assert notify_calls == []
+    freezer.tick(timedelta(hours=3))
+    hass.states.async_set("sensor.wp_aktiver_fehler", "error 30172", {})
+    technik.evaluate()
+    await hass.async_block_till_done()
+    msg = _messages(notify_calls)[-1]
+    assert msg.startswith("Wärmepumpe steht: Fehler 30172, Verdichter seit über 3 Stunden aus")
+    assert "Warmwasser 34,6 °C" in msg
+    assert notify_calls[-1].data["data"]["push"]["interruption-level"] == "time-sensitive"
+    assert technik.data["sent"] == ["hp_error|Fehler 30172"]
+    # after a restart the same fault is not sent again
+    count = len(notify_calls)
+    technik._primed = False
+    technik._sent = set()
+    technik.evaluate()
+    await hass.async_block_till_done()
+    assert len(notify_calls) == count
+    # a fault that was not there before the restart is
+    hass.states.async_set("sensor.wp_aktiver_fehler", "error 712", {})
+    technik._primed = False
+    technik.evaluate()
+    await hass.async_block_till_done()
+    assert "Fehler 712" in _messages(notify_calls)[-1]
 
 
 async def test_unreachable(hass: HomeAssistant, hass_ws_client, notify_calls, freezer) -> None:

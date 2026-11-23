@@ -472,6 +472,14 @@ und Pause des Heizbetriebs, nicht im Sommerbetrieb) und den nächsten Warmwasser
 die Wärmepumpe im Lauf aufnimmt (Attribut `hp_runs` = Läufe bis leer). Die Warmwasser-Temperatur, ab der nachgeheizt wird, lernt Core aus dem Tiefstwert vor
 jedem Aufheizen (bis dahin Soll − 5 K).
 
+
+**Störung der Wärmepumpe** (ab 0.53.1): Neben der eingestellten Fehler-Entität prüft Core auch die
+Fehlercode-Sensoren, die das Dashboard an der Wärmepumpe findet („Aktiver Fehler“, „Fehlercode“) – manche
+Integrationen melden eine Störung nur dort, während der Fehlerstatus „aus“ bleibt. Steht der Verdichter
+seit mindestens einer Stunde, heißt die Mitteilung „Wärmepumpe steht: Fehler … – Verdichter seit über N Stunden
+aus – Warmwasser … °C“ (dringend). Was schon gemeldet wurde, merkt sich Core über Neustarts hinweg: dieselbe
+Störung kommt nicht erneut, ein neuer Fehlercode schon.
+
 ## Wochenbericht (ab 0.50, ausführlich ab 0.51)
 
 Jeden Sonntag um 18:12 schickt Core eine Zusammenfassung der letzten sieben Tage (Quelle „Wochenbericht“, Push an),

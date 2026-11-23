@@ -4,7 +4,10 @@ Which sensors count comes from the dashboard (``technik/settings``), the way its
 found or was told them. Core checks every minute and notifies (sources "Heizung & Wärmepumpe"
 ``ht.heating``, "Strom, PV & Batterie" ``ht.energy``, "Wasser & Enthärter" ``ht.water``):
 
-* **faults** – heat pump / inverter error state, a device not reachable for 10 minutes,
+* **faults** – heat pump / inverter error state, a device not reachable for 10 minutes; for the heat
+  pump also the error code sensors the dashboard found (``heatpump_faults``, e.g. "Aktiver Fehler" –
+  some integrations report a fault only there) and, if the compressor has been off for an hour,
+  "Wärmepumpe steht" (urgent),
 * **heating pressure** – below ``pressure_min`` (1.5 bar): "Heizungswasser nachfüllen", urgent below
   ``pressure_critical``; falling by ``pressure_drop`` bar per week or more (daily minimum, 3 weeks),
 * **water softener** – salt at 20 % of ``salt_max`` or less, alarms / warnings / notes of the
@@ -56,6 +59,7 @@ DAYS_KEEP = 21
 NIGHTS_KEEP = 15
 DEFAULTS: dict[str, Any] = {
     "heatpump_error": None,
+    "heatpump_faults": [],  # further error code sensors of the heat pump ("Aktiver Fehler")
     "inverter_error": None,
     "inverter_error_ok": None,
     "reach": {},  # {"Wechselrichter": entity, "Batterie": entity, "Heizkreis": entity}
@@ -283,6 +287,29 @@ class Technik:
             return None
         return state.state
 
+    def heatpump_fault(self, s: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """Return the heat pump's fault (code, message) or None."""
+        s = s or self.settings()
+        for entity in [s["heatpump_error"], *(s.get("heatpump_faults") or [])]:
+            err = self._fault(entity)
+            if not err:
+                continue
+            code = re.sub(r"^(error|fehler)[\s:_-]*", "Fehler ", err, flags=re.IGNORECASE)
+            message = f"Wärmepumpe meldet eine Störung: {code}"
+            comp = self._state(s["compressor"])
+            if comp is not None and comp.state == "off":
+                hours = (dt_util.utcnow() - comp.last_changed).total_seconds() / 3600
+                if hours >= 1:
+                    message = (
+                        f"Wärmepumpe steht: {code}, Verdichter seit über {int(hours)} "
+                        f"{'Stunde' if int(hours) == 1 else 'Stunden'} aus"
+                    )
+            dhw = _num(getattr(self._state(s["dhw"]), "state", None))
+            if dhw is not None:
+                message += f" – Warmwasser {dhw:.1f} °C".replace(".", ",")
+            return {"code": code, "message": message + ". Störung prüfen bzw. Fachbetrieb anrufen."}
+        return None
+
     @callback
     def _tick(self, _now: Any = None) -> None:
         self._sample()
@@ -355,8 +382,8 @@ class Technik:
         def hint(key: str, src: str, title: str, message: str, **extra: Any) -> None:
             out[key] = {"src": src, "title": title, "message": message, **extra}
 
-        if err := self._fault(s["heatpump_error"]):
-            hint("hp_error", "ht.heating", "Wärmepumpe", f"Wärmepumpe: {err}", urgent=True)
+        if err := self.heatpump_fault(s):
+            hint(f"hp_error|{err['code']}", "ht.heating", "Wärmepumpe", err["message"], urgent=True)
         if err := self._fault(s["inverter_error"], s["inverter_error_ok"]):
             hint("inv_error", "ht.energy", "Wechselrichter", f"Wechselrichter: {err}")
         now = dt_util.utcnow()
@@ -450,17 +477,23 @@ class Technik:
     def evaluate(self) -> None:
         """Check everything, send what is new."""
         hints = self._hints()
-        if self._primed:
-            for key, h in hints.items():
-                if key not in self._sent:
-                    self.notify(
-                        h["src"],
-                        h["title"],
-                        h["message"],
-                        f"technik|{key.split('|')[0]}",
-                        urgent=bool(h.get("urgent")),
-                        actions=h.get("actions"),
-                    )
+        # what was already sent survives a restart: a fault that is still there is not sent again,
+        # one that came while Home Assistant was down (or that Core did not see before) is
+        if not self._primed:
+            self._sent = set(self.data.get("sent") or [])
+        for key, h in hints.items():
+            if key not in self._sent:
+                self.notify(
+                    h["src"],
+                    h["title"],
+                    h["message"],
+                    f"technik|{key.split('|')[0]}",
+                    urgent=bool(h.get("urgent")),
+                    actions=h.get("actions"),
+                )
+        if set(hints) != self._sent or not self._primed:
+            self.data["sent"] = sorted(hints)
+            self.store.save()
         self._sent = set(hints)
         self._primed = True
         if hints != self.hints:

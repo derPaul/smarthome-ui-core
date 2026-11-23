@@ -1211,6 +1211,7 @@ def ws_grocery_settings(
     {
         vol.Required("type"): "smarthome_ui/technik/settings",
         vol.Optional("heatpump_error"): vol.Any(None, str),
+        vol.Optional("heatpump_faults"): [str],
         vol.Optional("inverter_error"): vol.Any(None, str),
         vol.Optional("inverter_error_ok"): vol.Any(None, [vol.Coerce(str)]),
         vol.Optional("reach"): {str: vol.Any(None, str)},
