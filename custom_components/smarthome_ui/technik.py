@@ -7,7 +7,8 @@ found or was told them. Core checks every minute and notifies (sources "Heizung 
 * **faults** – heat pump / inverter error state, a device not reachable for 10 minutes; for the heat
   pump also the error code sensors the dashboard found (``heatpump_faults``, e.g. "Aktiver Fehler" –
   some integrations report a fault only there) and, if the compressor has been off for an hour,
-  "Wärmepumpe steht" (urgent),
+  "Wärmepumpe steht" (urgent); for Stiebel Eltron / Tecalor the code is explained from the WPM
+  message list (``data/stiebel_wpm.json``: what tripped and what to check),
 * **heating pressure** – below ``pressure_min`` (1.5 bar): "Heizungswasser nachfüllen", urgent below
   ``pressure_critical``; falling by ``pressure_drop`` bar per week or more (daily minimum, 3 weeks),
 * **water softener** – salt at 20 % of ``salt_max`` or less, alarms / warnings / notes of the
@@ -26,7 +27,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import timedelta
+import json
 import logging
+from pathlib import Path
 import re
 from statistics import median
 from typing import Any
@@ -41,6 +44,7 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -98,6 +102,11 @@ _NO_ERROR = re.compile(
     r"betrieb|in betrieb|running|idle|bereit|ready|standby)$",
     re.IGNORECASE,
 )
+CODES_FILE = Path(__file__).parent / "data" / "stiebel_wpm.json"
+# heat pumps whose codes follow the Stiebel Eltron WPM message list (Tecalor is the same make)
+_STIEBEL = re.compile(
+    r"(stiebel|tecalor|\blwz|_lwz|\bwpl|_wpl|\bwpf|_wpf|\bwpm|_wpm|\bisg|_isg)", re.I
+)
 _ERROR = re.compile(r"(error|fehler|fault|störung|stoerung|alarm|defekt|failure)", re.IGNORECASE)
 _QUIET = re.compile(
     r"^(kein|keine|none|no|ok|0+|ff|255|a0x0000|leer|nicht)$|^(kein|keine|none|no|ok|leer|nicht)\b"
@@ -133,6 +142,7 @@ class Technik:
         self._unsub: list[CALLBACK_TYPE] = []
         self._listeners: list[CALLBACK_TYPE] = []
         self._sent: set[str] = set()
+        self._codes: dict[str, list[str]] = {}
         self._primed = False
         self._flow_since: int | None = None
         self._starts: list[int] = []
@@ -287,14 +297,52 @@ class Technik:
             return None
         return state.state
 
+    async def async_load_codes(self) -> None:
+        """Read the message list of the heat pump makers (once, in the executor)."""
+
+        def read() -> dict[str, list[str]]:
+            try:
+                return json.loads(CODES_FILE.read_text(encoding="utf-8")).get("codes") or {}
+            except (OSError, ValueError) as err:
+                _LOGGER.warning("Could not read %s: %s", CODES_FILE.name, err)
+                return {}
+
+        self._codes = await self.hass.async_add_executor_job(read)
+
+    def _explain(self, entity_id: str, err: str) -> dict[str, Any] | None:
+        """Return what a Stiebel Eltron WPM code means (who, why, what to check)."""
+        m = re.search(r"\d{4,5}", err)
+        if not m or not getattr(self, "_codes", None):
+            return None
+        hit = self._codes.get(str(int(m.group())))
+        if not hit:
+            return None
+        ent = er.async_get(self.hass).async_get(entity_id)
+        dev = dr.async_get(self.hass).async_get(ent.device_id) if ent and ent.device_id else None
+        maker = f"{entity_id} {dev.manufacturer or ''} {dev.model or ''}" if dev else entity_id
+        if not _STIEBEL.search(maker):
+            return None
+        who, why, fix = hit
+        return {
+            "code": int(m.group()),
+            "who": who,
+            "why": why.rstrip("."),
+            "fix": fix,
+            # 5xxxx: the same message came too often – the heat pump is locked until it is reset
+            "locked": m.group().startswith("5"),
+        }
+
     def heatpump_fault(self, s: dict[str, Any] | None = None) -> dict[str, Any] | None:
-        """Return the heat pump's fault (code, message) or None."""
+        """Return the heat pump's fault (code, meaning, message) or None."""
         s = s or self.settings()
         for entity in [s["heatpump_error"], *(s.get("heatpump_faults") or [])]:
             err = self._fault(entity)
             if not err:
                 continue
             code = re.sub(r"^(error|fehler)[\s:_-]*", "Fehler ", err, flags=re.IGNORECASE)
+            info = self._explain(entity, err)
+            if info:
+                code = f"{code} ({info['why']})"
             message = f"Wärmepumpe meldet eine Störung: {code}"
             comp = self._state(s["compressor"])
             if comp is not None and comp.state == "off":
@@ -307,7 +355,14 @@ class Technik:
             dhw = _num(getattr(self._state(s["dhw"]), "state", None))
             if dhw is not None:
                 message += f" – Warmwasser {dhw:.1f} °C".replace(".", ",")
-            return {"code": code, "message": message + ". Störung prüfen bzw. Fachbetrieb anrufen."}
+            if info:
+                todo = info["fix"].rstrip(".")
+                todo += ", danach die Wärmepumpe zurücksetzen" if info["locked"] else ""
+                message += f". Laut Meldungsliste: {todo}."
+            else:
+                message += ". Störung prüfen bzw. Fachbetrieb anrufen."
+            key = re.sub(r" \(.*\)$", "", code)
+            return {"code": key, "message": message, "entity": entity, "info": info}
         return None
 
     @callback
@@ -517,6 +572,7 @@ class Technik:
                 for k, h in self.hints.items()
             ],
             "checks": s["checks"],
+            "hp_fault": self.heatpump_fault(s),
             "pressure_min": s["pressure_min"],
             "water_minutes": s["water_minutes"],
             "pressure_trend": self.pressure_trend(),

@@ -107,21 +107,35 @@ async def test_heatpump_error_code_and_standstill(
     technik = entry.runtime_data.technik
     # error status says nothing, only the error code sensor knows
     hass.states.async_set("sensor.wp_aktiver_fehler", "no error", {})
+    # codes are explained only for Stiebel Eltron (entity or device name)
+    hass.states.async_set("sensor.stiebel_lwz_aktiver_fehler", "no error", {})
     hass.states.async_set("sensor.ww_ist", "34.6", {})
     technik.set_settings(
-        {**SETTINGS, "heatpump_faults": ["sensor.wp_aktiver_fehler"], "dhw": "sensor.ww_ist"}
+        {
+            **SETTINGS,
+            "heatpump_faults": ["sensor.wp_aktiver_fehler", "sensor.stiebel_lwz_aktiver_fehler"],
+            "dhw": "sensor.ww_ist",
+        }
     )
     await hass.async_block_till_done()
     assert notify_calls == []
     freezer.tick(timedelta(hours=3))
-    hass.states.async_set("sensor.wp_aktiver_fehler", "error 30172", {})
+    hass.states.async_set("sensor.stiebel_lwz_aktiver_fehler", "error 30172", {})
     technik.evaluate()
     await hass.async_block_till_done()
     msg = _messages(notify_calls)[-1]
-    assert msg.startswith("Wärmepumpe steht: Fehler 30172, Verdichter seit über 3 Stunden aus")
+    assert msg.startswith(
+        "Wärmepumpe steht: Fehler 30172 (Schwimmerschalter hat ausgelöst), "
+        "Verdichter seit über 3 Stunden aus"
+    )
+    assert msg.endswith("Laut Meldungsliste: Kondensatpumpe und den Kondensatablauf kontrollieren.")
+    info = technik.info()["hp_fault"]
+    assert info["info"]["code"] == 30172 and not info["info"]["locked"]
     assert "Warmwasser 34,6 °C" in msg
     assert notify_calls[-1].data["data"]["push"]["interruption-level"] == "time-sensitive"
     assert technik.data["sent"] == ["hp_error|Fehler 30172"]
+    # another make: the same number is not interpreted
+    assert technik._explain("sensor.wp_aktiver_fehler", "error 30172") is None
     # after a restart the same fault is not sent again
     count = len(notify_calls)
     technik._primed = False
@@ -130,6 +144,7 @@ async def test_heatpump_error_code_and_standstill(
     await hass.async_block_till_done()
     assert len(notify_calls) == count
     # a fault that was not there before the restart is
+    hass.states.async_set("sensor.stiebel_lwz_aktiver_fehler", "no error", {})
     hass.states.async_set("sensor.wp_aktiver_fehler", "error 712", {})
     technik._primed = False
     technik.evaluate()

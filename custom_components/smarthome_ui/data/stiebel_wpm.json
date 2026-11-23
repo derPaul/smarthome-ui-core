@@ -1,0 +1,1865 @@
+{
+"_source": "STIEBEL ELTRON, WPM Meldungsliste (deutscher Teil), https://www.stiebel-eltron.de/content/dam/ste/de/privatkunden/de/downloads/redirects/wpm-meldungsliste.pdf",
+"codes": {
+"10002": [
+"Wärmepumpe",
+"Verdichter- oder Anlaufschütz klebt.",
+"Schütz K1 und K2 kontrollieren."
+],
+"10003": [
+"Wärmepumpe",
+"Der Wächter für minimalen Niederdruck hat ausgelöst.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungssystemen beachten. Kältemittel entwichen. Expansionsventil öffnet nicht. Lüfter läuft nicht."
+],
+"10004": [
+"Wärmepumpe",
+"Der Hochdruckwächter hat geschaltet.",
+"Volumenstrom und Fühlerankopplung der Heizungsseite prüfen. Die eingestellte Raumtemperatur oder Heizkurve prüfen."
+],
+"10005": [
+"Wärmepumpe",
+"Der Niederdruckschalter hat ausgelöst.",
+"Kältemittel entwichen. Expansionsventil öffnet nicht."
+],
+"10006": [
+"Wärmepumpe",
+"Der Wächter für minimalen Mitteldruck hat ausgelöst.",
+"Kältemittel entwichen. Expansionsventil öffnet nicht."
+],
+"10013": [
+"Wärmepumpe",
+"Der Wächter für minimalen Niederdruck < 0,9 bar absolut hat ausgelöst.",
+"Kältemittel entwichen. Expansionsventil öffnet nicht."
+],
+"10015": [
+"Wärmepumpe",
+"Der Frostschutz-Wächter im Abtaubetrieb hat ausgelöst.",
+"Wasservolumenstrom zu niedrig, Wassertemperatur zu niedrig."
+],
+"10023": [
+"Wärmepumpe",
+"HD-Sensor hat den Grenzwert überschritten.",
+"Volumenstrom der Heizung zu klein, eingestellte Raumtemperatur / Heizkurve zu hoch."
+],
+"10024": [
+"Wärmepumpe",
+"Heißgas-Temperatur hat Grenzwert überschritten.",
+"Einspritzventil arbeitet nicht richtig. Expansionsventil arbeitet nicht richtig. Kältemittelleckage."
+],
+"10025": [
+"Wärmepumpe",
+"Fühlerwert des „Hochdrucksensors“ außerhalb des zulässigen Wertebereiches.",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"10027": [
+"Wärmepumpe",
+"Hochdruck steigt nicht signifikant über Niederdruck nach Verdichteranlauf und einer Wartezeit.",
+"Phasenfolge nicht richtig oder Sicherung des Wärmepumpen-Anschlusses hat ausgelöst. Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"10028": [
+"Wärmepumpe",
+"Überhitzung des Kältemittels am Verdampferaustritt oder am Verdichtereintritt zu lange unterhalb des erlaubten Grenzwertes.",
+"Expansionsventil arbeitet nicht richtig."
+],
+"10029": [
+"Wärmepumpe",
+"Unerwartet hohe Abweichung des Expansionsventil-Öffnungsgrades von der Vorsteuerkennlinie",
+"Kältemittelleckage. Expansionsventil arbeitet nicht richtig."
+],
+"10034": [
+"Wärmepumpe",
+"Volumenstrom Überwachung aus Heizleistung, Vorlauftemperatur und Rücklauf-Temperatur",
+"Volumenstrom kontrollieren."
+],
+"10042": [
+"Wärmepumpe",
+"Fühlerwert des „Verflüssigeraustrittsfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"10047": [
+"Wärmepumpe",
+"Der Niederdruckwächter hat im Abtauen ausgelöst.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungssystemen beachten. Kältemittel entwichen. Expansionsventil öffnet nicht."
+],
+"10048": [
+"Wärmepumpe",
+"Der Niederdruckwächter hat im Kühlen ausgelöst.",
+"Rückschlagventil undicht. Expansionsventil arbeitet nicht richtig."
+],
+"10049": [
+"Wärmepumpe",
+"Der Einfrierschutzdrucksensor hat geschaltet.",
+""
+],
+"10099": [
+"Wärmepumpe",
+"Fühlerwert des „Ölsumpftemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"10108": [
+"FES",
+"Geringe Versorgungsspannung FES",
+"Spannungsquelle und Verkabelung zum FES prüfen."
+],
+"10115": [
+"FES",
+"Die Kommunikation mit dem FES funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"10227": [
+"WPM",
+"Maximale Anzahl CRC-Fehlererkennungen erreicht.",
+"Wärmepumpen-Manager defekt. Wärmepumpen-Manager tauschen."
+],
+"10228": [
+"WPM",
+"Fehler in Kommunikation mit Echtzeituhr (Real-Time-Clock, RTC).",
+"BUS-Anschluss und BUS-Kommunikation überprüfen. Ggf. Wärmepumpen-Manager tauschen."
+],
+"10495": [
+"Wärmepumpe",
+"Es konnte kein ausreichender Volumenstrom zum Start des Kühlbetriebes aufgebaut werden.",
+"Ladepumpe defekt. Ventile geschlossen."
+],
+"10500": [
+"Wärmepumpe",
+"Ein Versuch, die Ladepumpe zum Test der Sicherheitsfunktionen der Wärmepumpe zu deaktivieren, ist gescheitert. Dies kann unter Umständen Druckverlust im Heizkreis führen. Die Anlage kann weiter betrieben werden.",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren."
+],
+"10503": [
+"Wärmepumpe",
+"Die Sicherheitsbaugruppe der Wärmepumpe hat eine Gaswarnung ausgelöst.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungssystemen beachten. Schlechte Entlüftung des Systems. de"
+],
+"10511": [
+"Lüftungsmodul",
+"Lüfterausfall detektiert (keine Drehzahl). Spannungsreset für Lüfter wurde ausgelöst.",
+"Die Lüfterelektronik reagiert nicht."
+],
+"20012": [
+"Wärmepumpe",
+"Wächter Austritt für HD-Verdichter hat ausgelöst.",
+"Ggf. Netzspannung für Verdichterversorgung zu niedrig oder Netzimpedanz der Verdichterversorgung zu hoch."
+],
+"20014": [
+"Wärmepumpe",
+"Wächter Austritt für ND-Verdichter hat ausgelöst.",
+"Ggf. Netzspannung für Verdichterversorgung zu niedrig oder Netzimpedanz der Verdichterversorgung zu hoch."
+],
+"20022": [
+"Wärmepumpe",
+"Wächter Start – Fehler für HD-Verdichter hat ausgelöst.",
+"Ggf. Netzspannung für Verdichterversorgung zu niedrig oder Netzimpedanz der Verdichterversorgung zu hoch."
+],
+"20033": [
+"Wärmepumpe",
+"Minimale Vorlauftemperatur unterschritten; Schaltpunkt 6,5 °C.",
+"Heizungsvolumenstrom prüfen. Vorlauffühler Kühlen prüfen."
+],
+"20035": [
+"Wärmepumpe",
+"Wächter Stromunterbrechung Inverter ND-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt. Ggf. Verkabelung am Verdichter prüfen."
+],
+"20036": [
+"Wärmepumpe",
+"Temperaturwächter Inverter ND-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt. Ggf. Kühlkörper der Frequenzumrichter reinigen."
+],
+"20037": [
+"Wärmepumpe",
+"Wächter Rotor klemmt für ND-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt."
+],
+"20038": [
+"Wärmepumpe",
+"Wächter Start – Fehler für ND-Verdichter hat ausgelöst.",
+"Ggf. Netzspannung für Verdichterversorgung zu niedrig oder Netzimpedanz der Verdichterversorgung zu hoch."
+],
+"20039": [
+"Wärmepumpe",
+"Wächter Stromunterbrechung Inverter HD-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt. Ggf. Verkabelung am Verdichter prüfen."
+],
+"20040": [
+"Wärmepumpe",
+"Temperaturwächter Inverter HD-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt. Ggf. Kühlkörper der Frequenzumrichter reinigen."
+],
+"20041": [
+"Wärmepumpe",
+"Wächter Rotor klemmt für HD-Verdichter hat ausgelöst.",
+"Wert wird automatisch zurückgesetzt."
+],
+"20045": [
+"Wärmepumpe",
+"Drehzahlabweichung Verdichter zwischen Soll-Wert und Ist-Wert für definierte Zeitspanne (ND-Verdichter bei zwei Verdichtern)",
+"Frequenzumrichter oder Verdichter arbeiten nicht korrekt. Busverbindung des Frequenzumrichters prüfen."
+],
+"20046": [
+"Wärmepumpe",
+"Drehzahlabweichung Verdichter zwischen Soll-Wert und Ist-Wert für definierte Zeitspanne (HD-Verdichter bei zwei Verdichtern)",
+"Frequenzumrichter oder Verdichter arbeiten nicht korrekt. Busverbindung des Frequenzumrichters prüfen."
+],
+"20050": [
+"Wärmepumpe",
+"Temperaturwächter für minimale Vorlauftemperatur Wärmequelle hat angesprochen.",
+"Solekreis überprüfen."
+],
+"20051": [
+"Wärmepumpe",
+"Temperaturwächter für minimale Rücklauftemperatur Wärmequelle hat angesprochen.",
+"Solekreis überprüfen."
+],
+"20057": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Inverter IGBT Überstrom",
+"Inverterfehler"
+],
+"20058": [
+"Wärmepumpe",
+"Inverter Hauptfehler: PFC IGBT Überstrom",
+"Inverterfehler"
+],
+"20059": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Gleichspannungszwischenkreis Überspannung",
+"Inverterfehler"
+],
+"20060": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Gleichspannungszwischenkreis Unterspannung",
+"Inverterfehler"
+],
+"20061": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Wechselspannungseingang Überspannung",
+"Inverterfehler"
+],
+"20062": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Wechselspannungseingang Unterspannung",
+"Inverterfehler"
+],
+"20063": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Spannungsunterschiede zwischen den drei Eingangsphasen",
+"Inverterfehler"
+],
+"20064": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Entsättigung",
+"Inverterfehler"
+],
+"20065": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Inverter IGBTs Übertemperatur",
+"Inverterfehler"
+],
+"20066": [
+"Wärmepumpe",
+"Inverter Hauptfehler: PFC IGBTs Übertemperatur.",
+"Inverterfehler"
+],
+"20067": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Rotor dreht sich nicht wie erwartet.",
+"Inverterfehler"
+],
+"20068": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Arithmetik Fehler im Messungs- und Analyseprozess",
+"Inverterfehler"
+],
+"20069": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Eingangsrelais offen",
+"Inverterfehler"
+],
+"20070": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Stromunterschiede zwischen den drei Inverter IGBTs",
+"Inverterfehler"
+],
+"20071": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Stromunterschiede zwischen den drei PFC IGBTs",
+"Inverterfehler"
+],
+"20072": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Fehler EEPROM",
+"Inverterfehler"
+],
+"20073": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Motor Überdrehzahl",
+"Inverterfehler"
+],
+"20074": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Gleichspannungszwischenkreis Unterspannung",
+"Inverterfehler"
+],
+"20075": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Drehmomentgrenze erreicht",
+"Inverterfehler"
+],
+"20076": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Modbuskommunikation gestört",
+"Inverterfehler"
+],
+"20077": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Verdichter-Scroll Übertemperatur",
+"Inverterfehler"
+],
+"20078": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Verdichter-Motor Übertemperatur",
+"Inverterfehler"
+],
+"20079": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Schaltkreis Übertemperatur",
+"Inverterfehler"
+],
+"20080": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Inverter IGBTs Übertemperatur",
+"Inverterfehler"
+],
+"20081": [
+"Wärmepumpe",
+"Inverter Nebenfehler: PFC IGBTs Übertemperatur",
+"Inverterfehler"
+],
+"20084": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturunterschiede zwischen den drei Inverter IGBTs",
+"Inverterfehler"
+],
+"20085": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturunterschiede zwischen den drei PFC IGBTs",
+"Inverterfehler"
+],
+"20091": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Kommunikation zwischen Analog-digital-Wandler und Nebenprozessor gestört",
+"Inverterfehler"
+],
+"20093": [
+"Wärmepumpe",
+"Niederrelevante Kommunikationsobjekte zwischen IWS und Inverter wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler. Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Spannungsversorgung des Inverters prüfen."
+],
+"20095": [
+"Wärmepumpe",
+"INV Hauptfehler Sammelfehler 1",
+"Inverterfehler"
+],
+"20096": [
+"Wärmepumpe",
+"INV Hauptfehler Sammelfehler 2",
+"Inverterfehler"
+],
+"20097": [
+"Wärmepumpe",
+"INV Nebenfehler Sammelfehler 1",
+"Inverterfehler"
+],
+"20098": [
+"Wärmepumpe",
+"INV Nebenfehler Sammelfehler 2",
+"Inverterfehler"
+],
+"20100": [
+"Wärmepumpe",
+"Niederdruck unterschreitet SOA ND Grenze für unzulässige Zeitspanne.",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20101": [
+"Wärmepumpe",
+"Niederdruck überschreitet SOA ND Grenze für unzulässige Zeitspanne.",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20102": [
+"Wärmepumpe",
+"SOA Bereichsüberschreitung",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20103": [
+"Wärmepumpe",
+"Hochdruck unterschreitet SOA HD Grenze für unzulässige Zeitspanne.",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20104": [
+"Wärmepumpe",
+"Hochdruck überschreitet SOA HD Grenze für unzulässige Zeitspanne.",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20105": [
+"Wärmepumpe",
+"SOA Bereichsüberschreitung",
+"Kältekreis kann Betriebsbedingungen nicht in SOA Bereich des Verdichters verschieben."
+],
+"20135": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Eingangsstrombegrenzung",
+"Inverterfehler"
+],
+"20136": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Ausgangsstrombegrenzung",
+"Inverterfehler"
+],
+"20137": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Phasenverlust",
+"Inverterfehler"
+],
+"20138": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Powermodul",
+"Inverterfehler"
+],
+"20139": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Netzspannungssensor",
+"Inverterfehler"
+],
+"20140": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Motor Strom Offset",
+"Inverterfehler"
+],
+"20141": [
+"Wärmepumpe",
+"Inverter Hauptfehler: PFC Strom Offset",
+"Inverterfehler"
+],
+"20142": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Messung Motorinduktivität",
+"Inverterfehler"
+],
+"20143": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Messung Motorphasenwiderstand",
+"Inverterfehler"
+],
+"20144": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Wiederanlauf",
+"Inverterfehler"
+],
+"20145": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Motorüberstrom Abschaltfunktion",
+"Inverterfehler"
+],
+"20146": [
+"Wärmepumpe",
+"Inverter Hauptfehler: IGBT US Kurzschluss",
+"Inverterfehler"
+],
+"20147": [
+"Wärmepumpe",
+"Inverter Hauptfehler: IGBT OS Kurzschluss",
+"Inverterfehler"
+],
+"20148": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Motorphasen Kurzschluss",
+"Inverterfehler"
+],
+"20149": [
+"Wärmepumpe",
+"Inverter Hauptfehler: SVM Funktion",
+"Inverterfehler"
+],
+"20150": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Inverter Überstrom",
+"Inverterfehler"
+],
+"20151": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter SVM Funktion",
+"Inverterfehler"
+],
+"20152": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter DC Überspannung",
+"Inverterfehler"
+],
+"20153": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter DC Unterspannung",
+"Inverterfehler"
+],
+"20154": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Inverter Übertemperatur",
+"Inverterfehler de"
+],
+"20155": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Rotorvektor",
+"Inverterfehler"
+],
+"20156": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Motor Überdrehzahl",
+"Inverterfehler"
+],
+"20157": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Phasenverlust",
+"Inverterfehler"
+],
+"20158": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Powermodul",
+"Inverterfehler"
+],
+"20159": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Motor Strom Offset",
+"Inverterfehler"
+],
+"20160": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Messung Motorinduktivität",
+"Inverterfehler"
+],
+"20161": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Messung Motorphasenwiderstand",
+"Inverterfehler"
+],
+"20162": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Motorüberstrom Abschaltfunktion",
+"Inverterfehler"
+],
+"20163": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter IGBT US Kurzschluss",
+"Inverterfehler"
+],
+"20164": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter IGBT OS Kurzschluss",
+"Inverterfehler"
+],
+"20165": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter DC Unterspannung",
+"Inverterfehler"
+],
+"20166": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Modbus gestört",
+"Inverterfehler"
+],
+"20167": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Inverter Untertemperatur",
+"Inverterfehler"
+],
+"20168": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zwischenkreis Initialisierung",
+"Inverterfehler"
+],
+"20169": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Sammelfehler 1",
+"Inverterfehler"
+],
+"20170": [
+"Wärmepumpe",
+"Niederrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfterteil) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler. Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Spannungsversorgung des Inverters prüfen."
+],
+"20171": [
+"Wärmepumpe",
+"Höherrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfterteil) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler. Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Spannungsversorgung des Inverters prüfen."
+],
+"20226": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Motorphasen Kurzschluss",
+"Inverterfehler"
+],
+"20230": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Netz Unterspannung",
+"Inverterfehler"
+],
+"20231": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Motor Übertemperatur",
+"Inverterfehler"
+],
+"20232": [
+"Wärmepumpe",
+"Inverter Hauptfehler: PFC Überstrom Abschaltfunktion",
+"Inverterfehler"
+],
+"20233": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Inverter Temperaturregelung",
+"Inverterfehler"
+],
+"20234": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Eingangsstromregelung",
+"Inverterfehler"
+],
+"20235": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Hochdrucksensor Bereichsunterschreitung",
+"Inverterfehler"
+],
+"20236": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Verdichtertyp Konfiguration",
+"Inverterfehler"
+],
+"20237": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Hochdrucksensor Konfiguration",
+"Inverterfehler"
+],
+"20238": [
+"Wärmepumpe",
+"Wächter ND Einfrierschutz (Quellenseite)",
+"Wärmequellenmedium-Temperatur zu gering, Wärmequellenmedium-Volumenstrom zu gering (z. B. Wärmequellenmedium-Pumpe defekt, Wärmequellenmedium-Pumpe unzureichend entlüftet, Absperrhähne nicht geöffnet), Expansionsventil defekt (öffnet nicht hinreichend)."
+],
+"20240": [
+"Wärmepumpe",
+"Der minimale Überhitzungswert des Ölsumpfes gegenüber der Kondensationstemperatur für Überwachungszeit wurde dauerhaft unterschritten.",
+"Fühlerfehler Ölsumpf-Temperaturfühler, Ölsumpf-Temperaturfühler unzureichend thermisch an den Ölsumpf des Verdichters gekoppelt, Expansionsventil defekt (schließt nicht hinreichend zur Erhöhung der Überhitzung)"
+],
+"20241": [
+"WPM",
+"Update erfolgreich beendet",
+""
+],
+"20242": [
+"FES",
+"Update erfolgreich beendet",
+""
+],
+"20243": [
+"FET",
+"Update erfolgreich beendet",
+""
+],
+"20244": [
+"WPM",
+"Update fehlgeschlagen",
+"Spannungsversorgung kurzzeitig unterbrochen. MicroSD Karte im Update Prozess entfernt."
+],
+"20245": [
+"FES",
+"Update fehlgeschlagen",
+"Spannungsversorgung kurzzeitig unterbrochen. MicroSD Karte im Update Prozess entfernt. BUS Verbindung zwischen WPM und FES2 fehlerhaft."
+],
+"20246": [
+"FET",
+"Update fehlgeschlagen",
+"Spannungsversorgung kurzzeitig unterbrochen. MicroSD Karte im Update Prozess entfernt. BUS Verbindung zwischen WPM und FET fehlerhaft. FET während des Updateprozesses vom BUS entfernt."
+],
+"20247": [
+"Wärmepumpe",
+"Kompressionskammer Grenzwertüberschreitung",
+""
+],
+"20248": [
+"Wärmepumpe",
+"Sicherheitsdruckdose hat ausgelöst.",
+"Unterdruck Maschinengehäuse konnte nicht gehalten werden. Dichtigkeit des Gerätes kontrollieren."
+],
+"20249": [
+"WPM",
+"Erkennung eines neuen HP-ID Typs",
+""
+],
+"20277": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Inverter Überstrom",
+"Inverterfehler"
+],
+"20278": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft SVM Funktion",
+"Inverterfehler"
+],
+"20279": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft DC Überspannung",
+"Inverterfehler"
+],
+"20281": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Inverter Übertemperatur",
+"Inverterfehler"
+],
+"20282": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Rotorvektor",
+"Inverterfehler"
+],
+"20283": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Motor Überdrehzahl",
+"Inverterfehler"
+],
+"20284": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Phasenverlust",
+"Inverterfehler"
+],
+"20285": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Powermodul",
+"Inverterfehler"
+],
+"20286": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Motor Strom Offset",
+"Inverterfehler"
+],
+"20288": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Messung Motorphasenwiderstand",
+"Inverterfehler"
+],
+"20289": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Motorüberstrom Abschaltfunktion",
+"Inverterfehler"
+],
+"20290": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft IGBT US Kurzschluss",
+"Inverterfehler"
+],
+"20291": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft IGBT OS Kurzschluss",
+"Inverterfehler"
+],
+"20293": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Abluft Modbus gestört",
+"Inverterfehler"
+],
+"20294": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Abluft Inverter Untertemperatur",
+"Inverterfehler"
+],
+"20295": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Abluft Zwischenkreis Initialisierung",
+"Inverterfehler"
+],
+"20296": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Motorphasen Kurzschluss",
+"Inverterfehler"
+],
+"20297": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Abluft Motor Übertemperatur",
+"Inverterfehler"
+],
+"20298": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Inverter Überstrom",
+"Inverterfehler"
+],
+"20299": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft SVM Funktion",
+"Inverterfehler"
+],
+"20300": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft DC Überspannung",
+"Inverterfehler"
+],
+"20302": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Inverter Übertemperatur",
+"Inverterfehler"
+],
+"20303": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Rotorvektor",
+"Inverterfehler"
+],
+"20304": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Motor Überdrehzahl",
+"Inverterfehler"
+],
+"20305": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Phasenverlust",
+"Inverterfehler"
+],
+"20306": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Powermodul",
+"Inverterfehler"
+],
+"20307": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Motor Strom Offset",
+"Inverterfehler"
+],
+"20308": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Sammelfehler 3",
+"Inverterfehler"
+],
+"20309": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Messung Motorphasenwiderstand",
+"Inverterfehler"
+],
+"20310": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Motorüberstrom Abschaltfunktion",
+"Inverterfehler"
+],
+"20311": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft IGBT US Kurzschluss",
+"Inverterfehler"
+],
+"20312": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft IGBT OS Kurzschluss",
+"Inverterfehler"
+],
+"20313": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Sammelfehler 1",
+"Inverterfehler"
+],
+"20314": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zuluft Modbus gestört",
+"Inverterfehler"
+],
+"20315": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zuluft Inverter Untertemperatur",
+"Inverterfehler de"
+],
+"20316": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zuluft Zwischenkreis Initialisierung",
+"Inverterfehler"
+],
+"20317": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Motorphasen Kurzschluss",
+"Inverterfehler"
+],
+"20318": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zuluft Motor Übertemperatur",
+"Inverterfehler"
+],
+"20329": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Abluft Sammelfehler 1",
+"Inverterfehler"
+],
+"20334": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Lüfter Zuluft Sammelfehler 1",
+"Inverterfehler"
+],
+"20371": [
+"INV",
+"Inverter Hauptfehler: Lüfter Abluft Sammelfehler 1",
+"Inverterfehler"
+],
+"20376": [
+"INV",
+"Inverter Hauptfehler: Lüfter Zuluft Sammelfehler 1",
+"Inverterfehler"
+],
+"20383": [
+"Wärmepumpe",
+"Niederrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfter Abluft) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler; Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen; Spannungsversorgung des Inverters prüfen."
+],
+"20384": [
+"Wärmepumpe",
+"Höherrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfter Abluft) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler; Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen; Spannungsversorgung des Inverters prüfen."
+],
+"20386": [
+"Wärmepumpe",
+"Niederrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfter Zuluft) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler; Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen; Spannungsversorgung des Inverters prüfen."
+],
+"20387": [
+"Wärmepumpe",
+"Höherrelevante Kommunikationsobjekte zwischen IWS und Inverter (Lüfter Zuluft) wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler; Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen; Spannungsversorgung des Inverters prüfen."
+],
+"20420": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: Kurzschluss Motorphase (LeakageError)",
+"Inverterfehler"
+],
+"20421": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: Kommunikationsstörung zwischen KV5 und KV4 (Intercom)",
+"Inverterfehler"
+],
+"20423": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: Lüfter am Verdampfer dreht nicht (FanNotTurning).",
+"Inverterfehler"
+],
+"20424": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: Kurzschluss Motormodul KV4-Lüfter (KV4IPMotorShortCircuit)",
+"Inverterfehler"
+],
+"20426": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: PFC Temperatur unplausibel (PFCTempUnplausible)",
+"Inverterfehler"
+],
+"20427": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: PFC Übertemperatur (> 100°C) (PFCOvertemp)",
+"Inverterfehler"
+],
+"20428": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: PFC fehlerhaft (PFCUtrip, PFCDriverShutdown)",
+"Inverterfehler"
+],
+"20429": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: Min. ein DC-Link Kondensator Kurzschluss (DCLinkCapShort)",
+"Inverterfehler"
+],
+"20430": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Verdampfer: Kurzschluss Motorphase (LeakageError)",
+"Inverterfehler"
+],
+"20431": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Verdampfer: Kommunikationsstörung zwischen KV5 und KV4 (Intercom)",
+"Inverterfehler"
+],
+"20432": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Verdampfer: Hauptspannung ist unterbrochen (MainsInterrupted).",
+"Inverterfehler"
+],
+"20433": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Verdampfer: Zwischenkreisspannung zu niedrig (DCLinkVoltage-Low)",
+"Inverterfehler"
+],
+"20435": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Verdampfer: Lüfter am Verdampfer dreht nicht (FanNotTurning).",
+"Inverterfehler"
+],
+"20436": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Abluft: Kurzschluss Motorphase (LeakageError)",
+"Inverterfehler"
+],
+"20437": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Abluft: Kommunikationsstörung zwischen KV5 und KV4 (Intercom)",
+"Inverterfehler"
+],
+"20438": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Abluft: Hauptspannung ist unterbrochen (MainsInterrupted).",
+"Inverterfehler"
+],
+"20439": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Abluft: Zwischenkreisspannung zu niedrig (DCLinkVoltageLow)",
+"Inverterfehler"
+],
+"20441": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Zuluft: Kurzschluss Motorphase (LeakageError)",
+"Inverterfehler"
+],
+"20442": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Zuluft: Kommunikationsstörung zwischen KV5 und KV4 (Intercom)",
+"Inverterfehler"
+],
+"20443": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Zuluft: Hauptspannung ist unterbrochen (MainsInterrupted).",
+"Inverterfehler"
+],
+"20444": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Lüfter Zuluft: Zwischenkreisspannung zu niedrig (DCLinkVoltageLow)",
+"Inverterfehler"
+],
+"20457": [
+"Wärmepumpe",
+"Inverter Hauptfehler, Verdichtermodul: 2. STO-Eingang geöffnet (Ofen/Kaminkontakt)",
+"Inverterfehler"
+],
+"20458": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Sammelfehler 4",
+"Inverterfehler"
+],
+"20459": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Sammelfehler 2",
+"Inverterfehler"
+],
+"20460": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Abluft Sammelfehler 2",
+"Inverterfehler"
+],
+"20461": [
+"Wärmepumpe",
+"Inverter Hauptfehler: Lüfter Zuluft Sammelfehler 2",
+"Inverterfehler"
+],
+"20504": [
+"Wärmepumpe",
+"IWS-Update durchgeführt",
+""
+],
+"20505": [
+"Lüftungsmodul",
+"ILS-Update durchgeführt",
+""
+],
+"20506": [
+"Wärmepumpe",
+"IWS-Update fehlgeschlagen",
+""
+],
+"20507": [
+"Lüftungsmodul",
+"ILS-Update fehlgeschlagen",
+""
+],
+"30002": [
+"Wärmepumpe",
+"Verdichter- oder Anlaufschütz klebt.",
+"Schütz K1 und K2 kontrollieren."
+],
+"30007": [
+"WPM",
+"Der Wächter für minimalen Soledruck hat ausgelöst.",
+"Solekreis prüfen."
+],
+"30008": [
+"Wärmepumpe",
+"Der Schiebeschalter WP Typ der IWS ist nicht korrekt eingestellt.",
+"Netz der Wärmepumpe ausschalten und Schiebeschalter korrekt einstellen."
+],
+"30009": [
+"Wärmepumpe",
+"Fühlerwert des „Mitteldrucksensors“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30010": [
+"Wärmepumpe",
+"Bei Wärmepumpen mit einem Verdichter und Zwischeneinspritzung: Fühlerwert des „Einspritztemperaturfühlers“ außerhalb des zulässigen Wertebereiches. Bei Wärmepumpen mit zwei Verdichtern: Fühlerwert des „Sauggastemperaturfühlers für HD-Verdichter“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30011": [
+"Wärmepumpe",
+"Fühlerwert des \"Sauggastemperaturfühlers für ND-Verdichter\" außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30016": [
+"Wärmepumpe",
+"Fühlerwert des „Heißgastemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30017": [
+"Wärmepumpe",
+"Fühlerwert des „Verdampfertemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30018": [
+"Wärmepumpe",
+"Fühlerwert des „Kühlfühlers/Rekuperatorfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30019": [
+"Wärmepumpe",
+"Fühlerwert des „Außentemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30020": [
+"Wärmepumpe",
+"Fühlerwert des „Frostschutztemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30021": [
+"Wärmepumpe",
+"Fühlerwert des „Einspritztemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30025": [
+"Wärmepumpe",
+"Fühlerwert des „Hochdrucksensors“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30026": [
+"Wärmepumpe",
+"Fühlerwert des „Niederdrucksensors“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30031": [
+"Wärmepumpe",
+"Fühlerwert des „Vorlauftemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30032": [
+"Wärmepumpe",
+"Fühlerwert des „Rücklauftemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehöde rigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30042": [
+"Wärmepumpe",
+"Fühlerwert des „Verflüssigeraustrittsfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30043": [
+"Wärmepumpe",
+"Fühlerwert des „Fortlufttemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30044": [
+"Wärmepumpe",
+"Fühlerwert des „Differenzdrucksensors“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30052": [
+"Wärmepumpe",
+"Soledruckwächter hat angesprochen.",
+"Solekreis überprüfen."
+],
+"30053": [
+"Alle",
+"Mindestens zwei Baugruppen mit der gleichen Buskennung auf dem Bussystem vorhanden",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"30054": [
+"Wärmepumpe",
+"Das Thermistorschutzrelais für den Verdichter hat ausgelöst.",
+"Die Zwischeneinspritzung ist defekt. Die Thermistorkette ist unterbrochen. Der Verdichter ist defekt. Der Verdichter hat einen Wicklungsschluss. Das Motorschutzrelais ist defekt. Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"30056": [
+"Wärmepumpe",
+"Ölausgleichsventil öffnet bzw. schließt nicht.",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30063": [
+"IWS",
+"Inverter Hauptfehler: Spannungsunterschiede zwischen den drei Eingangsphasen.",
+"Unterbrechung einer Phase in der Anschlussleitung. Sicherung ausgelöst."
+],
+"30082": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Kommunikation zwischen Signalprozessor und Hauptprozessor gestört.",
+"Inverterfehler"
+],
+"30083": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Kommunikation zwischen Signalprozessor und Hauptprozessor gestört.",
+"Inverterfehler"
+],
+"30086": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturfühlerfehler Scrolltemperatur unterhalb des zulässigen Bereiches.",
+"Inverterfehler"
+],
+"30087": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturfühlerfehler Motortemperatur unterhalb des zulässigen Bereiches.",
+"Inverterfehler"
+],
+"30088": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturfühlerfehler interne Schaltkreistemperatur unterhalb des zulässigen Bereiches.",
+"Inverterfehler"
+],
+"30089": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturfühlerfehler Inverter IGBTs unterhalb des zulässigen Bereiches.",
+"Inverterfehler"
+],
+"30090": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Temperaturfühlerfehler PFC IGBTs unterhalb des zulässigen Bereiches.",
+"Inverterfehler"
+],
+"30092": [
+"Wärmepumpe",
+"Inverter Nebenfehler: Inverter Fehlergrenze wurde erreicht und Inverter wurde verriegelt.",
+"Inverterfehler"
+],
+"30094": [
+"Wärmepumpe",
+"Höherrelevante Kommunikationsobjekte zwischen IWS und Inverter wurden mehrmals nicht korrekt übermittelt.",
+"Inverterfehler. Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Spannungsversorgung des Inverters prüfen."
+],
+"30099": [
+"Wärmepumpe",
+"Fühlerwert des „Ölsumpftemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30106": [
+"Wärmepumpe",
+"Die definierte minimale Quellentemperatur wurde unterschritten.",
+"Minimale Quellentemperatur kontrollieren ggf. ändern. Quellen-Volumenstrom kontrollieren: Quellenauslegung prüfen."
+],
+"30107": [
+"FES",
+"Die Kommunikation mit dem WPM funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30110": [
+"WPM",
+"Fühlerwert der „FE7“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.13"
+],
+"30111": [
+"WPM",
+"Versionskonflikt FES",
+"Das FES benötigt ein Softwareupdate. Lassen Sie ein Update durchführen."
+],
+"30112": [
+"WPM",
+"Versionskonflikt WPE",
+"Die WPE benötigt ein Softwareupdate. Lassen Sie ein Update durchführen."
+],
+"30113": [
+"WPM",
+"Versionskonflikt FET",
+"Das FET benötigt ein Softwareupdate. Lassen Sie ein Update durchführen."
+],
+"30114": [
+"WPM",
+"Versionskonflikt WPM",
+"Der WPM benötigt ein Softwareupdate. Lassen Sie ein Update durchführen."
+],
+"30117": [
+"Wärmepumpe",
+"Wächter Kommunikationsunterbrechung IWS / CWS",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30125": [
+"Wärmepumpe",
+"MFG-Fühlerwert der „Ruecklauftemperatur WP“ außerhalb des zulässigen Wertebereiches.",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30126": [
+"Wärmepumpe",
+"MFG-Fühlerwert der „Vorlauftemperatur WP“ außerhalb des zulässigen Wertebereiches.",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30127": [
+"Wärmepumpe",
+"MFG-Fühlerwert des „Volumenstroms“ außerhalb des zulässigen Wertebereiches.",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30128": [
+"Wärmepumpe",
+"Die Kommunikation zu dem Rücklauftemperaturfühler WP im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30129": [
+"Wärmepumpe",
+"Die Kommunikation zu dem Vorlauftemperaturfühler WP im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30130": [
+"Wärmepumpe",
+"Die Kommunikation zu dem Heizkreisvolumenstromsensor im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30172": [
+"Wärmepumpe",
+"Schwimmerschalter hat ausgelöst.",
+"Kondensatpumpe und den Kondensatablauf kontrollieren."
+],
+"30173": [
+"Wärmepumpe",
+"IWS-Fühlerwert der „Rücklauftemperatur Wärmequelle“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30174": [
+"Wärmepumpe",
+"IWS-Fühlerwert der „Vorlauftemperatur Wärmequelle“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30175": [
+"WPM",
+"MFG-Fühlerwert der „Rücklauftemperatur WP“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30176": [
+"WPM",
+"MFG-Fühlerwert der „Vorlauftemperatur WP“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30177": [
+"WPM",
+"MFG-Fühlerwert der „Vorlauftemperatur NHZ“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30178": [
+"WPM",
+"MFG-Fühlerwert der „Warmwassertemperatur“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30186": [
+"WPM",
+"Die Heizkreispumpe am MFG kann nicht angesteuert werden.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30188": [
+"WPM",
+"Das 3-Wege-Umschaltventil im MFG kann nicht angesteuert werden.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30189": [
+"WPM",
+"Die elektrische Not- / Zusatzheizung im MFG kann nicht angesteuert werden.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30190": [
+"WPM",
+"Die Kommunikation zum Rücklauftemperaturfühler WP im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30191": [
+"WPM",
+"Die Kommunikation zum Vorlauftemperaturfühler WP im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30192": [
+"WPM",
+"Die Kommunikation zum Vorlauffühler NHZ im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30193": [
+"WPM",
+"Die Kommunikation zum Warmwassertemperaturfühler im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30196": [
+"WPM",
+"Die Kommunikation zum Heizkreisvolumenstromsensor im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30197": [
+"WPM",
+"Die Kommunikation zum Solekreisvolumenstromsensor im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30198": [
+"WPM",
+"Die Kommunikation zum Heizkreisdrucksensor im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30199": [
+"WPM",
+"Die Kommunikation zum Soledrucksensor im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30201": [
+"WPM",
+"Die Kommunikation zur Heizkreispumpe im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30202": [
+"WPM",
+"Die Kommunikation zur Solepumpe am MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30203": [
+"WPM",
+"Die Kommunikation zum 3-Wege-Umschaltventil im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30204": [
+"WPM",
+"Die Kommunikation zur Not- / Zusatzheizung im MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln. de"
+],
+"30205": [
+"WPM",
+"Die Kommunikation mit dem MFG funktioniert nicht korrekt.",
+"Klemmstelle des Kommunikationskabels prüfen oder Kommunikationskabel wechseln."
+],
+"30206": [
+"Wärmepumpe",
+"Fühlerwert vom „Stromsensor“ ist außerhalb des zulässigen Wertebereiches.",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30207": [
+"WPM",
+"Fühlerwert vom „Außentemperaturfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.3"
+],
+"30208": [
+"WPM",
+"Fühlerwert vom „Puffertemperaturfühler (Heizkreisfühler 1)“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.4"
+],
+"30209": [
+"WPM",
+"Fühlerwert vom „Vorlauftemperaturfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.5"
+],
+"30210": [
+"WPM",
+"Fühlerwert vom „Heizkreisfühler 2“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.6"
+],
+"30211": [
+"WPM",
+"Fühlerwert vom „Heizkreisfühler 3“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.7"
+],
+"30212": [
+"WPM",
+"Fühlerwert vom „Warmwasserspeicherfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.8"
+],
+"30213": [
+"WPM",
+"Fühlerwert vom „Quellenfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.9"
+],
+"30214": [
+"WPM",
+"Fühlerwert vom „2. Wärmeerzeuger“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.10"
+],
+"30215": [
+"WPM",
+"Fühlerwert vom „Vorlauf-Kühlen Fühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.11"
+],
+"30216": [
+"WPM",
+"Fühlerwert vom „Zirkulationstemperaturfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPM X1.12"
+],
+"30217": [
+"WPE",
+"Fühlerwert vom „Schwimmbadfühler primär“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.4"
+],
+"30218": [
+"WPE",
+"Fühlerwert vom „Schwimmbadfühler sekundär“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.5"
+],
+"30219": [
+"WPE",
+"Fühlerwert vom „Heizkreisfühler 4“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.6"
+],
+"30220": [
+"WPE",
+"Fühlerwert vom „Heizkreisfühler 5“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.7"
+],
+"30221": [
+"WPE",
+"Fühlerwert vom „Warmwasserspeicher 2 Fühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.8"
+],
+"30222": [
+"WPE",
+"Fühlerwert vom \"Differenzfühler 1.1\" oder \"Thermostatfühler 1\" außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.9"
+],
+"30223": [
+"WPE",
+"Fühlerwert vom „Differenzfühler 1.2“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.10"
+],
+"30224": [
+"WPE",
+"Fühlerwert vom \"Differenzfühler 2.1\" oder \"Thermostatfühler 2\" außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.11"
+],
+"30225": [
+"WPE",
+"Fühlerwert vom „Differenzfühler 2.2“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Klemme: WPE X3.12"
+],
+"30229": [
+"Wärmepumpe",
+"Fühlerwert vom „Verdampfereingangstemperaturfühler“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30239": [
+"FEK 2",
+"Der in der FEK 2 zugeordnete Heizkreis ist im WPM nicht vorhanden.",
+"FEK 2 auf Werkseinstellung zurücksetzen und der FEK 2 den richtigen Heizkreis zuordnen."
+],
+"30248": [
+"Wärmepumpe",
+"Sicherheitsdruckdose hat ausgelöst.",
+"Unterdruck Maschinengehäuse konnte nicht gehalten werden. Kontrolle der Dichtigkeit des Gerätes"
+],
+"30251": [
+"Wärmepumpe",
+"Der Soledruckschalter für minimalen Soledruck hat ausgelöst.",
+"Solekreis überprüfen."
+],
+"30252": [
+"Wärmepumpe",
+"Fühlerwert des „Expansionsventileintrittstemperaturfühlers“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"30397": [
+"Lüftungsmodul",
+"Zulufttemperatur außerhalb des zulässigen Bereiches (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine Regelung auf PHI-Komforttemperatur"
+],
+"30398": [
+"Lüftungsmodul",
+"Fortlufttemperatur außerhalb des zulässigen Bereiches (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine Auswirkungen"
+],
+"30399": [
+"Lüftungsmodul",
+"Außenlufttemperatur vorerwärmt außerhalb des zulässigen Bereiches (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine Regelung auf Komforttemperatur, VHZ läuft nicht oder nur mit schwacher Leistung."
+],
+"30403": [
+"Lüftungsmodul",
+"Kommunikationsfehler Feinstaubsensor (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, sensorgesteuerte Regelung ausgeschaltet"
+],
+"30404": [
+"Lüftungsmodul",
+"Ventilator ZUL (keine Drehzahlrückmeldung) (Lüftung)",
+"Trotz Ansteuerung keine Drehzahlrückmeldung, keine Auswirkungen"
+],
+"30405": [
+"Lüftungsmodul",
+"Ventilator FOL (keine Drehzahlrückmeldung) (Lüftung)",
+"Trotz Ansteuerung keine Drehzahlrückmeldung, keine Auswirkungen"
+],
+"30406": [
+"Lüftungsmodul",
+"Kommunikationsfehler Außenluftfeuchte und Temperatur SHT31 (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine dauerhafte Feuchteschutzregelung"
+],
+"30407": [
+"Lüftungsmodul",
+"Kommunikationsfehler Abluftfeuchte und Temperatur SHT31 (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine dauerhafte Feuchteschutzregelung"
+],
+"30408": [
+"Lüftungsmodul",
+"Heizregister defekt (Temperatur zu niedrig, ZUL-Abschaltung) (Lüftung)",
+"Vorheizung liefert nicht genug Energie zum Erwärmen der Außenluft, Heizung oder Triac defekt, keine Auswirkungen."
+],
+"30409": [
+"Lüftungsmodul",
+"Ofenkontakt ausgelöst (Lüftung)",
+"Ofenkontakt hat ausgelöst, Unterdruck in Haus, Lüfter werden mit 10% angesteuert, Volumenstromregelung deaktiviert."
+],
+"30410": [
+"Lüftungsmodul",
+"Sensorspannung (Lüftung)",
+"Sensorspannung zu niedrig, keine Werterfassung von Drücken, Temperaturen und Feuchte möglich. Kein automatischer Bypassbetrieb, Lüfter auf Max.-Wert der eingestellten Luftstufe"
+],
+"30467": [
+"FES",
+"Defekt Temperatur und Feuchtesensor im Bedienteil",
+""
+],
+"30468": [
+"Wärmepumpe",
+"Temperaturwächter für maximale Ölsumpftemperatur hat angesprochen.",
+"Verdichter falsch am Inverter angeschlossen"
+],
+"30469": [
+"FES",
+"Defekt VOC-Sensor im Bedienteil",
+""
+],
+"30470": [
+"Lüftungsmodul",
+"Interner Fehler, keine V-ID im Lüftungsmodul eingegeben",
+""
+],
+"30479": [
+"WPM",
+"Mindestwasservolumenstrom für die Aktivierung der Zusatzheizung unterschritten",
+"Pumpe defekt. Heizkreis nicht genügend offen."
+],
+"30480": [
+"WPM",
+"Der Anlagendruck ist zu gering.",
+"Entlüftung des Systems hat zum Druckverlust geführt. Defektes oder falsches Ausdehnungsgefäß. Leckage im Heizungskreislauf."
+],
+"30483": [
+"WPM",
+"Zusatzheizung ohne Spannungsversorgung",
+"Ausgelöster Sicherheitstemperaturbegrenzer. Hauptsicherung ausgelöst."
+],
+"30488": [
+"Lüftungsmodul",
+"Fühlerwert des Außenlufttemperaturfühlers „Lüftung“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30489": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Außenluftfeuchte vorerwärmt“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30490": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Abluftemperatur“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30491": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Abluftfeuchte“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30492": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Differenzdrucksensor Zuluft“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30493": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Differenzdrucksensor Fortluft“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30494": [
+"Lüftungsmodul",
+"I2C-Fühlerwert „Differenzdrucksensor Abluft“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren. Bei Defekt austauschen."
+],
+"30497": [
+"WPM",
+"Schaltkontakt der Opferanode hat ausgelöst.",
+"Opferanode aufgebraucht oder Kontakt offen"
+],
+"30501": [
+"Wärmepumpe",
+"Das Sicherheitsventil lässt sich innerhalb einer Funktionsprüfung nicht verfahren.",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. de"
+],
+"30502": [
+"Wärmepumpe",
+"Bei geöffnetem Sicherheitsventil ist innerhalb eines Funktionstests kein Wasser-Volumenstrom über die Wärmepumpe messbar.",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Die Funktion der Ladepumpe muss ebenfalls überprüft werden. Ventile im Heizkreis überprüfen. Ist ein Mindestvolumenstrom gewährleistet. Bei Defekt austauschen."
+],
+"30503": [
+"Wärmepumpe",
+"Die Sicherheitsbaugruppe der Wärmepumpe hat eine Gaswarnung ausgelöst.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungsanlagen beachten. Schlechte Entlüftung des Systems."
+],
+"30508": [
+"Wärmepumpe",
+"Doppelte Adressierung der EBPE erkannt.",
+"Neue Initialisierung der Adressen in der Kaskade durchführen."
+],
+"30509": [
+"Wärmepumpe",
+"Es konnte keine Kommunikation zwischen IWS und EBPE aufgebaut werden.",
+"Verkabelung und die dazugehörigen Steckverbinder prüfen. EBPE-Platine bei Defekt tauschen."
+],
+"30512": [
+"Wärmepumpe",
+"Sicherheitsabfragen werden nicht unterstützt.",
+"Update des Systems (Wärmepumpenmanager und Bedienteil) erforderlich"
+],
+"30513": [
+"Wärmepumpe",
+"Der Funktionstest konnte nicht durchgeführt werden. seinen Sollvolumenstrom.",
+"Kommunikation zwischen Wärmepumpen-Manager und Wärmepumpe gestört oder unterbrochen gewesen. schlossen. Fehler im Aufbau der Lüftungsanlage. Behebung: Blockade entfernen oder Lüftungsklappen öffnen."
+],
+"30515": [
+"WPM",
+"Keine HP-ID ausgewählt.",
+""
+],
+"30516": [
+"WPM",
+"Keine Hydraulik-ID ausgewählt.",
+""
+],
+"40481": [
+"WPM",
+"Der Anlagendruck ist gering.",
+"Entlüftung des Systems hat zum Druckverlust geführt. Defektes oder falsches Ausdehnungsgefäß. Leckage im Heizungskreislauf."
+],
+"40482": [
+"WPM",
+"Der Anlagendruck ist zu hoch.",
+"Defektes oder falsches Ausdehnungsgefäß."
+],
+"50002": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0002 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50003": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0003 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungsanlagen beachten. Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50004": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0004 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50006": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0006 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50008": [
+"Wärmepumpe",
+"Der Schiebeschalter WP-Typ der IWS ist nicht korrekt eingestellt.",
+"Wärmepumpe vom Stromnetz trennen und Schiebeschalter korrekt einstellen. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50013": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0013 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50015": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0015 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50026": [
+"Wärmepumpe",
+"Fühlerwert vom „Niederdrucksensor“ außerhalb des zulässigen Wertebereiches",
+"Fühler, dessen Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50027": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0027 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50028": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0028 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50029": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0029 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50034": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0034 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50047": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0047 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Möglicher Eintritt von Kältemittel in den Heizkreis. Keine Heizkörper entlüften. Vorgehen beim Entlüften von Heizungsanlagen beachten. Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50048": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0048 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50049": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0049 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50248": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0248 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50250": [
+"Wärmepumpe",
+"Temperaturschalter am Verdichtergehäuse hat ausgelöst.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50400": [
+"Lüftungsmodul",
+"Kommunikationsfehler Differenzdruck Zuluft (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, ZULu. FOL-Ventilator werden ausgeschaltet."
+],
+"50401": [
+"Lüftungsmodul",
+"Kommunikationsfehler Differenzdruck Fortluft (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, ZULu. FOL-Ventilator werden ausgeschaltet."
+],
+"50402": [
+"Lüftungsmodul",
+"Kommunikationsfehler Differenzdruck Abluft (Lüftung)",
+"Kabelbruch, Kurzschluss oder defekter Sensor, keine Konstantdruckregelung, Umschaltung auf Volumenstromreglung"
+],
+"50411": [
+"Lüftungsmodul",
+"AUL vorerwärmt Tmax-Überschreitung Lüftung (Lüftung)",
+"Plötzlicher Volumenstromabriss"
+],
+"50495": [
+"Wärmepumpe",
+"Es konnte wiederholt kein ausreichender Volumenstrom zum Start des Kühlbetriebes aufgebaut werden.",
+"Ladepumpe defekt. Ventile geschlossen."
+],
+"50496": [
+"Wärmepumpe",
+"Umschaltventil hat nicht geschaltet. Ein Betrieb der Wärmepumpe im Umkehrbetrieb ist nicht möglich.",
+"Verkabelung und die dazugehörigen Steckverbinder kontrollieren, bei Defekt austauschen."
+],
+"50501": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0501 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+],
+"50502": [
+"Wärmepumpe",
+"Mehrfaches Auftreten der Meldungsnummer X-0502 hat zu einer Verriegelung der Wärmepumpe geführt.",
+"Beheben Sie die Ursache. Führen Sie danach über den WPM einen Reset der Wärmepumpe durch."
+]
+}
+}

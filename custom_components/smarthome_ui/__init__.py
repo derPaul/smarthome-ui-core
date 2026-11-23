@@ -538,6 +538,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     hass.async_create_task(entry.runtime_data.energy.async_setup())
     entry.runtime_data.presence_sim.async_setup()
     entry.runtime_data.grocery.async_setup()
+    await entry.runtime_data.technik.async_load_codes()
     entry.runtime_data.technik.async_setup()
     forecasts = entry.runtime_data.forecasts
 

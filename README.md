@@ -478,7 +478,13 @@ Fehlercode-Sensoren, die das Dashboard an der Wärmepumpe findet („Aktiver Feh
 Integrationen melden eine Störung nur dort, während der Fehlerstatus „aus“ bleibt. Steht der Verdichter
 seit mindestens einer Stunde, heißt die Mitteilung „Wärmepumpe steht: Fehler … – Verdichter seit über N Stunden
 aus – Warmwasser … °C“ (dringend). Was schon gemeldet wurde, merkt sich Core über Neustarts hinweg: dieselbe
-Störung kommt nicht erneut, ein neuer Fehlercode schon.
+Störung kommt nicht erneut, ein neuer Fehlercode schon. Bei Stiebel Eltron und Tecalor erklärt Core den Code aus der
+WPM-Meldungsliste des Herstellers (`data/stiebel_wpm.json`, deutscher Teil, Quelle:
+[stiebel-eltron.de](https://www.stiebel-eltron.de/content/dam/ste/de/privatkunden/de/downloads/redirects/wpm-meldungsliste.pdf)):
+was ausgelöst hat und was zu prüfen ist, z. B. „Fehler 30172 (Schwimmerschalter hat ausgelöst) … Laut
+Meldungsliste: Kondensatpumpe und den Kondensatablauf kontrollieren.“ Codes ab 50000 bedeuten, dass die
+Wärmepumpe nach mehrfachem Auftreten verriegelt ist – dann nach dem Beheben zurücksetzen. Das Dashboard zeigt
+dieselbe Erklärung im roten Streifen der Haustechnik.
 
 ## Wochenbericht (ab 0.50, ausführlich ab 0.51)
 
