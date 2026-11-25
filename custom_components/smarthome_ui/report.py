@@ -29,6 +29,9 @@ higher than needed, which costs efficiency. Comparing cold (below 3 °C) with mi
 above) tells the slope from the base point. The report adds one line with the suggestion
 (``heating.curve``).
 
+System (from the watcher): how often Home Assistant hung or crashed, did not respond, and how
+often Core repaired Zigbee2MQTT – only when something happened.
+
 Monthly balance: on the 1st of each month at 09:12 the same numbers for the month before, compared
 with the month before that and the same month a year ago (``report_month``, title "Monatsbilanz").
 """
@@ -567,6 +570,12 @@ class WeeklyReport:
             if out.get("heating"):
                 out["heating"]["outdoor"] = weather["mean"]
         since, until = int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+        try:
+            guard = self.context().get("guard")
+        except Exception:  # noqa: BLE001 - watcher not available
+            guard = None
+        if guard is not None:
+            out["system"] = guard(since, until)
         ev = self._events(since, until)
         ev["prev"] = self._events(int(p_start.timestamp() * 1000), int(p_end.timestamp() * 1000))
         out["events"] = ev
@@ -712,6 +721,16 @@ class WeeklyReport:
             if month and (t.get("year") or {}).get("mean") is not None:
                 line += f", Vorjahr Ø {_deg(t['year']['mean'])}"
             lines.append(line)
+        if (sy := data.get("system")) and (sy.get("unclean") or sy.get("hangs") or sy.get("heals")):
+            parts = []
+            if sy.get("unclean"):
+                mins = max(1, round((sy.get("down_s") or 0) / 60))
+                parts.append(f"{sy['unclean']}× hing oder abgestürzt (zusammen {mins} Min. weg)")
+            if sy.get("hangs"):
+                parts.append(f"{sy['hangs']}× reagierte nicht")
+            if sy.get("heals"):
+                parts.append(f"Zigbee {sy['heals']}× selbst repariert")
+            lines.append("System: " + ", ".join(parts))
         ev = data.get("events") or {}
         happen = []
         if ev.get("alarm"):

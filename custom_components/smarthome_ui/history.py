@@ -11,6 +11,9 @@ System you choose a default for all devices and, per device, a different number 
 
 Long-term statistics (hourly means and sums, energy dashboard) are not touched.
 
+Single entities can be kept shorter as well (``history_entities``, ``{entity_id: days}``, e.g. a
+sensor that writes a lot – see the database report of the watcher); they win over their device.
+
 Stored as ``history`` (``{device_id: days}``), ``history_default`` (days or None = as configured)
 and the last run as ``history_run``.
 """
@@ -61,6 +64,11 @@ class HistoryKeeper:
     def devices(self) -> dict[str, int]:
         """Return the chosen days per device."""
         return self.store.data.setdefault("history", {})
+
+    @property
+    def entities(self) -> dict[str, int]:
+        """Return the chosen days per entity."""
+        return self.store.data.setdefault("history_entities", {})
 
     def default_days(self) -> int | None:
         """Return the default for all devices (own choice, else the recorder's)."""
@@ -118,6 +126,15 @@ class HistoryKeeper:
         self._changed()
 
     @callback
+    def set_entity_days(self, entity_id: str, days: int | None) -> None:
+        """Set the days of one entity (None: back to its device or the default)."""
+        if days is None or days <= 0:
+            self.entities.pop(entity_id, None)
+        else:
+            self.entities[entity_id] = min(int(days), MAX_DAYS)
+        self._changed()
+
+    @callback
     def set_default(self, days: int | None) -> None:
         """Set the default for all devices (None: as configured in the recorder)."""
         if days and days != self.configured:
@@ -165,6 +182,13 @@ class HistoryKeeper:
             own.update(ids)
             if keep is None or days < keep:
                 out[days].extend(ids)
+        for entity_id, days in list(self.entities.items()):
+            for ids in out.values():
+                if entity_id in ids:
+                    ids.remove(entity_id)
+            own.add(entity_id)
+            if keep is None or days < keep:
+                out[days].append(entity_id)
         # all other entities down to the default (only if the recorder keeps longer)
         if base is not None and keep is not None and base < keep:
             out[base].extend(e for e in self.hass.states.async_entity_ids() if e not in own)
@@ -194,6 +218,7 @@ class HistoryKeeper:
         """Return the settings for the dashboard."""
         return {
             "devices": dict(self.devices),
+            "entities": dict(self.entities),
             "default": self.default_days(),
             "configured": self.configured,
             "keep": self.longest(),

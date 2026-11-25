@@ -19,6 +19,13 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
+def guard_quiet(monkeypatch):
+    """Time jumps in tests look like hangs to the watcher; test_guard measures on its own."""
+    monkeypatch.setattr("custom_components.smarthome_ui.guard.LAG_HANG_S", float("inf"))
+    monkeypatch.setattr("custom_components.smarthome_ui.guard.MEM_LOW_PCT", -1)
+
+
+@pytest.fixture(autouse=True)
 def github_offline():
     """GitHub is not reached in tests (the dashboard card); test_ui replaces this."""
 

@@ -94,6 +94,10 @@ def _default() -> dict[str, Any]:
         "system": {},
         # history per device: {device_id: days} kept shorter than the recorder default
         "history": {},
+        # history per entity: {entity_id: days} (wins over the device)
+        "history_entities": {},
+        # watcher: alive / clean stop, events, worst values per hour, the database report
+        "guard": {},
         # the dashboard's device settings were taken over into the catalog (device subentries)
         "catalog_migrated": False,
         # later takeovers of the catalog (step 3: home, rooms, household, garden)

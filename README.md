@@ -521,6 +521,33 @@ milden Tagen warm genug, Thermostate heizen nur 12 % der Zeit – Fußpunkt etwa
 mit dem Monat davor und dem gleichen Monat im Vorjahr (Quelle „Wochenbericht“, Titel „Monatsbilanz November 2026“).
 Das Dashboard zeigt sie drei Tage lang bei den Mitteilungen.
 
+## Wächter (ab 0.54)
+
+Core behält Home Assistant selbst im Blick (Quelle „Home Assistant“ `sys.health`, Push an):
+
+- **Neustarts:** Jede Minute merkt sich Core, dass Home Assistant läuft. Startet es ohne vorher sauber
+  heruntergefahren zu sein, hing es (der Watchdog des Supervisors hat neu gestartet) oder ist abgestürzt – dann
+  kommt „Home Assistant ist neu gestartet, ohne vorher sauber herunterzufahren – etwa 5 Min. weg“.
+- **Reaktionszeit:** Alle 10 Sekunden misst Core, wie spät ein Zeitgeber läuft. Ab 30 Sekunden zählt das als
+  Hänger („Home Assistant hat 42 Sekunden lang nicht reagiert“, höchstens alle 6 Stunden).
+- **Arbeitsspeicher und Last** jede Minute, je Stunde der schlechteste Wert (zwei Wochen); unter 5 % freiem
+  Speicher eine Mitteilung.
+- **Zigbee-Selbstheilung:** Ist Home Assistant oder der MQTT-Broker eine Weile weg, kann Zigbee2MQTT nicht
+  melden, dass seine Geräte wieder da sind – sie bleiben „nicht verfügbar“, obwohl sie funktionieren. 5 Minuten
+  nach einem Start (und 3 Minuten nachdem die Bridge wieder verbunden ist) zählt Core die nicht erreichbaren
+  Zigbee-Geräte; sind es mehr als vorher, startet Core Zigbee2MQTT neu (`zigbee2mqtt/bridge/request/restart`,
+  höchstens alle 6 Stunden) und meldet es. Abschaltbar im Dashboard.
+- **Datenbank:** Jede Nacht um 3:37 (und auf Knopfdruck) zählt Core, wie viele Einträge jede Entität in den
+  letzten 24 Stunden geschrieben hat, dazu die Größe der Datenbank (MariaDB/MySQL und SQLite). Im Dashboard lässt
+  sich der Verlauf einer Entität auf 1 Tag kürzen (Core räumt ihn jede Nacht mit `recorder.purge_entities` auf,
+  siehe „Verlauf je Gerät“) oder eine Diagnose-Entität abschalten.
+
+Der Wochenbericht bekommt eine Zeile „System“, wenn etwas war (hing, reagierte nicht, Zigbee repariert).
+
+Websocket: `smarthome_ui/guard/info`, `…/scan` (Datenbank jetzt zählen), `…/db_action` (`entity_id`,
+`action`: `short` | `default` | `disable` | `enable`), `…/heal` (Zigbee2MQTT neu starten), `…/options`
+(`heal`, `z2m_base`).
+
 ## System & Netzwerk
 
 Gerät **„System“** mit `sensor.system_problems` (Anzahl, Attribut `problems`). Was überwacht wird, schickt das

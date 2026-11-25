@@ -55,6 +55,7 @@ from .energy import EnergyPrefs
 from .entity import entry_ids, find_device, has_identifier
 from .forecast import Forecasts
 from .grocery import Grocery
+from .guard import Guard
 from .history import HistoryKeeper
 from .lights import LightSettings, suggest as suggest_lights, tag_automations
 from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
@@ -125,6 +126,7 @@ class CoreRuntime:
     history: HistoryKeeper
     report: WeeklyReport
     vacation: Vacation
+    guard: Guard
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -326,6 +328,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_history_default,
         ws_report_run,
         ws_vacation_set,
+        ws_guard_info,
+        ws_guard_scan,
+        ws_guard_db_action,
+        ws_guard_heal,
+        ws_guard_options,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -379,6 +386,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
                 urgent=urgent or bool(cfg.get("urgent")),
                 tag=tag,
                 actions=actions,
+            )
+
+    @callback
+    def guard_notify(title: str, message: str, tag: str) -> None:
+        """Home Assistant itself: hangs, memory, Zigbee self-repair (push on by default)."""
+        cfg = (store.data["notify"].get("sources") or {}).get("sys.health") or {}
+        if cfg.get("push", True):
+            engine.send(
+                title,
+                message,
+                src="sys.health",
+                url=cfg.get("url") or "/",
+                urgent=bool(cfg.get("urgent")),
+                tag=tag,
             )
 
     technik = Technik(hass, store, technik_notify)
@@ -448,10 +469,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
                 "outdoor": entry.runtime_data.catalog.outdoor(),
                 "technik": entry.runtime_data.technik.settings(),
                 "vacation": entry.runtime_data.vacation.on,
+                "guard": entry.runtime_data.guard.summary,
             },
         ),
         Vacation(hass, store, engine, presence_sim, alarm),
+        Guard(hass, store, guard_notify),
     )
+    entry.runtime_data.guard.history = entry.runtime_data.history
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
     security.alarm_reason = lambda: (
         r if alarm.configured and (r := alarm.reason()) != "unbekannt" else None
@@ -553,6 +577,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.history.async_setup()
     entry.runtime_data.report.async_setup()
     entry.runtime_data.vacation.async_setup()
+    entry.runtime_data.guard.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -655,6 +680,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.history.async_stop()
     entry.runtime_data.report.async_stop()
     entry.runtime_data.vacation.async_stop()
+    entry.runtime_data.guard.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -707,6 +733,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
         "report": runtime.report.info(),
         "report_month": runtime.report.info_month(),
         "vacation": runtime.vacation.info(),
+        "guard": runtime.guard.info(),
         "catalog": runtime.catalog.info(
             store.data["catalog_migrated"], store.data["catalog_steps"]
         ),
@@ -749,6 +776,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "weekly_report",
             "monthly_report",
             "vacation",
+            "guard",
             "heatpump_cop",
             "energy_prices",
         ],
@@ -819,6 +847,7 @@ def ws_subscribe(
                     "report": runtime.report.info(),
                     "report_month": runtime.report.info_month(),
                     "vacation": runtime.vacation.info(),
+                    "guard": runtime.guard.info(),
                     "catalog": runtime.catalog.info(
                         runtime.store.data["catalog_migrated"], runtime.store.data["catalog_steps"]
                     ),
@@ -1658,3 +1687,95 @@ async def ws_vacation_set(
         elif msg.get("settings"):
             vac.set_settings(msg["settings"])
         connection.send_result(msg["id"], vac.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/info"})
+@callback
+def ws_guard_info(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the watcher's data (restarts, hangs, memory, Zigbee, database report)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], runtime.guard.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/scan"})
+@websocket_api.async_response
+async def ws_guard_scan(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Count the states per entity now (database report)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        report = await runtime.guard.async_db_scan()
+        if report is None:
+            connection.send_error(msg["id"], "failed", "Database report not available")
+            return
+        connection.send_result(msg["id"], runtime.guard.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/guard/db_action",
+        vol.Required("entity_id"): str,
+        vol.Required("action"): vol.In(["short", "default", "disable", "enable"]),
+        vol.Optional("days", default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=365)),
+    }
+)
+@callback
+def ws_guard_db_action(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Keep the history of one entity shorter (or as before), or switch the entity off / on."""
+    if (runtime := _ws_runtime(connection, msg)) is None:
+        return
+    entity_id, action = msg["entity_id"], msg["action"]
+    if action in ("short", "default"):
+        runtime.history.set_entity_days(entity_id, msg["days"] if action == "short" else None)
+    else:
+        registry = er.async_get(hass)
+        if registry.async_get(entity_id) is None:
+            connection.send_error(msg["id"], "not_found", "Entity is not in the registry")
+            return
+        registry.async_update_entity(
+            entity_id,
+            disabled_by=er.RegistryEntryDisabler.USER if action == "disable" else None,
+        )
+    report = runtime.guard.data.get("db")
+    for item in (report or {}).get("top") or []:
+        if item["entity_id"] == entity_id:
+            item["keep"] = runtime.history.entities.get(entity_id)
+            if action in ("disable", "enable"):
+                item["disabled"] = action == "disable"
+    runtime.store.save(SIGNAL_DATA)
+    connection.send_result(msg["id"], runtime.guard.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/heal"})
+@websocket_api.async_response
+async def ws_guard_heal(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Restart Zigbee2MQTT now."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        ok = await runtime.guard.async_heal("manual")
+        if not ok:
+            connection.send_error(msg["id"], "failed", "MQTT is not available")
+            return
+        connection.send_result(msg["id"], runtime.guard.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/guard/options",
+        vol.Optional("heal"): bool,
+        vol.Optional("z2m_base"): vol.All(str, vol.Length(min=1, max=64)),
+    }
+)
+@callback
+def ws_guard_options(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Switch the Zigbee self-repair on / off, set the MQTT base topic of Zigbee2MQTT."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.guard.set_options({k: msg[k] for k in ("heal", "z2m_base") if k in msg})
+        connection.send_result(msg["id"], runtime.guard.info())

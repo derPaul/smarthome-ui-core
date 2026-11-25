@@ -275,3 +275,16 @@ async def test_heating_curve(hass: HomeAssistant, freezer) -> None:
             }
         )
     )
+
+
+def test_system_line() -> None:
+    lines = WeeklyReport.text(
+        {"system": {"restarts": 3, "unclean": 2, "down_s": 540, "hangs": 1, "heals": 1}}
+    )
+    assert lines == [
+        "System: 2× hing oder abgestürzt (zusammen 9 Min. weg), 1× reagierte nicht, "
+        "Zigbee 1× selbst repariert"
+    ]
+    assert (
+        WeeklyReport.text({"system": {"restarts": 2, "unclean": 0, "hangs": 0, "heals": 0}}) == []
+    )
