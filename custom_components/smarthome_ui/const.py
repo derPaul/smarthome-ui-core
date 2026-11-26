@@ -33,6 +33,7 @@ SIGNAL_TECHNIK: Final = f"{DOMAIN}_technik"
 SIGNAL_FORECAST: Final = f"{DOMAIN}_forecast"
 SIGNAL_SYSTEM: Final = f"{DOMAIN}_system"
 SIGNAL_VACATION: Final = f"{DOMAIN}_vacation"
+SIGNAL_WINDOWS: Final = f"{DOMAIN}_windows"
 
 # Notifications
 TICK_INTERVAL: Final = timedelta(seconds=30)

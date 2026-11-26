@@ -427,6 +427,9 @@
       },
       "system_problems": {
         "name": "Probleme"
+      },
+      "window_cleaned": {
+        "name": "Zuletzt geputzt"
       }
     },
     "binary_sensor": {
@@ -482,6 +485,9 @@
       },
       "mail_emptied": {
         "name": "Briefkasten geleert"
+      },
+      "window_clean": {
+        "name": "Geputzt"
       }
     },
     "select": {
@@ -545,6 +551,20 @@
         "state": {
           "ask": "Per Push nachfragen",
           "allow": "Still erlauben"
+        }
+      },
+      "window_orientation": {
+        "name": "Himmelsrichtung",
+        "state": {
+          "unknown": "Nicht gesetzt",
+          "n": "Nord",
+          "ne": "Nordost",
+          "e": "Ost",
+          "se": "Südost",
+          "s": "Süd",
+          "sw": "Südwest",
+          "w": "West",
+          "nw": "Nordwest"
         }
       }
     },
@@ -629,6 +649,9 @@
       },
       "system_unifi_auto": {
         "name": "UniFi-Geräte automatisch"
+      },
+      "window_automatic": {
+        "name": "Automatik"
       }
     },
     "number": {

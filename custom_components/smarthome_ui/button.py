@@ -16,6 +16,7 @@ from .entity import DEVICE_HOUSEHOLD, DEVICE_SECURITY, CoreEntity
 from .maintenance import Part, PartEntity, async_setup_part_entities
 from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .plants import PlantEntity, PlantTracker, async_setup_plant_entities
+from .windows import WindowEntity, async_setup_window_entities
 
 
 async def async_setup_entry(
@@ -24,6 +25,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up one reload button per display."""
+    windows = entry.runtime_data.windows
+    entry.async_on_unload(
+        async_setup_window_entities(
+            hass,
+            windows,
+            async_add_entities,
+            lambda wid: [WindowClean(entry.entry_id, windows, wid)],
+        )
+    )
+
     manager = entry.runtime_data.displays
     entry.async_on_unload(
         async_setup_display_entities(
@@ -205,3 +216,17 @@ class MailEmptied(CoreEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Emptied now."""
         self._mailbox.emptied()
+
+
+class WindowClean(WindowEntity, ButtonEntity):
+    """The window was cleaned (now)."""
+
+    _attr_icon = "mdi:spray-bottle"
+
+    def __init__(self, entry_id: str, windows, wid: str) -> None:
+        """Initialize."""
+        super().__init__(entry_id, windows, wid, "clean", "button")
+
+    async def async_press(self) -> None:
+        """Mark as cleaned."""
+        self._windows.cleaned([self._wid])

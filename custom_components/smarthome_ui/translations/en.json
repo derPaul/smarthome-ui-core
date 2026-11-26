@@ -427,6 +427,9 @@
       },
       "system_problems": {
         "name": "Problems"
+      },
+      "window_cleaned": {
+        "name": "Last cleaned"
       }
     },
     "binary_sensor": {
@@ -482,6 +485,9 @@
       },
       "mail_emptied": {
         "name": "Mailbox emptied"
+      },
+      "window_clean": {
+        "name": "Cleaned"
       }
     },
     "select": {
@@ -545,6 +551,20 @@
         "state": {
           "ask": "Ask by push",
           "allow": "Allow silently"
+        }
+      },
+      "window_orientation": {
+        "name": "Orientation",
+        "state": {
+          "unknown": "Not set",
+          "n": "North",
+          "ne": "North-east",
+          "e": "East",
+          "se": "South-east",
+          "s": "South",
+          "sw": "South-west",
+          "w": "West",
+          "nw": "North-west"
         }
       }
     },
@@ -629,6 +649,9 @@
       },
       "system_unifi_auto": {
         "name": "All UniFi devices automatically"
+      },
+      "window_automatic": {
+        "name": "Automatic"
       }
     },
     "number": {

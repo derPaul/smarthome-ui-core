@@ -365,6 +365,35 @@ Zusammenfassung „Willkommen zurück“ (Tage, Alarm, Klingeln, Post, zurückge
 `smarthome_ui/vacation/set` (`on`, `settings`: `offset`, `hot_water`, `sim`, `alarm`, `quiet`, `until` in ms,
 `preheat_h`).
 
+## Fenster (ab 0.55)
+
+Jedes Fenster ist ein eigenes Gerät („Fenster Arbeitszimmer“) im passenden Bereich. Jeder Rollladen
+(`cover` der Art Rollladen/Jalousie/Rollo oder ohne Art; keine Garagentore und Markisen) wird von selbst zu
+einem Fenster – auch neu angelernte, z. B. ein weiterer Eve Shutter Switch. Fenster ohne Rollladen lassen
+sich im Dashboard anlegen. Je Fenster:
+
+- **Rollladen**, **Kontakt** (optional; hat der Bereich genau einen Fensterkontakt, wird er übernommen),
+  **Tür** (Terrassentür: Aussperrschutz), **Himmelsrichtung** (für den Hitzeschutz), **Automatik**,
+  **Putzstatus**.
+
+| Entität | |
+|---|---|
+| `select.window_<id>_orientation` | Himmelsrichtung (Nord … Nordwest) |
+| `switch.window_<id>_automatic` | nimmt an den Automatiken teil |
+| `sensor.window_<id>_cleaned` | zuletzt geputzt (Attribut `due`: fällig) |
+| `button.window_<id>_clean` | geputzt |
+
+Automatiken (im Dashboard einstellbar):
+
+- **Morgens** auf (werktags 7:00, am Wochenende 8:30), **abends** 15 Minuten nach Sonnenuntergang zu.
+- **Hitzeschutz** – scheint die Sonne auf die Fassade (Sonne höchstens 70° neben der Blickrichtung, mindestens
+  12° hoch) und ist es draußen mindestens 24 °C: auf 25 %; wieder hoch, wenn die Sonne weg ist – außer jemand
+  hat den Rollladen inzwischen bewegt. Von Hand bewegt: 3 Stunden Ruhe für dieses Fenster.
+- **Aussperrschutz** – eine offene Tür wird nie zugefahren; das abendliche Schließen folgt, sobald sie zu ist.
+- **Winter-Modus** (automatisch unter 8 °C draußen, oder fest an/aus) – genau bei Sonnenuntergang zu,
+  morgens frühestens 15 Minuten nach Sonnenaufgang auf, kein Hitzeschutz.
+- Im **Urlaubsmodus** und während die **Anwesenheitssimulation** läuft, übernehmen diese morgens und abends.
+
 ## Briefkasten
 
 Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **Entnahmetür**. Core erkennt sie am Namen
@@ -818,6 +847,11 @@ actions:
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
 | `smarthome_ui/notify/log` | Mitteilungen der letzten 30 Tage (`items`: `id`, `t`, `title`, `message`, `src`, `url`, `urgent`, `status`, `actions`, `answer`) |
+| `smarthome_ui/windows/info` | Fenster (Rollladen, Kontakt, Himmelsrichtung, Putzstatus, Sonne, Hitzeschutz) und Einstellungen |
+| `smarthome_ui/windows/set` | Fenster anlegen (ohne `window_id`) oder ändern (`name`, `area_id`, `cover`, `contact`, `lock`, `door`, `orientation`, `auto`) |
+| `smarthome_ui/windows/remove` | Fenster entfernen (`window_id`) |
+| `smarthome_ui/windows/clean` | Fenster geputzt (`window_ids`) |
+| `smarthome_ui/windows/settings` | Automatiken (`morning`, `morning_weekend`, `morning_on`, `evening_on`, `evening_offset`, `heat_on`, `heat_temp`, `heat_position`, `lockout`, `winter`, `outdoor`, `clean_days`) |
 | `smarthome_ui/notify/log_action` | Aktion einer Mitteilung nachträglich auslösen (`log_id`, `action`) – wie am Handy getippt |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
 | `smarthome_ui/alarm/settings` | Alarm-Logik übernehmen (`panel`, `rules`, `actions`, `guests`, `nightwalk`, einmalig `guests_on`, `nightwalk_until`) |

@@ -14,6 +14,7 @@ from .const import SIGNAL_MOWER
 from .displays import SELECT_KEYS, DisplayEntity, async_setup_display_entities
 from .entity import attach_device
 from .mower import FREQ_OPTIONS, MowerTracker
+from .windows import ORIENTATIONS, WindowEntity, async_setup_window_entities
 
 
 async def async_setup_entry(
@@ -22,6 +23,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the selects of every display."""
+    windows = entry.runtime_data.windows
+    entry.async_on_unload(
+        async_setup_window_entities(
+            hass,
+            windows,
+            async_add_entities,
+            lambda wid: [WindowOrientation(entry.entry_id, windows, wid)],
+        )
+    )
+
     manager = entry.runtime_data.displays
     entry.async_on_unload(
         async_setup_display_entities(
@@ -130,3 +141,25 @@ class NightwalkEffect(AlarmOption, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Change the effect."""
         self._set(option)
+
+
+class WindowOrientation(WindowEntity, SelectEntity):
+    """Which way the window looks (for the heat protection)."""
+
+    _attr_options = ["unknown", *ORIENTATIONS]
+    _attr_icon = "mdi:compass-outline"
+
+    def __init__(self, entry_id: str, windows, wid: str) -> None:
+        """Initialize."""
+        super().__init__(entry_id, windows, wid, "orientation", "select")
+
+    @property
+    def current_option(self) -> str:
+        """Return the orientation."""
+        return self.item.get("orientation") or "unknown"
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the orientation."""
+        self._windows.set_window(
+            self._wid, {"orientation": None if option == "unknown" else option}
+        )

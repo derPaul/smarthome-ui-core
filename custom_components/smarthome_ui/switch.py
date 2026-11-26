@@ -20,6 +20,7 @@ from .planner import PlannerEntity, RobotPlanner, async_setup_planner_entities
 from .store import CoreStore
 from .system import OPTIONS as SYSTEM_OPTIONS, SystemOption
 from .technik import TechnikOption
+from .windows import WindowEntity, async_setup_window_entities
 
 
 async def async_setup_entry(
@@ -28,6 +29,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the notifications switch and one standby switch per display."""
+    windows = entry.runtime_data.windows
+    entry.async_on_unload(
+        async_setup_window_entities(
+            hass,
+            windows,
+            async_add_entities,
+            lambda wid: [WindowAuto(entry.entry_id, windows, wid)],
+        )
+    )
+
     async_add_entities([NotificationsSwitch(entry.entry_id, entry.runtime_data.store)])
     security = entry.runtime_data.security
     async_add_entities(
@@ -432,3 +443,26 @@ class VacationSwitch(CoreEntity, SwitchEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_VACATION, self.async_write_ha_state)
         )
+
+
+class WindowAuto(WindowEntity, SwitchEntity):
+    """The window takes part in the automations (morning, evening, heat protection)."""
+
+    _attr_icon = "mdi:window-shutter-auto"
+
+    def __init__(self, entry_id: str, windows, wid: str) -> None:
+        """Initialize."""
+        super().__init__(entry_id, windows, wid, "automatic", "switch")
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if automatic."""
+        return bool(self.item.get("auto", True))
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Take part."""
+        self._windows.set_window(self._wid, {"auto": True})
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Leave the automations."""
+        self._windows.set_window(self._wid, {"auto": False})

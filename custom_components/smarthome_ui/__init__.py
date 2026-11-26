@@ -78,6 +78,7 @@ from .vacation import Vacation
 from .vacuum import VacuumManager
 from .waste import WasteManager
 from .watchers import Watchers
+from .windows import Windows
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -127,6 +128,7 @@ class CoreRuntime:
     report: WeeklyReport
     vacation: Vacation
     guard: Guard
+    windows: Windows
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -335,6 +337,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_guard_options,
         ws_notify_log,
         ws_notify_log_action,
+        ws_windows_info,
+        ws_windows_set,
+        ws_windows_remove,
+        ws_windows_clean,
+        ws_windows_settings,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -477,6 +484,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         ),
         Vacation(hass, store, engine, presence_sim, alarm),
         Guard(hass, store, guard_notify),
+        Windows(hass, store),
+    )
+    rt = entry.runtime_data
+    # morning and evening: left to the holiday mode and the presence simulation while they run
+    rt.windows.others_busy = lambda cover: (
+        rt.vacation.on
+        or (
+            presence_sim.enabled
+            and presence_sim.condition()
+            and cover in presence_sim.settings()["covers"]
+        )
     )
     entry.runtime_data.guard.history = entry.runtime_data.history
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
@@ -581,6 +599,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.report.async_setup()
     entry.runtime_data.vacation.async_setup()
     entry.runtime_data.guard.async_setup()
+    entry.runtime_data.windows.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -684,6 +703,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.report.async_stop()
     entry.runtime_data.vacation.async_stop()
     entry.runtime_data.guard.async_stop()
+    entry.runtime_data.windows.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     await entry.runtime_data.engine.log.async_flush()
@@ -784,6 +804,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "heatpump_cop",
             "energy_prices",
             "notify_log",
+            "windows",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1722,6 +1743,94 @@ def ws_notify_log_action(
         connection.send_error(msg["id"], "not_found", "Mitteilung oder Aktion nicht gefunden")
         return
     connection.send_result(msg["id"], {"entry": runtime.engine.log.find(msg["log_id"])})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/windows/info"})
+@callback
+def ws_windows_info(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the windows (cover, contact, orientation, cleaning) and the automation settings."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], runtime.windows.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/windows/set",
+        vol.Optional("window_id"): vol.Any(None, str),
+        vol.Optional("name"): str,
+        vol.Optional("area_id"): vol.Any(None, str),
+        vol.Optional("cover"): vol.Any(None, str),
+        vol.Optional("contact"): vol.Any(None, str),
+        vol.Optional("lock"): vol.Any(None, str),
+        vol.Optional("door"): bool,
+        vol.Optional("orientation"): vol.Any(None, str),
+        vol.Optional("auto"): bool,
+    }
+)
+@callback
+def ws_windows_set(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Add a window (without ``window_id``) or change one."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        values = {k: v for k, v in msg.items() if k not in ("id", "type", "window_id")}
+        runtime.windows.set_window(msg.get("window_id"), values)
+        connection.send_result(msg["id"], runtime.windows.info())
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "smarthome_ui/windows/remove", vol.Required("window_id"): str}
+)
+@callback
+def ws_windows_remove(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Remove a window (its cover does not come back by itself)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.windows.remove(msg["window_id"])
+        connection.send_result(msg["id"], runtime.windows.info())
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "smarthome_ui/windows/clean", vol.Required("window_ids"): [str]}
+)
+@callback
+def ws_windows_clean(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Mark windows as cleaned (e.g. all windows of a room)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.windows.cleaned(msg["window_ids"])
+        connection.send_result(msg["id"], runtime.windows.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/windows/settings",
+        vol.Optional("morning"): str,
+        vol.Optional("morning_weekend"): str,
+        vol.Optional("morning_on"): bool,
+        vol.Optional("evening_on"): bool,
+        vol.Optional("evening_offset"): vol.Coerce(int),
+        vol.Optional("heat_on"): bool,
+        vol.Optional("heat_temp"): vol.Coerce(float),
+        vol.Optional("heat_position"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        vol.Optional("lockout"): bool,
+        vol.Optional("winter"): vol.In(["auto", "on", "off"]),
+        vol.Optional("outdoor"): vol.Any(None, str),
+        vol.Optional("clean_days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=730)),
+    }
+)
+@callback
+def ws_windows_settings(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Change the window automations."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.windows.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
+        connection.send_result(msg["id"], runtime.windows.info())
 
 
 @websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/info"})

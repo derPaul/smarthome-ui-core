@@ -52,6 +52,7 @@ from .tasks import TaskState, task_states
 from .technik import TechnikEntity
 from .vacuum import VacuumTracker
 from .waste import WasteManager
+from .windows import WindowEntity, async_setup_window_entities
 
 TASK_PREFIX = "task_"
 
@@ -62,6 +63,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the sensors; add and remove task sensors when the tasks change."""
+    windows = entry.runtime_data.windows
+    entry.async_on_unload(
+        async_setup_window_entities(
+            hass,
+            windows,
+            async_add_entities,
+            lambda wid: [WindowCleaned(entry.entry_id, windows, wid)],
+        )
+    )
+
     store = entry.runtime_data.store
     async_add_entities([LastNotificationSensor(entry.entry_id, store)])
     security = entry.runtime_data.security
@@ -1043,3 +1054,25 @@ class WaterUsage(TechnikEntity, RestoreSensor):
             elif value - self._last <= WATER_REFILL:
                 return  # small rise (rounding): keep the lower value, so it is not counted twice
         self._last = value
+
+
+class WindowCleaned(WindowEntity, SensorEntity):
+    """When the window was cleaned last (attribute: due)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:spray-bottle"
+
+    def __init__(self, entry_id: str, windows, wid: str) -> None:
+        """Initialize."""
+        super().__init__(entry_id, windows, wid, "cleaned", "sensor")
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the time of the last cleaning."""
+        last = self.item.get("cleaned")
+        return dt_util.utc_from_timestamp(last / 1000) if last else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return whether a cleaning is due."""
+        return {"due": self._windows.clean_due(self.item)} if self.item else {}
