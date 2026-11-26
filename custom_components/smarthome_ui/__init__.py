@@ -62,6 +62,7 @@ from .lists import PAGES as LIST_PAGES, VALUES as LIST_VALUES, PageLists
 from .mailbox import Mailbox
 from .maintenance import PartManager, async_migrate_tasks
 from .mower import MowerManager
+from .newdevices import NewDevices
 from .notify import NotifyEngine
 from .planner import PlannerManager
 from .plants import PlantManager
@@ -129,6 +130,7 @@ class CoreRuntime:
     vacation: Vacation
     guard: Guard
     windows: Windows
+    newdev: NewDevices
 
     def robots(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return mowers and vacuums with their planner state (for the dashboard)."""
@@ -343,6 +345,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_windows_remove,
         ws_windows_clean,
         ws_windows_settings,
+        ws_newdev_info,
+        ws_newdev_apply,
+        ws_newdev_dismiss,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -486,6 +491,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         Vacation(hass, store, engine, presence_sim, alarm),
         Guard(hass, store, guard_notify),
         Windows(hass, store),
+        NewDevices(hass, store, presence_sim),
     )
     rt = entry.runtime_data
     # morning and evening: left to the holiday mode and the presence simulation while they run
@@ -602,6 +608,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     entry.runtime_data.vacation.async_setup()
     entry.runtime_data.guard.async_setup()
     entry.runtime_data.windows.async_setup()
+    entry.runtime_data.newdev.async_setup()
 
     # tasks from the definitions: again after every change of the data and every quarter hour
     today: list[Any] = [dt_util.now().date()]
@@ -706,6 +713,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.vacation.async_stop()
     entry.runtime_data.guard.async_stop()
     entry.runtime_data.windows.async_stop()
+    entry.runtime_data.newdev.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
     await entry.runtime_data.engine.log.async_flush()
@@ -807,6 +815,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "energy_prices",
             "notify_log",
             "windows",
+            "newdev",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1833,6 +1842,55 @@ def ws_windows_settings(
     if (runtime := _ws_runtime(connection, msg)) is not None:
         runtime.windows.set_settings({k: v for k, v in msg.items() if k not in ("id", "type")})
         connection.send_result(msg["id"], runtime.windows.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/newdev/info"})
+@callback
+def ws_newdev_info(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the new devices with suggestions (area, name, diagnostics, class, automations)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], runtime.newdev.info())
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/newdev/apply",
+        vol.Required("device_id"): str,
+        vol.Optional("area_id"): vol.Any(None, str),
+        vol.Optional("name"): str,
+        vol.Optional("enable"): [str],
+        vol.Optional("device_class"): {str: str},
+        vol.Optional("sim"): [str],
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_newdev_apply(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Apply the chosen suggestions to a new device."""
+    if (runtime := _ws_runtime(connection, msg)) is None:
+        return
+    choice = {k: v for k, v in msg.items() if k not in ("id", "type", "device_id")}
+    if runtime.newdev.apply(msg["device_id"], choice) is None:
+        connection.send_error(msg["id"], "not_found", "Gerät nicht gefunden")
+        return
+    connection.send_result(msg["id"], runtime.newdev.info())
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "smarthome_ui/newdev/dismiss", vol.Required("device_id"): str}
+)
+@callback
+def ws_newdev_dismiss(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Leave a new device as it is (no longer suggested)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        runtime.newdev.done(msg["device_id"])
+        connection.send_result(msg["id"], runtime.newdev.info())
 
 
 @websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/info"})

@@ -365,6 +365,21 @@ Zusammenfassung „Willkommen zurück“ (Tage, Alarm, Klingeln, Post, zurückge
 `smarthome_ui/vacation/set` (`on`, `settings`: `offset`, `hot_water`, `sim`, `alarm`, `quiet`, `until` in ms,
 `preheat_h`).
 
+## Neue Geräte (ab 0.55)
+
+Geräte, die nach der Einrichtung von Smarthome UI Core dazukommen (z. B. ein Eve Shutter Switch), stehen im
+Dashboard als **neues Gerät** – 14 Tage lang oder bis sie eingerichtet oder übergangen sind. Core schlägt vor:
+
+- **Raum** aus dem Namen (ein Raumname darin) oder vom übergeordneten Gerät,
+- **Namen** „<Raum> <Art>“, wenn das Gerät nur einen Modellnamen trägt („Eve Shutter Switch 20EBN9901“ →
+  „Arbeitszimmer Rollladen“),
+- **Diagnose** einschalten: abgeschaltete Diagnose-Entitäten, die bei Fehlern helfen (Signal, Batterie,
+  Neustarts, Betriebszeit, Thread-Rolle …),
+- **Geräteklasse**: ein Rollladen ohne Art wird „Rollladen“ (bei „Jalousie“ „Jalousie“), ein Kontakt ohne Art
+  „Fenster“ (oder „Tür“),
+- **Automationen**: Rollläden und Lichter in die Anwesenheitssimulation (die auch im Urlaubsmodus läuft);
+  Rollläden werden außerdem von selbst zu Fenstern.
+
 ## Fenster (ab 0.55)
 
 Jedes Fenster ist ein eigenes Gerät („Fenster Arbeitszimmer“) im passenden Bereich. Jeder Rollladen
@@ -851,6 +866,9 @@ actions:
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
 | `smarthome_ui/notify/log` | Mitteilungen der letzten 30 Tage (`items`: `id`, `t`, `title`, `message`, `src`, `url`, `urgent`, `status`, `actions`, `answer`) |
+| `smarthome_ui/newdev/info` | neue Geräte mit Vorschlägen (`suggest_area`, `suggest_name`, `diagnostics`, `device_class`, `sim`) |
+| `smarthome_ui/newdev/apply` | Vorschläge übernehmen (`device_id`, `area_id`, `name`, `enable`, `device_class`, `sim`; nur Admins) |
+| `smarthome_ui/newdev/dismiss` | neues Gerät so lassen (`device_id`) |
 | `smarthome_ui/windows/info` | Fenster (Rollladen, Kontakt, Himmelsrichtung, Putzstatus, Sonne, Hitzeschutz) und Einstellungen |
 | `smarthome_ui/windows/set` | Fenster anlegen (ohne `window_id`) oder ändern (`name`, `area_id`, `cover`, `contact`, `lock`, `door`, `orientation`, `auto`) |
 | `smarthome_ui/windows/remove` | Fenster entfernen (`window_id`) |
