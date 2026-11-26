@@ -25,13 +25,14 @@ from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.event import (
     TrackTemplate,
     async_track_state_change_event,
     async_track_template_result,
     async_track_time_interval,
 )
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.template import Template, result_as_boolean
 from homeassistant.util import dt as dt_util
 
@@ -42,6 +43,7 @@ from .const import (
     FORGET_AFTER,
     RECENT_MAX,
     REPORT_TTL,
+    SIGNAL_LOG,
     SIGNAL_NOTIFY,
     SIGNAL_SENT,
     SIGNAL_TASKS,
@@ -53,6 +55,90 @@ from .tasks import task_states
 _LOGGER = logging.getLogger(__name__)
 
 INVALID = ("unknown", "unavailable", "")
+
+# notification log: every message of the last 30 days, also the ones not pushed (muted, paused,
+# holiday, quiet hours), with its actions and which one was chosen
+LOG_KEY = "smarthome_ui_core.notify_log"
+LOG_DAYS = 30
+LOG_MAX = 1500
+ACTION_EVENT = "mobile_app_notification_action"
+
+
+class NotifyLog:
+    """The last 30 days of notifications, in a file of their own."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the log."""
+        self.hass = hass
+        self._store: Store[dict[str, Any]] = Store(hass, 1, LOG_KEY)
+        self.items: list[dict[str, Any]] = []
+        self._seq = 0
+
+    async def async_load(self) -> None:
+        """Load the stored log (what was logged before keeps its place on top)."""
+        stored = await self._store.async_load() or {}
+        self.items = [*self.items, *(stored.get("items") or [])]
+        self._prune()
+
+    async def async_flush(self) -> None:
+        """Write pending changes now."""
+        await self._store.async_save({"items": self.items})
+
+    def _prune(self) -> None:
+        cutoff = now_ms() - LOG_DAYS * 86_400_000
+        self.items = [i for i in self.items if i.get("t", 0) >= cutoff][:LOG_MAX]
+
+    def _save(self) -> None:
+        self._store.async_delay_save(lambda: {"items": self.items}, 5)
+        async_dispatcher_send(self.hass, SIGNAL_LOG)
+
+    @callback
+    def add(self, item: dict[str, Any], status: str) -> dict[str, Any]:
+        """Log a notification with what happened to it."""
+        self._seq += 1
+        entry = {
+            "id": f"{now_ms():x}{self._seq % 1000:03d}",
+            "t": now_ms(),
+            "title": item.get("title") or "",
+            "message": item.get("message") or "",
+            "src": item.get("src") or "",
+            "url": item.get("url") or "",
+            "urgent": bool(item.get("urgent")),
+            "status": status,
+        }
+        if actions := [
+            {"action": a["action"], "title": a.get("title") or a["action"]}
+            for a in item.get("actions") or []
+            if a.get("action") and not str(a["action"]).startswith("URI")
+        ]:
+            entry["actions"] = actions
+        self.items.insert(0, entry)
+        self._prune()
+        self._save()
+        return entry
+
+    @callback
+    def set_status(self, entry: dict[str, Any] | None, status: str) -> None:
+        """Change what happened to a logged notification (e.g. sent after quiet hours)."""
+        if entry is not None:
+            entry["status"] = status
+            self._save()
+
+    def find(self, log_id: str) -> dict[str, Any] | None:
+        """Return a logged notification."""
+        return next((i for i in self.items if i["id"] == log_id), None)
+
+    @callback
+    def answered(self, action: str, via: str, log_id: str | None = None) -> dict[str, Any] | None:
+        """Note the chosen action on the newest notification (of 2 days) that offered it."""
+        cutoff = now_ms() - 2 * 86_400_000
+        entries = [self.find(log_id)] if log_id else [i for i in self.items if i["t"] >= cutoff]
+        for entry in entries:
+            if entry is not None and any(a["action"] == action for a in entry.get("actions") or []):
+                entry["answer"] = {"action": action, "t": now_ms(), "via": via}
+                self._save()
+                return entry
+        return None
 
 
 def _parse_hhmm(value: Any, default: dtime) -> dtime:
@@ -114,6 +200,7 @@ class NotifyEngine:
         self.extra_rules: Callable[[], list[dict[str, Any]]] = list
         # further tasks from the integration itself (e.g. areas due for mowing)
         self.extra_tasks: Callable[[], list[dict[str, Any]]] = list
+        self.log = NotifyLog(hass)
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -125,8 +212,26 @@ class NotifyEngine:
         self._unsub.append(
             async_track_time_interval(self.hass, self._async_poll_calendars, CALENDAR_INTERVAL)
         )
+        self._unsub.append(self.hass.bus.async_listen(ACTION_EVENT, self._on_action))
+        await self.log.async_load()
         self.reload()
         self.hass.async_create_task(self._async_poll_calendars())
+
+    @callback
+    def _on_action(self, event: Event) -> None:
+        """Note which action was chosen on a phone (or here, from the log)."""
+        if action := event.data.get("action"):
+            via = "dashboard" if event.data.get("smarthome_ui_log") else "push"
+            self.log.answered(str(action), via, event.data.get("smarthome_ui_log"))
+
+    @callback
+    def run_action(self, log_id: str, action: str) -> bool:
+        """Choose an action of a logged notification afterwards, as if tapped on the phone."""
+        entry = self.log.find(log_id)
+        if entry is None or not any(a["action"] == action for a in entry.get("actions") or []):
+            return False
+        self.hass.bus.async_fire(ACTION_EVENT, {"action": action, "smarthome_ui_log": log_id})
+        return True
 
     @callback
     def async_stop(self) -> None:
@@ -488,14 +593,6 @@ class NotifyEngine:
         camera: str | None = None,
     ) -> bool:
         """Send a notification to all targets (unless paused, muted or in quiet hours)."""
-        if not force and not self.config.get("enabled", True):
-            return False
-        if not force and self.muted(src, message):
-            _LOGGER.debug("Muted notification: %s", message)
-            return False
-        # holiday mode: only what needs you even from afar (the rest is counted)
-        if not force and not urgent and not self.vacation_allows(src):
-            return False
         item = {
             "title": title,
             "message": message,
@@ -506,7 +603,19 @@ class NotifyEngine:
             "actions": actions,
             "camera": camera if camera and str(camera).startswith("camera.") else None,
         }
+        if not force and not self.config.get("enabled", True):
+            self.log.add(item, "paused")
+            return False
+        if not force and self.muted(src, message):
+            _LOGGER.debug("Muted notification: %s", message)
+            self.log.add(item, "muted")
+            return False
+        # holiday mode: only what needs you even from afar (the rest is counted)
+        if not force and not urgent and not self.vacation_allows(src):
+            self.log.add(item, "vacation")
+            return False
         if not force and not urgent and in_quiet(self.config.get("quiet"), dt_util.now()):
+            item["log"] = self.log.add(item, "quiet")
             self._deferred.append(item)
             return False
         return self._deliver(item)
@@ -522,9 +631,18 @@ class NotifyEngine:
     @callback
     def _deliver(self, item: dict[str, Any]) -> bool:
         targets = self.targets()
+        late = item.pop("log", None)
         if not targets:
             _LOGGER.warning("No notify target for: %s", item["message"])
+            if late is None:
+                self.log.add(item, "no_target")
+            else:
+                self.log.set_status(late, "no_target")
             return False
+        if late is None:
+            self.log.add(item, "sent")
+        else:
+            self.log.set_status(late, "late")
         data = {"url": item["url"], "clickAction": item["url"], "group": item["src"] or "smarthome"}
         if item.get("tag"):
             data["tag"] = item["tag"]

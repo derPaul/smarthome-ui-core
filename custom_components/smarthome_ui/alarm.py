@@ -27,6 +27,7 @@ the lists (sensors, modes) stay in the dashboard's dialog.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import timedelta
 import logging
 from typing import Any
@@ -92,6 +93,8 @@ class AlarmLogic:
         self._unsub: list[CALLBACK_TYPE] = []
         self._guest_timer: CALLBACK_TYPE | None = None
         self._asking: asyncio.Task | None = None
+        # set up by the integration: notifications log (title, message, actions)
+        self.log_push: Callable[[dict[str, Any], str], Any] = lambda item, status: None
 
     # ---------------------------------------------------------------- settings and state
 
@@ -488,7 +491,10 @@ class AlarmLogic:
         return str(on[0].attributes.get("friendly_name") or on[0].entity_id) if on else "unbekannt"
 
     async def _push(self, title: str, message: str, data: dict[str, Any]) -> None:
-        for target in self.actions()["targets"]:
+        targets = self.actions()["targets"]
+        item = {"title": title, "message": message, "src": "alarm", "urgent": True}
+        self.log_push({**item, "actions": data.get("actions")}, "sent" if targets else "no_target")
+        for target in targets:
             try:
                 await self.hass.services.async_call(
                     "notify",

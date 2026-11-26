@@ -333,6 +333,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ws_guard_db_action,
         ws_guard_heal,
         ws_guard_options,
+        ws_notify_log,
+        ws_notify_log_action,
     ):
         websocket_api.async_register_command(hass, command)
     return True
@@ -405,6 +407,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
     technik = Technik(hass, store, technik_notify)
     doorbells = DoorbellManager(hass, store)
     alarm = AlarmLogic(hass, store)
+    alarm.log_push = engine.log.add
 
     @callback
     def doorbell_rang(tracker: Any) -> None:
@@ -683,6 +686,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> boo
     entry.runtime_data.guard.async_stop()
     entry.runtime_data.displays.async_shutdown()
     await entry.runtime_data.store.async_flush()
+    await entry.runtime_data.engine.log.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
@@ -779,6 +783,7 @@ def _state(runtime: CoreRuntime) -> dict[str, Any]:
             "guard",
             "heatpump_cop",
             "energy_prices",
+            "notify_log",
         ],
         "own_tasks": store.own_tasks,
         "waste": {
@@ -1687,6 +1692,36 @@ async def ws_vacation_set(
         elif msg.get("settings"):
             vac.set_settings(msg["settings"])
         connection.send_result(msg["id"], vac.info())
+
+
+@websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/notify/log"})
+@callback
+def ws_notify_log(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the notifications of the last 30 days (newest first)."""
+    if (runtime := _ws_runtime(connection, msg)) is not None:
+        connection.send_result(msg["id"], {"items": runtime.engine.log.items})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "smarthome_ui/notify/log_action",
+        vol.Required("log_id"): str,
+        vol.Required("action"): str,
+    }
+)
+@callback
+def ws_notify_log_action(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Choose an action of a logged notification afterwards (e.g. "Wasser absperren")."""
+    if (runtime := _ws_runtime(connection, msg)) is None:
+        return
+    if not runtime.engine.run_action(msg["log_id"], msg["action"]):
+        connection.send_error(msg["id"], "not_found", "Mitteilung oder Aktion nicht gefunden")
+        return
+    connection.send_result(msg["id"], {"entry": runtime.engine.log.find(msg["log_id"])})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "smarthome_ui/guard/info"})

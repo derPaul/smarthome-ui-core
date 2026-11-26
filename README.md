@@ -82,6 +82,11 @@ Außerdem:
   Meldung auf „Kein Push“ oder „Aus“ stellen, z. B. eine, die jeden Abend kommt. Zahlen und Uhrzeiten im Text
   zählen dabei nicht; Test-Mitteilungen kommen immer.
 - **Empfänger** – die im Dashboard gewählten `notify`-Dienste, sonst alle `notify.mobile_app_…`.
+- **Verlauf** (ab 0.55) – jede Mitteilung der letzten 30 Tage, auch die nicht verschickten (stumm, pausiert,
+  im Urlaub zurückgehalten, in der Ruhezeit verschoben), mit ihren Aktionen und der am Handy gewählten
+  Antwort. Im Dashboard unter Mitteilungen → Verlauf; eine Aktion (z. B. „Wasser absperren“) lässt sich dort
+  nachträglich auslösen. Gespeichert in einer eigenen Datei (`.storage/smarthome_ui_core.notify_log`,
+  höchstens 1500 Einträge).
 
 | Entität / Aktion | |
 |---|---|
@@ -812,6 +817,8 @@ actions:
 | `smarthome_ui/tasks/sync` | Aufgaben mit Fälligkeit |
 | `smarthome_ui/notify/config` | Regeln, Empfänger, Quellen, Ruhezeiten, Uhrzeit für Aufgaben |
 | `smarthome_ui/notify/report` | aktuelle Meldungen eines offenen Dashboards |
+| `smarthome_ui/notify/log` | Mitteilungen der letzten 30 Tage (`items`: `id`, `t`, `title`, `message`, `src`, `url`, `urgent`, `status`, `actions`, `answer`) |
+| `smarthome_ui/notify/log_action` | Aktion einer Mitteilung nachträglich auslösen (`log_id`, `action`) – wie am Handy getippt |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
 | `smarthome_ui/alarm/settings` | Alarm-Logik übernehmen (`panel`, `rules`, `actions`, `guests`, `nightwalk`, einmalig `guests_on`, `nightwalk_until`) |
 | `smarthome_ui/security/settings` | Fenster & Türen (`openings`) und Nacht (`night`: `start`, `end`, Sensorlisten je Art) |

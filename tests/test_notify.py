@@ -302,3 +302,58 @@ async def test_muted_message_is_not_sent(hass: HomeAssistant, entry, notify_call
     assert engine.send("Test", "Wechselrichter: Fehler 1", src="ht.energy", force=True)
     await hass.async_block_till_done()
     assert len(notify_calls) == 2
+
+
+async def test_notification_log(hass: HomeAssistant, entry, notify_calls, hass_ws_client) -> None:
+    from pytest_homeassistant_custom_component.common import async_capture_events
+
+    from custom_components.smarthome_ui.notify import mute_key
+
+    engine = entry.runtime_data.engine
+    valve = [{"action": "SHUI_TEST_VALVE", "title": "Wasser absperren", "destructive": True}]
+    engine.send("Wasser", "Seit 30 Minuten fließt Wasser.", src="ht.water", actions=valve)
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 1
+    first = engine.log.items[0]
+    assert first["status"] == "sent" and first["src"] == "ht.water"
+    assert first["actions"] == [{"action": "SHUI_TEST_VALVE", "title": "Wasser absperren"}]
+    # tapped on the phone: noted on the message that offered it
+    hass.bus.async_fire("mobile_app_notification_action", {"action": "SHUI_TEST_VALVE"})
+    await hass.async_block_till_done()
+    assert first["answer"]["via"] == "push"
+    # muted, paused: not pushed, but in the log
+    await _config(hass, entry, mute={mute_key("ht.power", "Strom weg"): "nopush"})
+    engine.send("Strom", "Strom weg", src="ht.power")
+    await _config(hass, entry, enabled=False)
+    engine.send("Info", "Pausiert", src="x")
+    await _config(hass, entry, enabled=True)
+    await hass.async_block_till_done()
+    assert [i["status"] for i in engine.log.items[:3]] == ["paused", "muted", "sent"]
+    assert len(notify_calls) == 1
+    # older than 30 days: gone with the next message
+    engine.log.items.append(
+        {**engine.log.items[-1], "id": "old", "t": first["t"] - 31 * 86_400_000}
+    )
+    engine.send("Neu", "Neu", src="x")
+    assert len(engine.log.items) == 4 and engine.log.find("old") is None
+    # from the dashboard: list and choose the action afterwards
+    events = async_capture_events(hass, "mobile_app_notification_action")
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "smarthome_ui/notify/log"})
+    res = await client.receive_json()
+    assert [i["title"] for i in res["result"]["items"]] == ["Neu", "Info", "Strom", "Wasser"]
+    await client.send_json_auto_id(
+        {"type": "smarthome_ui/notify/log_action", "log_id": first["id"], "action": "NOPE"}
+    )
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+    await client.send_json_auto_id(
+        {
+            "type": "smarthome_ui/notify/log_action",
+            "log_id": first["id"],
+            "action": "SHUI_TEST_VALVE",
+        }
+    )
+    res = await client.receive_json()
+    await hass.async_block_till_done()
+    assert res["success"] and events[-1].data["action"] == "SHUI_TEST_VALVE"
+    assert first["answer"]["via"] == "dashboard"
