@@ -138,3 +138,31 @@ async def test_windows(hass: HomeAssistant, notify_calls, hass_ws_client) -> Non
     assert "wohnzimmer" not in win.items
     await hass.async_block_till_done()
     assert hass.states.get("switch.window_bad_automatic").state == "on"
+
+
+async def test_window_cleaning_per_room(hass: HomeAssistant, notify_calls, hass_ws_client) -> None:
+    entry = await _setup(hass)
+    win = entry.runtime_data.windows
+    win.set_window(
+        None, {"name": "Fenster Arbeitszimmer 2", "area_id": win.items["arbeitszimmer"]["area_id"]}
+    )
+    tasks = {t["area"]: t for t in win.tasks()}
+    assert tasks["Arbeitszimmer"]["name"] == "Fenster putzen (2)"
+    assert tasks["Arbeitszimmer"]["last"] is None
+    # one window cleaned: the room stays due (the other one is not)
+    win.cleaned(["arbeitszimmer"])
+    assert {t["area"]: t for t in win.tasks()}["Arbeitszimmer"]["last"] is None
+    # the room's task checked off: every window of the room counts as cleaned
+    client = await hass_ws_client(hass)
+    key = tasks["Arbeitszimmer"]["key"]
+    await client.send_json_auto_id(
+        {"type": "smarthome_ui/done", "changes": {key: {"t": 1_900_000_000_000, "by": "x"}}}
+    )
+    assert (await client.receive_json())["success"]
+    assert not any(
+        win.clean_due(w)
+        for w in win.items.values()
+        if w.get("area_id") == win.items["arbeitszimmer"]["area_id"]
+    )
+    assert win.clean_due(win.items["wohnzimmer"])
+    assert any(t["key"] == key for t in entry.runtime_data.tasks())

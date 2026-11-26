@@ -52,7 +52,8 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util, slugify
 
-from .const import DOMAIN, SIGNAL_DATA, SIGNAL_WINDOWS
+from .chores import start_of_day
+from .const import DOMAIN, SIGNAL_DATA, SIGNAL_TASKS, SIGNAL_WINDOWS
 from .store import CoreStore, now_ms
 
 _LOGGER = logging.getLogger(__name__)
@@ -145,7 +146,7 @@ class Windows:
         return {**DEFAULTS, **(self.data.get("settings") or {})}
 
     def _save(self) -> None:
-        self.store.save(SIGNAL_DATA)
+        self.store.save(SIGNAL_DATA, SIGNAL_TASKS)
         async_dispatcher_send(self.hass, SIGNAL_WINDOWS)
 
     def set_settings(self, settings: dict[str, Any]) -> None:
@@ -198,13 +199,53 @@ class Windows:
                 self.items[wid]["cleaned"] = when or now_ms()
         self._save()
 
+    @staticmethod
+    def room_key(area_id: str | None) -> str:
+        """Return the task key of cleaning the windows of a room."""
+        return f"window_clean|{area_id or 'none'}"
+
+    def last_cleaned(self, item: dict[str, Any]) -> int | None:
+        """Return when the window was cleaned (on its own or with its room's task)."""
+        room = int((self.store.done.get(self.room_key(item.get("area_id"))) or {}).get("t") or 0)
+        return max(int(item.get("cleaned") or 0), room) or None
+
     def clean_due(self, item: dict[str, Any]) -> bool:
         """Return True when the window is due for cleaning (never cleaned counts as due)."""
         days = _num(self.settings()["clean_days"]) or 0
         if days <= 0:
             return False
-        last = item.get("cleaned")
+        last = self.last_cleaned(item)
         return last is None or now_ms() - last >= days * 86_400_000
+
+    def tasks(self) -> list[dict[str, Any]]:
+        """Return "Fenster putzen" per room (due with its longest-unclean window)."""
+        days = _num(self.settings()["clean_days"]) or 0
+        if days <= 0 or not self.items:
+            return []
+        rooms: dict[str | None, list[dict[str, Any]]] = {}
+        for item in self.items.values():
+            rooms.setdefault(item.get("area_id"), []).append(item)
+        areas = ar.async_get(self.hass)
+        out = []
+        for area_id, items in rooms.items():
+            lasts = [self.last_cleaned(i) for i in items]
+            last = None if None in lasts else min(lasts)
+            area = areas.async_get_area(area_id) if area_id else None
+            out.append(
+                {
+                    "key": self.room_key(area_id),
+                    "name": "Fenster putzen" + (f" ({len(items)})" if len(items) > 1 else ""),
+                    "src": "hh.tasks",
+                    "area": area.name if area else None,
+                    "icon": "mdi:window-closed-variant",
+                    "interval": days,
+                    "last": last,
+                    "due": start_of_day(
+                        (last or now_ms() - int(days * 86_400_000)) + int(days * 86_400_000)
+                    ),
+                }
+            )
+        return out
 
     # ---------------------------------------------------------------- discovery
 
@@ -538,7 +579,7 @@ class Windows:
                     "door": bool(w.get("door")),
                     "orientation": w.get("orientation"),
                     "auto": w.get("auto", True),
-                    "cleaned": w.get("cleaned"),
+                    "cleaned": self.last_cleaned(w),
                     "clean_due": self.clean_due(w),
                     "open": self.is_open(w),
                     "position": self.position(w),
@@ -597,9 +638,10 @@ class WindowEntity(Entity):
 
     async def async_added_to_hass(self) -> None:
         """Update when the windows change."""
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_WINDOWS, self.async_write_ha_state)
-        )
+        for signal in (SIGNAL_WINDOWS, SIGNAL_DATA):
+            self.async_on_remove(
+                async_dispatcher_connect(self.hass, signal, self.async_write_ha_state)
+            )
 
 
 @callback

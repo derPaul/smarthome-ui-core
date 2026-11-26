@@ -146,6 +146,7 @@ class CoreRuntime:
             *self.appliances.tasks(),
             *self.parts.tasks(),
             *self.plants.tasks(),
+            *self.windows.tasks(),
         ]
 
     @callback
@@ -518,6 +519,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         *watchers.notify_tasks(),
         *parts.tasks(),
         *plants.tasks(),
+        *entry.runtime_data.windows.tasks(),
     ]
 
     @callback

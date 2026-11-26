@@ -394,6 +394,10 @@ Automatiken (im Dashboard einstellbar):
   morgens frühestens 15 Minuten nach Sonnenaufgang auf, kein Hitzeschutz.
 - Im **Urlaubsmodus** und während die **Anwesenheitssimulation** läuft, übernehmen diese morgens und abends.
 
+**Putzen:** geputzt wird je Fenster (Taste `button.window_<id>_clean`), in den Aufgaben steht es je Raum –
+„Fenster putzen (3)“ im Arbeitszimmer, fällig mit dem am längsten nicht geputzten Fenster (Standard alle 90
+Tage). Die Raum-Aufgabe abhaken zählt für alle Fenster des Raums.
+
 ## Briefkasten
 
 Zwei Kontaktsensoren am Briefkasten – an der **Einwurfklappe** und an der **Entnahmetür**. Core erkennt sie am Namen
