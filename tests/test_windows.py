@@ -49,6 +49,8 @@ async def test_windows(hass: HomeAssistant, notify_calls, hass_ws_client) -> Non
     }
     entry = await _setup(hass)
     win = entry.runtime_data.windows
+    assert not win.settings()["heat_on"]  # nothing moves until chosen
+    win.set_settings({"heat_on": True, "morning_on": True, "evening_on": True})
     # every shutter became a window (not the garage door); contact guessed in its area
     assert sorted(win.items) == ["arbeitszimmer", "wohnzimmer"]
     office = win.items["arbeitszimmer"]

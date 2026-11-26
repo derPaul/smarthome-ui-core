@@ -9,7 +9,8 @@ by itself). A window can also be added without a cover (contact only). Per windo
   window looks to; needed for the heat protection), ``auto`` (takes part in the automations),
   ``cleaned`` (ms, last cleaned).
 
-Automations (``settings``):
+Automations (``settings``; morning, evening and heat protection start switched off, so nothing moves
+before they are chosen in the dashboard – existing automations of the covers keep working):
 
 * **morning** – open at ``morning`` on weekdays, ``morning_weekend`` on weekends,
 * **evening** – close ``evening_offset`` minutes after sunset,
@@ -71,10 +72,10 @@ ORIENTATIONS: dict[str, int] = {
 DEFAULTS: dict[str, Any] = {
     "morning": "07:00",
     "morning_weekend": "08:30",
-    "morning_on": True,
-    "evening_on": True,
+    "morning_on": False,
+    "evening_on": False,
     "evening_offset": 15,
-    "heat_on": True,
+    "heat_on": False,
     "heat_temp": 24.0,
     "heat_position": 25,
     "lockout": True,

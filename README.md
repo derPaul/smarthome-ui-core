@@ -398,7 +398,8 @@ sich im Dashboard anlegen. Je Fenster:
 | `sensor.window_<id>_cleaned` | zuletzt geputzt (Attribut `due`: fällig) |
 | `button.window_<id>_clean` | geputzt |
 
-Automatiken (im Dashboard einstellbar):
+Automatiken (im Dashboard einstellbar; morgens, abends und Hitzeschutz sind anfangs aus, damit nichts fährt,
+bevor du es willst – bestehende Automationen für die Rollläden laufen weiter):
 
 - **Morgens** auf (werktags 7:00, am Wochenende 8:30), **abends** 15 Minuten nach Sonnenuntergang zu.
 - **Hitzeschutz** – scheint die Sonne auf die Fassade (Sonne höchstens 70° neben der Blickrichtung, mindestens
