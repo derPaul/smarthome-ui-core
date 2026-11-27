@@ -494,14 +494,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoreConfigEntry) -> bool
         NewDevices(hass, store, presence_sim),
     )
     rt = entry.runtime_data
-    # morning and evening: left to the holiday mode and the presence simulation while they run
+    # morning and evening: left to the presence simulation (and so the holiday mode) only for the
+    # covers it still moves itself; all others keep their rhythm, also while away
     rt.windows.others_busy = lambda cover: (
-        rt.vacation.on
-        or (
-            presence_sim.enabled
-            and presence_sim.condition()
-            and cover in presence_sim.settings()["covers"]
-        )
+        presence_sim.enabled
+        and presence_sim.condition()
+        and cover in presence_sim.settings()["covers"]
     )
     entry.runtime_data.guard.history = entry.runtime_data.history
     entry.runtime_data.system.catalog = entry.runtime_data.catalog
@@ -1832,6 +1830,10 @@ def ws_windows_clean(
         vol.Optional("winter"): vol.In(["auto", "on", "off"]),
         vol.Optional("outdoor"): vol.Any(None, str),
         vol.Optional("clean_days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=730)),
+        vol.Optional("trigger"): vol.In(["time", "dark"]),
+        vol.Optional("dark_sensor"): vol.Any(None, str),
+        vol.Optional("dark_delay"): vol.All(vol.Coerce(int), vol.Range(min=0, max=120)),
+        vol.Optional("stagger"): vol.All(vol.Coerce(int), vol.Range(min=0, max=600)),
     }
 )
 @callback

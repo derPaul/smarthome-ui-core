@@ -377,8 +377,9 @@ Dashboard als **neues Gerät** – 14 Tage lang oder bis sie eingerichtet oder �
   Neustarts, Betriebszeit, Thread-Rolle …),
 - **Geräteklasse**: ein Rollladen ohne Art wird „Rollladen“ (bei „Jalousie“ „Jalousie“), ein Kontakt ohne Art
   „Fenster“ (oder „Tür“),
-- **Automationen**: Rollläden und Lichter in die Anwesenheitssimulation (die auch im Urlaubsmodus läuft);
-  Rollläden werden außerdem von selbst zu Fenstern.
+- **Automationen**: Lichter in die Anwesenheitssimulation (die auch im Urlaubsmodus läuft); Rollläden werden
+  von selbst zu Fenstern mit eigenem Morgens/Abends. Geräte von Core selbst (Fenster, Displays) zählen ab
+  0.56 nicht als neu.
 
 ## Fenster (ab 0.55)
 
@@ -408,7 +409,16 @@ bevor du es willst – bestehende Automationen für die Rollläden laufen weiter
 - **Aussperrschutz** – eine offene Tür wird nie zugefahren; das abendliche Schließen folgt, sobald sie zu ist.
 - **Winter-Modus** (automatisch unter 8 °C draußen, oder fest an/aus) – genau bei Sonnenuntergang zu,
   morgens frühestens 15 Minuten nach Sonnenaufgang auf, kein Hitzeschutz.
-- Im **Urlaubsmodus** und während die **Anwesenheitssimulation** läuft, übernehmen diese morgens und abends.
+- **Nach Helligkeit** (ab 0.56; statt Uhrzeit/Sonne): ein „ist dunkel“-Sensor, z. B. der einer Kamera
+  (`binary_sensor.…_ist_dunkel`, wird von selbst gefunden oder im Dashboard gewählt), entscheidet. Ist es
+  10 Minuten dunkel, gehen die Rollläden zu; ist es 10 Minuten hell, gehen sie auf – aber nicht vor der
+  Morgen-Uhrzeit (wird es früher hell, um diese Uhrzeit). Flackern und ein Neustart (nicht verfügbar)
+  zählen nicht; je Abend und Morgen nur einmal.
+- **Mit Versatz** (ab 0.56): morgens und abends fährt ein Rollladen nach dem anderen, Raum für Raum, im
+  Abstand von etwa 45 Sekunden (zufällig die Hälfte mehr oder weniger) – als ginge jemand durchs Haus.
+- Rollläden gehören nicht mehr in die **Anwesenheitssimulation** (der Assistent für neue Geräte schlägt sie
+  dort nicht mehr vor); auch im Urlaub fahren sie im gewohnten Rhythmus. Nur Rollläden, die dort noch
+  eingetragen sind, überlässt Core ihr, solange sie läuft.
 
 **Putzen:** geputzt wird je Fenster (Taste `button.window_<id>_clean`), in den Aufgaben steht es je Raum –
 „Fenster putzen (3)“ im Arbeitszimmer, fällig mit dem am längsten nicht geputzten Fenster (Standard alle 90
@@ -875,7 +885,7 @@ actions:
 | `smarthome_ui/windows/set` | Fenster anlegen (ohne `window_id`) oder ändern (`name`, `area_id`, `cover`, `contact`, `lock`, `door`, `orientation`, `auto`) |
 | `smarthome_ui/windows/remove` | Fenster entfernen (`window_id`) |
 | `smarthome_ui/windows/clean` | Fenster geputzt (`window_ids`) |
-| `smarthome_ui/windows/settings` | Automatiken (`morning`, `morning_weekend`, `morning_on`, `evening_on`, `evening_offset`, `heat_on`, `heat_temp`, `heat_position`, `lockout`, `winter`, `outdoor`, `clean_days`) |
+| `smarthome_ui/windows/settings` | Automatiken (`morning`, `morning_weekend`, `morning_on`, `evening_on`, `evening_offset`, `heat_on`, `heat_temp`, `heat_position`, `lockout`, `winter`, `outdoor`, `clean_days`, ab 0.56 `trigger` time/dark, `dark_sensor`, `dark_delay` Minuten, `stagger` Sekunden) |
 | `smarthome_ui/notify/log_action` | Aktion einer Mitteilung nachträglich auslösen (`log_id`, `action`) – wie am Handy getippt |
 | `smarthome_ui/mower/settings` | Mähplan eines Mähers (`plan` je Monat, `interval`, `freq` je Fläche) |
 | `smarthome_ui/alarm/settings` | Alarm-Logik übernehmen (`panel`, `rules`, `actions`, `guests`, `nightwalk`, einmalig `guests_on`, `nightwalk_until`) |

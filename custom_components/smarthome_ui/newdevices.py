@@ -10,8 +10,8 @@ Devices that appear after Core is set up (an Eve Shutter Switch, a Zigbee sensor
   reboots, uptime, Thread role …),
 * **device class** – a cover without one becomes a shutter (blind for "Jalousie"), a contact
   without one a window (door when the name says so),
-* **automations** – covers and lights can join the presence simulation (and so the holiday
-  mode); covers become windows by themselves.
+* **automations** – lights can join the presence simulation (and so the holiday mode); covers
+  become windows by themselves (with their own morning and evening).
 
 Applying writes to the registries and the presence simulation's settings.
 """
@@ -30,7 +30,7 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import SIGNAL_DATA, SIGNAL_NEWDEV
+from .const import DOMAIN, SIGNAL_DATA, SIGNAL_NEWDEV
 from .entity import all_devices
 from .store import CoreStore, now_ms
 
@@ -125,12 +125,16 @@ class NewDevices:
         if device_id not in known:
             known.append(device_id)
         device = dr.async_get(self.hass).async_get(device_id)
-        # service devices (integrations, our own) are not something you paired
-        if device is None or device.entry_type is not None:
+        # service devices (integrations, our own windows and displays) are not something you paired
+        if device is None or device.entry_type is not None or self._ours(device):
             self._save()
             return
         self.data.setdefault("new", {})[device_id] = now_ms()
         self._save()
+
+    def _ours(self, device: dr.DeviceEntry) -> bool:
+        """Return True for a device of this integration (a window, a display …)."""
+        return any(domain == DOMAIN for domain, _id in device.identifiers)
 
     def pending(self) -> list[str]:
         """Return the new devices not done yet (of the last 14 days)."""
@@ -140,7 +144,10 @@ class NewDevices:
         return [
             did
             for did, t in sorted((self.data.get("new") or {}).items(), key=lambda x: -x[1])
-            if t >= cutoff and did not in done and devices.async_get(did) is not None
+            if t >= cutoff
+            and did not in done
+            and (device := devices.async_get(did)) is not None
+            and not self._ours(device)
         ]
 
     # ---------------------------------------------------------------- suggestions
@@ -205,7 +212,8 @@ class NewDevices:
         candidates = [
             e.entity_id
             for e in entries
-            if e.domain in ("cover", "light") and e.entity_category is None and not e.disabled_by
+            # covers are windows with their own automations, not part of the simulation
+            if e.domain == "light" and e.entity_category is None and not e.disabled_by
         ]
         return {
             "device_id": device_id,

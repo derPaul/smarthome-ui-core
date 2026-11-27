@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_mock_service,
@@ -168,3 +170,73 @@ async def test_window_cleaning_per_room(hass: HomeAssistant, notify_calls, hass_
     )
     assert win.clean_due(win.items["wohnzimmer"])
     assert any(t["key"] == key for t in entry.runtime_data.tasks())
+
+
+async def test_windows_by_brightness(hass: HomeAssistant, notify_calls, freezer) -> None:
+    """Closed when the camera says dark for a while, opened when light – not before the morning."""
+    from datetime import timedelta  # noqa: PLC0415
+
+    from pytest_homeassistant_custom_component.common import (  # noqa: PLC0415
+        async_fire_time_changed,
+    )
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    calls = {s: async_mock_service(hass, "cover", s) for s in ("open_cover", "close_cover")}
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "off")
+    freezer.move_to(dt_util.as_utc(dt_util.now().replace(hour=16, minute=30)))
+    entry = await _setup(hass)
+    win = entry.runtime_data.windows
+    assert win.dark_sensor() == "binary_sensor.g6_entry_ist_dunkel"  # found by itself
+    win.set_settings(
+        {
+            "trigger": "dark",
+            "morning_on": True,
+            "evening_on": True,
+            "dark_delay": 10,
+            "stagger": 0,
+            "morning": "07:00",
+            "morning_weekend": "07:00",
+        }
+    )
+
+    async def later(minutes: float) -> None:
+        freezer.tick(timedelta(minutes=minutes))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    # flickers for 3 minutes: nothing
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "on")
+    await later(3)
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "off")
+    await later(11)
+    assert calls["close_cover"] == []
+    # dark for 10 minutes: every window closes, one after another in the order of the rooms
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "on")
+    await later(11)
+    assert [c.data["entity_id"] for c in calls["close_cover"]] == [
+        "cover.arbeitszimmer_rollladen",
+        "cover.terrassentur",
+    ]
+    # a restart (unavailable and back) is no new dusk
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "unavailable")
+    await later(1)
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "on")
+    await later(11)
+    assert len(calls["close_cover"]) == 2
+    # light at 06:20: waits for the morning time
+    freezer.move_to(
+        dt_util.as_utc((dt_util.now() + timedelta(days=1)).replace(hour=6, minute=20, second=0))
+    )
+    hass.states.async_set("binary_sensor.g6_entry_ist_dunkel", "off")
+    await later(11)
+    assert calls["open_cover"] == []
+    await later(30)  # 07:01
+    assert len(calls["open_cover"]) == 2
+    assert win.info()["last_run"]["why"] == "morning"
+    # staggered: one by one with a pause in between (give or take a half)
+    win.set_settings({"stagger": 30})
+    with patch("custom_components.smarthome_ui.windows.asyncio.sleep", AsyncMock()) as sleep:
+        await win._sequence(None, "evening", stagger=True)
+    assert len(calls["close_cover"]) == 4
+    assert sleep.await_count == 1 and 15 <= sleep.await_args.args[0] <= 45

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.smarthome_ui.const import DOMAIN
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
@@ -48,7 +49,7 @@ async def test_new_device(hass: HomeAssistant, entry, hass_ws_client) -> None:
     assert sug["suggest_name"] == "Arbeitszimmer Rollladen"
     assert sug["diagnostics"] == [{"entity_id": rssi.entity_id, "name": "RSSI"}]
     assert sug["device_class"] == {cover.entity_id: "shutter"}
-    assert sug["sim"] == [cover.entity_id]
+    assert sug["sim"] == []  # covers are windows, not part of the simulation
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
@@ -58,7 +59,7 @@ async def test_new_device(hass: HomeAssistant, entry, hass_ws_client) -> None:
             "name": "Arbeitszimmer Rollladen",
             "enable": [rssi.entity_id],
             "device_class": {cover.entity_id: "shutter"},
-            "sim": [cover.entity_id],
+            "sim": [cover.entity_id],  # ignored
         }
     )
     res = await client.receive_json()
@@ -67,7 +68,13 @@ async def test_new_device(hass: HomeAssistant, entry, hass_ws_client) -> None:
     assert dev.area_id == office.id and dev.name_by_user == "Arbeitszimmer Rollladen"
     assert ents.async_get(rssi.entity_id).disabled_by is None
     assert ents.async_get(cover.entity_id).device_class == "shutter"
-    assert cover.entity_id in entry.runtime_data.presence_sim.settings()["covers"]
+    assert entry.runtime_data.presence_sim.settings()["covers"] == []
+    # devices of Core itself (a window, a display) are nothing someone paired
+    devs.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "window_x")}, name="Fenster X"
+    )
+    await hass.async_block_till_done()
+    assert newdev.info()["items"] == []
     # another one, left as it is
     other = devs.async_get_or_create(
         config_entry_id=matter.entry_id, identifiers={("matter", "x2")}, name="Steckdose"

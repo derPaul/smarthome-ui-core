@@ -20,16 +20,25 @@ before they are chosen in the dashboard – existing automations of the covers k
 * **lockout protection** – an open door is never closed; the evening close follows once it is shut,
 * **winter mode** (``winter``: auto below 8 °C outside, on, off) – close right at sunset, open not
   before 15 minutes after sunrise, no heat protection.
+* **brightness** (``trigger`` "dark" instead of "time"): a "dark" sensor (e.g. a camera's
+  ``binary_sensor.…_ist_dunkel``) decides instead of the clock and the sun – closed once it has been
+  dark for ``dark_delay`` minutes, opened once it has been light as long, but not before the morning
+  time. Changes from or to unavailable (a restart) do not count.
 
-Moved by hand: the heat protection leaves that window alone for 3 hours. While the holiday mode or
-the presence simulation runs, morning and evening are left to them.
+Morning and evening move the covers one after another, ``stagger`` seconds apart (give or take a
+half, in the order of the rooms) – as if someone walked through the house.
+
+Moved by hand: the heat protection leaves that window alone for 3 hours. Covers still chosen in the
+presence simulation are left to it while it runs; all others keep their rhythm, also while away.
 """
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from datetime import datetime, timedelta
 import logging
+import random
 import re
 from typing import Any
 
@@ -47,6 +56,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_point_in_utc_time,
+    async_track_state_change_event,
     async_track_sunset,
     async_track_time_change,
     async_track_time_interval,
@@ -82,6 +92,10 @@ DEFAULTS: dict[str, Any] = {
     "winter": "auto",
     "outdoor": None,
     "clean_days": 90,
+    "trigger": "time",
+    "dark_sensor": None,
+    "dark_delay": 10,
+    "stagger": 45,
 }
 SUN_SPREAD = 70
 SUN_MIN_ELEVATION = 12
@@ -91,6 +105,8 @@ HEAT_INTERVAL = timedelta(minutes=10)
 COVER_CLASSES = ("shutter", "blind", "shade", "curtain", "window", None)
 _NOT_WINDOW = re.compile(r"garage|\btor\b|_tor\b|gate|markise|awning|sonnensegel")
 _CONTACT_CLASSES = ("window", "door", "opening", "garage_door")
+_DARK = re.compile(r"ist_dunkel|is_dark|_dark$|dunkel")
+_GONE = ("unknown", "unavailable")
 
 
 def _hm(value: Any, default: str) -> tuple[int, int]:
@@ -127,6 +143,8 @@ class Windows:
         self._unsub: list[CALLBACK_TYPE] = []
         self._sched: list[CALLBACK_TYPE] = []
         self._ctx: dict[str, float] = {}
+        self._dark: list[CALLBACK_TYPE] = []
+        self._seq: asyncio.Task[None] | None = None
         # set by the integration: is morning/evening someone else's job right now?
         self.others_busy: Callable[[str], bool] = lambda cover: False
 
@@ -156,6 +174,8 @@ class Windows:
         own.update({k: v for k, v in settings.items() if k in DEFAULTS})
         if own.get("winter") not in ("auto", "on", "off"):
             own.pop("winter", None)
+        if own.get("trigger") not in ("time", "dark"):
+            own.pop("trigger", None)
         self.data["settings"] = own
         self._schedule()
         self._save()
@@ -395,7 +415,7 @@ class Windows:
         item.pop("pending", None)
         return True
 
-    async def async_morning(self) -> None:
+    async def async_morning(self) -> None:  # noqa: RUF029
         """Open the covers in the morning."""
         if self.winter():
             sunrise = self._next("sunrise")
@@ -404,28 +424,56 @@ class Windows:
                 self._sched.append(
                     async_track_point_in_utc_time(
                         self.hass,
-                        self._run(self.async_morning_now),
+                        self._run(lambda: self.async_morning_now(stagger=True)),
                         sunrise + timedelta(minutes=15),
                     )
                 )
                 return
-        await self.async_morning_now()
+        self._start(100, "morning")
 
-    async def async_morning_now(self) -> None:
+    def _walk(self) -> list[dict[str, Any]]:
+        """Return the active windows in the order of a walk through the rooms."""
+        areas = ar.async_get(self.hass)
+
+        def room(w: dict[str, Any]) -> str:
+            area = areas.async_get_area(w["area_id"]) if w.get("area_id") else None
+            return area.name if area else "~"
+
+        return sorted(
+            (w for _wid, w in self._active()),
+            key=lambda w: (room(w), str(w.get("name") or "")),
+        )
+
+    async def _sequence(self, position: float | None, why: str, stagger: bool) -> None:
+        """Move every window (not those someone else runs), one after another when staggering."""
+        gap = float(_num(self.settings()["stagger"]) or 0) if stagger else 0.0
+        first = True
+        for w in self._walk():
+            if self.others_busy(w["cover"]):
+                continue
+            if not first and gap > 0:
+                await asyncio.sleep(gap * random.uniform(0.5, 1.5))
+            first = False
+            w.pop("heat", None)
+            await self._move(w, position, why)
+        self.data["last_run"] = {"why": why, "t": now_ms()}
+        self._save()
+
+    def _start(self, position: float | None, why: str) -> None:
+        """Start a staggered run (a newer one replaces one still walking)."""
+        if self._seq is not None and not self._seq.done():
+            self._seq.cancel()
+        self._seq = self.hass.async_create_background_task(
+            self._sequence(position, why, stagger=True), f"{DOMAIN} windows {why}"
+        )
+
+    async def async_morning_now(self, stagger: bool = False) -> None:
         """Open every window's cover (not those someone else runs right now)."""
-        for _wid, w in self._active():
-            if not self.others_busy(w["cover"]):
-                w.pop("heat", None)
-                await self._move(w, 100, "morning")
-        self._save()
+        await self._sequence(100, "morning", stagger)
 
-    async def async_evening(self) -> None:
+    async def async_evening(self, stagger: bool = False) -> None:
         """Close the covers in the evening (open doors follow once shut)."""
-        for _wid, w in self._active():
-            if not self.others_busy(w["cover"]):
-                w.pop("heat", None)
-                await self._move(w, None, "evening")
-        self._save()
+        await self._sequence(None, "evening", stagger)
 
     async def async_heat(self, _now: Any = None) -> None:
         """Heat protection: down while the sun is on the facade, back afterwards."""
@@ -477,12 +525,100 @@ class Windows:
         except ValueError:
             return None
 
+    # ---------------------------------------------------------------- brightness
+
+    def dark_sensor(self) -> str | None:
+        """Return the chosen "dark" sensor (else the first camera's one that exists)."""
+        if own := self.settings()["dark_sensor"]:
+            return own
+        found = self.dark_candidates()
+        return found[0] if found else None
+
+    def dark_candidates(self) -> list[str]:
+        """Return the binary sensors that say whether it is dark."""
+        return sorted(
+            s.entity_id
+            for s in self.hass.states.async_all("binary_sensor")
+            if _DARK.search(s.entity_id)
+        )
+
+    def is_dark(self) -> bool | None:
+        """Return True while the sensor says dark (None without a usable sensor)."""
+        sensor = self.dark_sensor()
+        state = self.hass.states.get(sensor) if sensor else None
+        if state is None or state.state in _GONE:
+            return None
+        return state.state == "on"
+
+    def morning_at(self, now: datetime) -> datetime:
+        """Return today's morning time (weekday or weekend) in local time."""
+        local = dt_util.as_local(now)
+        s = self.settings()
+        value = s["morning_weekend"] if local.weekday() >= 5 else s["morning"]
+        hour, minute = _hm(value, "07:00")
+        return local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    @callback
+    def _dark_check(self, *_args: Any) -> None:
+        """Close when it has been dark long enough, open when light (not before the morning)."""
+        s = self.settings()
+        if s["trigger"] != "dark" or (dark := self.is_dark()) is None:
+            return
+        sensor = self.hass.states.get(self.dark_sensor() or "")
+        delay = timedelta(minutes=float(_num(s["dark_delay"]) or 0))
+        now = dt_util.utcnow()
+        if sensor is None or now - sensor.last_changed < delay - timedelta(seconds=2):
+            return
+        # once per dusk and once per morning (a step switched off still counts as done)
+        last = self.data.get("dark_last")
+        if dark and last != "close":
+            self.data["dark_last"] = "close"
+            if s["evening_on"]:
+                self._start(None, "evening")
+        elif not dark and last != "open":
+            if now < self.morning_at(now):
+                return  # the morning time follows with its own check
+            self.data["dark_last"] = "open"
+            if s["morning_on"]:
+                self._start(100, "morning")
+
+    @callback
+    def _dark_changed(self, event: Event) -> None:
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        if old is None or new is None or old.state in _GONE or new.state in _GONE:
+            return  # a restart or a short outage is no dusk
+        if old.state == new.state:
+            return
+        delay = float(_num(self.settings()["dark_delay"]) or 0) * 60
+        for unsub in self._dark:
+            unsub()
+        self._dark.clear()
+        self._dark.append(async_call_later(self.hass, delay, self._dark_check))
+
     @callback
     def _schedule(self) -> None:
         for unsub in self._sched:
             unsub()
         self._sched.clear()
         s = self.settings()
+        if s["trigger"] == "dark":
+            if self.data.get("dark_last") is None and (dark := self.is_dark()) is not None:
+                # what it is right now counts as done: only the next dusk or morning moves
+                self.data["dark_last"] = "close" if dark else "open"
+            if sensor := self.dark_sensor():
+                self._sched.append(
+                    async_track_state_change_event(self.hass, [sensor], self._dark_changed)
+                )
+            # light before the morning time: open at the morning time
+            if s["morning_on"]:
+                for value in (s["morning"], s["morning_weekend"]):
+                    hour, minute = _hm(value, "07:00")
+                    self._sched.append(
+                        async_track_time_change(
+                            self.hass, self._dark_check, hour=hour, minute=minute, second=5
+                        )
+                    )
+            return
         if s["morning_on"]:
             for value, days in ((s["morning"], "weekday"), (s["morning_weekend"], "weekend")):
                 hour, minute = _hm(value, "07:00")
@@ -503,13 +639,18 @@ class Windows:
                 # winter: right at sunset, else some minutes later
                 offset = 0 if self.winter() else int(_num(self.settings()["evening_offset"]) or 0)
                 if offset <= 0:
-                    self.hass.async_create_task(self.async_evening())
+                    self._start(None, "evening")
                 else:
                     self._sched.append(
-                        async_call_later(self.hass, offset * 60, self._run(self.async_evening))
+                        async_call_later(
+                            self.hass, offset * 60, self._run(lambda: self._evening_walk())
+                        )
                     )
 
             self._sched.append(async_track_sunset(self.hass, sunset))
+
+    async def _evening_walk(self) -> None:  # noqa: RUF029
+        self._start(None, "evening")
 
     @callback
     def _changed(self, event: Event) -> None:
@@ -561,10 +702,13 @@ class Windows:
     @callback
     def async_stop(self) -> None:
         """Stop."""
-        for unsub in [*self._unsub, *self._sched]:
+        for unsub in [*self._unsub, *self._sched, *self._dark]:
             unsub()
         self._unsub.clear()
         self._sched.clear()
+        self._dark.clear()
+        if self._seq is not None and not self._seq.done():
+            self._seq.cancel()
 
     # ---------------------------------------------------------------- dashboard
 
@@ -595,6 +739,10 @@ class Windows:
             "settings": self.settings(),
             "winter": self.winter(),
             "outdoor": self.outdoor(),
+            "dark": self.is_dark(),
+            "dark_sensor": self.dark_sensor(),
+            "dark_candidates": self.dark_candidates(),
+            "last_run": self.data.get("last_run"),
         }
 
 
