@@ -103,3 +103,42 @@ async def test_zigbee_self_repair(hass: HomeAssistant, entry, notify_calls) -> N
     guard._heal_check("start", 0)
     await hass.async_block_till_done()
     assert len(publish) == 1 and guard.events[-1]["kind"] == "heal_off"
+
+
+async def test_db_report_only_when_calm(hass: HomeAssistant, entry, monkeypatch) -> None:
+    """The automatic database report: weekly, not right after a start, not while busy."""
+    from custom_components.smarthome_ui import guard as guard_mod
+
+    guard = entry.runtime_data.guard
+    guard.read_proc = lambda: {
+        "total_mb": 3786,
+        "avail_mb": 1400,
+        "avail_pct": 37.0,
+        "load_pct": 50,
+    }
+    hour = guard_mod.HOUR_MS
+    # just started: not now
+    assert not guard.db_due()
+    guard.started -= 3 * hour
+    assert guard.db_due()
+    # a timer ran 3 s late a moment ago: wait
+    guard.lag(3)
+    assert not guard.db_due()
+    guard._busy_at -= 20 * 60_000
+    assert guard.db_due()
+    # ran 2 days ago: not again before a week is over
+    guard.data["db"] = {"at": guard_mod.now_ms() - 2 * guard_mod.DAY_MS}
+    assert not guard.db_due()
+    guard.data["db"] = {"at": guard_mod.now_ms() - 7 * guard_mod.DAY_MS}
+    assert guard.db_due()
+    # little memory left: not now
+    guard.read_proc = lambda: {"total_mb": 3786, "avail_mb": 300, "avail_pct": 8.0, "load_pct": 50}
+    assert not guard.db_due()
+    called = []
+    monkeypatch.setattr(guard, "async_db_scan", lambda: called.append(1) or _noop())
+    guard._nightly(None)
+    assert called == []
+
+
+async def _noop() -> None:
+    return None

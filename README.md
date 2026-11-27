@@ -591,7 +591,8 @@ Core behält Home Assistant selbst im Blick (Quelle „Home Assistant“ `sys.he
   nach einem Start (und 3 Minuten nachdem die Bridge wieder verbunden ist) zählt Core die nicht erreichbaren
   Zigbee-Geräte; sind es mehr als vorher, startet Core Zigbee2MQTT neu (`zigbee2mqtt/bridge/request/restart`,
   höchstens alle 6 Stunden) und meldet es. Abschaltbar im Dashboard.
-- **Datenbank:** Jede Nacht um 3:37 (und auf Knopfdruck) zählt Core, wie viele Einträge jede Entität in den
+- **Datenbank:** Einmal pro Woche nachts um 3:37 (und auf Knopfdruck) zählt Core – automatisch nur, wenn Home
+  Assistant seit mindestens 2 Stunden läuft, gerade ruhig ist und genug Arbeitsspeicher frei hat (ab 0.55.1) –, wie viele Einträge jede Entität in den
   letzten 24 Stunden geschrieben hat, dazu die Größe der Datenbank (MariaDB/MySQL und SQLite). Im Dashboard lässt
   sich der Verlauf einer Entität auf 1 Tag kürzen (Core räumt ihn jede Nacht mit `recorder.purge_entities` auf,
   siehe „Verlauf je Gerät“) oder eine Diagnose-Entität abschalten.

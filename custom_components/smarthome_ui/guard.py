@@ -64,6 +64,12 @@ KEEP_HOURS_MS = 14 * DAY_MS
 DB_RUN_AT = (3, 37)
 DB_WINDOW_H = 24
 DB_TOP = 40
+# the automatic report is heavy on a small machine (counting a day of states): once a week, and
+# only when Home Assistant has been running for a while and is calm right now
+DB_EVERY_MS = 7 * DAY_MS
+DB_MIN_UPTIME_MS = 2 * HOUR_MS
+DB_CALM_LAG_S = 2.0
+DB_CALM_MS = 15 * 60_000
 OPTIONS = {"heal": True, "z2m_base": "zigbee2mqtt"}
 # diagnostic values that change often and are rarely looked at again
 _CHATTY = re.compile(
@@ -120,6 +126,7 @@ class Guard:
         self._lag_handle: CALLBACK_TYPE | None = None
         self.proc: dict[str, float] | None = None
         self.started = now_ms()
+        self._busy_at = 0
         self.read_proc: Callable[[], dict[str, float] | None] = _read_proc
 
     # ---------------------------------------------------------------- data
@@ -282,6 +289,8 @@ class Guard:
     def lag(self, seconds: float) -> None:
         """Take one measurement: how many seconds a timer ran late."""
         self._hour(lag=seconds)
+        if seconds >= DB_CALM_LAG_S:
+            self._busy_at = now_ms()
         if seconds >= LAG_HANG_S:
             self._event("hang", s=round(seconds))
             if not self._recent("hang_told", WARN_GAP_MS):
@@ -424,9 +433,23 @@ class Guard:
 
     # ---------------------------------------------------------------- database
 
+    def db_due(self) -> bool:
+        """Whether the automatic database report may run now (weekly, calm, not after a start)."""
+        now = now_ms()
+        last = int((self.data.get("db") or {}).get("at") or 0)
+        if now - last < DB_EVERY_MS - HOUR_MS:
+            return False
+        if now - self.started < DB_MIN_UPTIME_MS:
+            return False
+        if now - self._busy_at < DB_CALM_MS:
+            return False
+        proc = self.read_proc() or {}
+        return not (proc.get("avail_pct") is not None and proc["avail_pct"] < 15)
+
     @callback
     def _nightly(self, _now: Any) -> None:
-        self.hass.async_create_task(self.async_db_scan())
+        if self.db_due():
+            self.hass.async_create_task(self.async_db_scan())
 
     async def async_db_scan(self) -> dict[str, Any] | None:
         """Count the states each entity wrote in the last 24 hours; keep and return the report."""
@@ -529,17 +552,30 @@ def _db_query(hass: HomeAssistant, since: float) -> dict[str, Any]:
         out["total"] = session.execute(
             text("SELECT COUNT(*) FROM states WHERE last_updated_ts > :since"), {"since": since}
         ).scalar()
+        # group by the id only (no join over a day of rows), then name the few that remain
+        counts = session.execute(
+            text(
+                "SELECT metadata_id, COUNT(*) AS n FROM states "
+                "WHERE last_updated_ts > :since "
+                "GROUP BY metadata_id ORDER BY n DESC LIMIT :top"
+            ),
+            {"since": since, "top": DB_TOP},
+        ).all()
+        ids = [int(row[0]) for row in counts if row[0] is not None]
+        names: dict[int, str] = {}
+        if ids:
+            names = {
+                int(row[0]): str(row[1])
+                for row in session.execute(
+                    text(
+                        "SELECT metadata_id, entity_id FROM states_meta WHERE metadata_id IN ("
+                        + ",".join(str(i) for i in ids)
+                        + ")"
+                    )
+                ).all()
+            }
         out["top"] = [
-            (row[0], row[1])
-            for row in session.execute(
-                text(
-                    "SELECT m.entity_id, COUNT(*) AS n FROM states s "
-                    "JOIN states_meta m ON s.metadata_id = m.metadata_id "
-                    "WHERE s.last_updated_ts > :since "
-                    "GROUP BY m.entity_id ORDER BY n DESC LIMIT :top"
-                ),
-                {"since": since, "top": DB_TOP},
-            ).all()
+            (names[int(r[0])], r[1]) for r in counts if r[0] is not None and int(r[0]) in names
         ]
         out["entities"] = session.execute(text("SELECT COUNT(*) FROM states_meta")).scalar()
         if dialect in ("mysql", "mariadb"):
