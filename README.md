@@ -416,6 +416,9 @@ bevor du es willst – bestehende Automationen für die Rollläden laufen weiter
   zählen nicht; je Abend und Morgen nur einmal.
 - **Mit Versatz** (ab 0.56): morgens und abends fährt ein Rollladen nach dem anderen, Raum für Raum, im
   Abstand von etwa 45 Sekunden (zufällig die Hälfte mehr oder weniger) – als ginge jemand durchs Haus.
+- **Umbenannt** (ab 0.56): bekommt ein Rollladen eine neue Entitäts-ID (`cover.eve_shutter_switch_…` →
+  `cover.gaestewc_rollladen`), bleibt er dasselbe Fenster mit allen Einstellungen. Fenster, deren Rollladen es
+  nicht mehr gibt, verschwinden samt Gerät; ein im Dashboard entferntes Fenster nimmt sein Gerät mit.
 - Rollläden gehören nicht mehr in die **Anwesenheitssimulation** (der Assistent für neue Geräte schlägt sie
   dort nicht mehr vor); auch im Urlaub fahren sie im gewohnten Rhythmus. Nur Rollläden, die dort noch
   eingetragen sind, überlässt Core ihr, solange sie läuft.

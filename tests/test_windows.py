@@ -240,3 +240,38 @@ async def test_windows_by_brightness(hass: HomeAssistant, notify_calls, freezer)
         await win._sequence(None, "evening", stagger=True)
     assert len(calls["close_cover"]) == 4
     assert sleep.await_count == 1 and 15 <= sleep.await_args.args[0] <= 45
+
+
+async def test_window_follows_rename(hass: HomeAssistant, notify_calls) -> None:
+    """A renamed cover stays the same window; a deleted one takes its window device along."""
+    from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+
+    entry = await _setup(hass)
+    win = entry.runtime_data.windows
+    ents = er.async_get(hass)
+    win.set_window("arbeitszimmer", {"orientation": "e"})
+    ents.async_update_entity("cover.arbeitszimmer_rollladen", new_entity_id="cover.buero_rollladen")
+    await hass.async_block_till_done()
+    assert win.items["arbeitszimmer"]["cover"] == "cover.buero_rollladen"
+    assert win.items["arbeitszimmer"]["orientation"] == "e"
+    # renamed while Core was not listening: the stale window goes, the cover comes back as one
+    win.items["arbeitszimmer"]["cover"] = "cover.eve_shutter_switch_x"
+    hass.states.async_set(
+        "cover.buero_rollladen", "open", {"device_class": "shutter", "friendly_name": "Büro"}
+    )
+    win._discover_soon()
+    await hass.async_block_till_done()
+    assert [w["cover"] for w in win.items.values()].count("cover.buero_rollladen") == 1
+    assert "cover.eve_shutter_switch_x" not in [w["cover"] for w in win.items.values()]
+    # removed in the dashboard: its device goes as well
+    devices = dr.async_get(hass)
+    wid = next(k for k, w in win.items.items() if w["cover"] == "cover.terrassentur")
+    assert any(
+        i.endswith(f"_window_{wid}") for d in devices.devices.values() for _x, i in d.identifiers
+    )
+    win.remove(wid)
+    await hass.async_block_till_done()
+    assert not any(
+        i.endswith(f"_window_{wid}") for d in devices.devices.values() for _x, i in d.identifiers
+    )
+    assert hass.states.get(f"switch.window_{wid}_automatic") is None

@@ -61,6 +61,7 @@ from homeassistant.helpers.event import (
     async_track_time_change,
     async_track_time_interval,
 )
+from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util, slugify
 
 from .chores import start_of_day
@@ -210,8 +211,34 @@ class Windows:
             ignored = self.data.setdefault("ignored", [])
             if item["cover"] not in ignored:
                 ignored.append(item["cover"])
+        self._drop_device(wid)
         self._save()
         return True
+
+    @callback
+    def _drop_device(self, wid: str) -> None:
+        """Remove the window's own device (and so its entities)."""
+        devices = dr.async_get(self.hass)
+        for device in list(devices.devices.values()):
+            if any(d == DOMAIN and i.endswith(f"_window_{wid}") for d, i in device.identifiers):
+                devices.async_remove_device(device.id)
+
+    @callback
+    def _prune(self) -> bool:
+        """Drop windows whose cover is gone from Home Assistant (deleted, or renamed while off)."""
+        ents = er.async_get(self.hass)
+        gone = [
+            wid
+            for wid, w in self.items.items()
+            if w.get("cover")
+            and ents.async_get(w["cover"]) is None
+            and self.hass.states.get(w["cover"]) is None
+        ]
+        for wid in gone:
+            _LOGGER.info("Window %s: cover %s is gone", wid, self.items[wid]["cover"])
+            self.items.pop(wid)
+            self._drop_device(wid)
+        return bool(gone)
 
     def cleaned(self, wids: list[str], when: int | None = None) -> None:
         """Mark windows as cleaned (now)."""
@@ -677,21 +704,37 @@ class Windows:
 
     @callback
     def _registry(self, event: Event) -> None:
-        if event.data.get("action") == "create" and str(event.data.get("entity_id", "")).startswith(
-            "cover."
-        ):
+        action = event.data.get("action")
+        entity_id = str(event.data.get("entity_id", ""))
+        if action == "create" and entity_id.startswith("cover."):
             # the state comes a moment later
+            self.hass.loop.call_later(5, self._discover_soon)
+        elif action == "update" and (old := event.data.get("old_entity_id")):
+            # renamed (cover.eve_shutter_switch_… → cover.gaestewc_rollladen): follow it
+            changed = False
+            for w in self.items.values():
+                for key in ("cover", "contact", "lock"):
+                    if w.get(key) == old:
+                        w[key] = entity_id
+                        changed = True
+            if changed:
+                self._save()
+        elif action == "remove" and entity_id.startswith("cover."):
             self.hass.loop.call_later(5, self._discover_soon)
 
     @callback
     def _discover_soon(self) -> None:
+        if self._prune():
+            self._save()
         if self.discover():
             _LOGGER.info("New covers became windows")
 
     @callback
     def async_setup(self) -> None:
         """Find the windows, start the automations."""
-        self.discover()
+        self._discover_soon()
+        # covers of integrations that start later (Matter, Zigbee …)
+        self._unsub.append(async_at_started(self.hass, lambda _hass: self._discover_soon()))
         self._schedule()
         self._unsub.append(self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._changed))
         self._unsub.append(
