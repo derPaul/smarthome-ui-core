@@ -134,7 +134,7 @@ class NewDevices:
 
     def _ours(self, device: dr.DeviceEntry) -> bool:
         """Return True for a device of this integration (a window, a display …)."""
-        return any(domain == DOMAIN for domain, _id in device.identifiers)
+        return any(ident[0] == DOMAIN for ident in device.identifiers)
 
     def pending(self) -> list[str]:
         """Return the new devices not done yet (of the last 14 days)."""

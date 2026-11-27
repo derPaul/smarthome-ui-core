@@ -218,10 +218,20 @@ class Windows:
     @callback
     def _drop_device(self, wid: str) -> None:
         """Remove the window's own device (and so its entities)."""
+        # found through its own entity (device identifiers differ between versions)
+        ents = er.async_get(self.hass)
+        ids = {
+            entry.device_id
+            for key in ("automatic", "orientation", "cleaned", "clean")
+            for domain in ("switch", "select", "sensor", "button")
+            if (entry := ents.async_get(f"{domain}.window_{wid}_{key}")) is not None
+            and entry.platform == DOMAIN
+            and entry.device_id
+        }
         devices = dr.async_get(self.hass)
-        for device in list(devices.devices.values()):
-            if any(d == DOMAIN and i.endswith(f"_window_{wid}") for d, i in device.identifiers):
-                devices.async_remove_device(device.id)
+        for device_id in ids:
+            if devices.async_get(device_id) is not None:
+                devices.async_remove_device(device_id)
 
     @callback
     def _prune(self) -> bool:
@@ -237,7 +247,10 @@ class Windows:
         for wid in gone:
             _LOGGER.info("Window %s: cover %s is gone", wid, self.items[wid]["cover"])
             self.items.pop(wid)
-            self._drop_device(wid)
+            try:
+                self._drop_device(wid)
+            except Exception:  # never stop the setup for a stale device
+                _LOGGER.exception("Window %s: could not remove its device", wid)
         return bool(gone)
 
     def cleaned(self, wids: list[str], when: int | None = None) -> None:
@@ -732,7 +745,10 @@ class Windows:
     @callback
     def async_setup(self) -> None:
         """Find the windows, start the automations."""
-        self._discover_soon()
+        try:
+            self._discover_soon()
+        except Exception:  # the rest of Core must start anyway
+            _LOGGER.exception("Finding the windows failed")
         # covers of integrations that start later (Matter, Zigbee …)
         self._unsub.append(async_at_started(self.hass, lambda _hass: self._discover_soon()))
         self._schedule()

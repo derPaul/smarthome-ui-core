@@ -266,12 +266,9 @@ async def test_window_follows_rename(hass: HomeAssistant, notify_calls) -> None:
     # removed in the dashboard: its device goes as well
     devices = dr.async_get(hass)
     wid = next(k for k, w in win.items.items() if w["cover"] == "cover.terrassentur")
-    assert any(
-        i.endswith(f"_window_{wid}") for d in devices.devices.values() for _x, i in d.identifiers
-    )
+    dev_id = ents.async_get(f"switch.window_{wid}_automatic").device_id
+    assert devices.async_get(dev_id) is not None
     win.remove(wid)
     await hass.async_block_till_done()
-    assert not any(
-        i.endswith(f"_window_{wid}") for d in devices.devices.values() for _x, i in d.identifiers
-    )
+    assert devices.async_get(dev_id) is None
     assert hass.states.get(f"switch.window_{wid}_automatic") is None
