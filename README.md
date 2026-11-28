@@ -419,6 +419,12 @@ bevor du es willst – bestehende Automationen für die Rollläden laufen weiter
 - **Umbenannt** (ab 0.56): bekommt ein Rollladen eine neue Entitäts-ID (`cover.eve_shutter_switch_…` →
   `cover.gaestewc_rollladen`), bleibt er dasselbe Fenster mit allen Einstellungen. Fenster, deren Rollladen es
   nicht mehr gibt, verschwinden samt Gerät; ein im Dashboard entferntes Fenster nimmt sein Gerät mit.
+- **Als Home-Assistant-Automation** (ab 0.57): Blaupause *Rollläden nach Helligkeit*
+  (`blueprints/automation/smarthome_ui/windows_brightness.yaml`, Kategorie „Rollläden“, Label Smart-Core). Eingaben:
+  „ist dunkel“-Sensor, Wartezeit (10 min), Schließen/Öffnen an/aus, frühestens öffnen Mo–Fr und Sa/So, Versatz
+  (45 s). Sie ruft den Dienst `smarthome_ui.windows_move` (`action` open/close, `stagger` Sekunden, `once`: nicht
+  zweimal hintereinander dasselbe) – gefahren wird wie oben: alle Fenster mit Automatik, Raum für Raum, mit
+  Aussperrschutz. Morgens/Abends in Core dafür ausgeschaltet lassen.
 - Rollläden gehören nicht mehr in die **Anwesenheitssimulation** (der Assistent für neue Geräte schlägt sie
   dort nicht mehr vor); auch im Urlaub fahren sie im gewohnten Rhythmus. Nur Rollläden, die dort noch
   eingetragen sind, überlässt Core ihr, solange sie läuft.

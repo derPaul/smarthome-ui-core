@@ -67,3 +67,24 @@ vacuum_rooms:
       default: true
       selector:
         boolean:
+
+windows_move:
+  fields:
+    action:
+      required: true
+      selector:
+        select:
+          options:
+            - open
+            - close
+          translation_key: windows_action
+    stagger:
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: s
+    once:
+      default: true
+      selector:
+        boolean:

@@ -794,6 +794,24 @@
           "description": "Switch mopping off (if the vacuum can mop)."
         }
       }
+    },
+    "windows_move": {
+      "name": "Move windows",
+      "description": "Opens or closes the covers of all windows with automation on, one after another in the order of the rooms (an open terrace door is not closed).",
+      "fields": {
+        "action": {
+          "name": "Action",
+          "description": "Open or close."
+        },
+        "stagger": {
+          "name": "Stagger",
+          "description": "Seconds between two covers (give or take a half); empty = the setting in the dashboard."
+        },
+        "once": {
+          "name": "Only once",
+          "description": "Not again if the last call did the same (e.g. the morning time after it got light earlier)."
+        }
+      }
     }
   },
   "exceptions": {
@@ -851,6 +869,12 @@
         "tv": "TV",
         "player": "Player (Apple TV …)",
         "syncbox": "Sync box"
+      }
+    },
+    "windows_action": {
+      "options": {
+        "open": "Open",
+        "close": "Close"
       }
     }
   },

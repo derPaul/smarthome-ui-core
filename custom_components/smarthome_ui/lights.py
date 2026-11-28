@@ -247,6 +247,7 @@ LABEL = "Smart-Core"
 CATEGORIES = {
     f"{DOMAIN}/motion_light.yaml": ("Licht", "mdi:lightbulb-auto-outline"),
     f"{DOMAIN}/vacuum_when_leaving.yaml": ("Saugen", "mdi:robot-vacuum"),
+    f"{DOMAIN}/windows_brightness.yaml": ("Rollläden", "mdi:window-shutter-auto"),
 }
 
 

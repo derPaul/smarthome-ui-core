@@ -484,9 +484,12 @@ class Windows:
             key=lambda w: (room(w), str(w.get("name") or "")),
         )
 
-    async def _sequence(self, position: float | None, why: str, stagger: bool) -> None:
+    async def _sequence(
+        self, position: float | None, why: str, stagger: bool, gap: float | None = None
+    ) -> None:
         """Move every window (not those someone else runs), one after another when staggering."""
-        gap = float(_num(self.settings()["stagger"]) or 0) if stagger else 0.0
+        if gap is None:
+            gap = float(_num(self.settings()["stagger"]) or 0) if stagger else 0.0
         first = True
         for w in self._walk():
             if self.others_busy(w["cover"]):
@@ -499,13 +502,29 @@ class Windows:
         self.data["last_run"] = {"why": why, "t": now_ms()}
         self._save()
 
-    def _start(self, position: float | None, why: str) -> None:
+    def _start(self, position: float | None, why: str, gap: float | None = None) -> None:
         """Start a staggered run (a newer one replaces one still walking)."""
         if self._seq is not None and not self._seq.done():
             self._seq.cancel()
         self._seq = self.hass.async_create_background_task(
-            self._sequence(position, why, stagger=True), f"{DOMAIN} windows {why}"
+            self._sequence(position, why, stagger=True, gap=gap), f"{DOMAIN} windows {why}"
         )
+
+    @callback
+    def move(self, action: str, stagger: float | None = None, once: bool = True) -> dict[str, Any]:
+        """Open or close all windows one after another (service ``windows_move``).
+
+        ``once``: not again when the last run of the service did the same (the morning time
+        after it got light earlier, a second dusk).
+        """
+        if once and self.data.get("service_last") == action:
+            return {"started": 0, "skipped": True}
+        self.data["service_last"] = action
+        self.store.save(SIGNAL_DATA)
+        count = len([w for w in self._walk() if not self.others_busy(w["cover"])])
+        opening = action == "open"
+        self._start(100 if opening else None, "morning" if opening else "evening", stagger)
+        return {"started": count, "skipped": False}
 
     async def async_morning_now(self, stagger: bool = False) -> None:
         """Open every window's cover (not those someone else runs right now)."""

@@ -46,6 +46,7 @@ from .const import (
     SERVICE_VACUUM_ROOMS,
     SERVICE_WASTE_ACK,
     SERVICE_WASTE_SKIP,
+    SERVICE_WINDOWS_MOVE,
     SIGNAL_DATA,
     SIGNAL_TASKS,
 )
@@ -273,6 +274,26 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         SERVICE_AREA_MOWED,
         area_mowed,
         schema=vol.Schema({vol.Required(ATTR_AREA): cv.string}),
+    )
+
+    async def windows_move(call: ServiceCall) -> dict[str, Any]:  # noqa: RUF029
+        # for automations (blueprint "Rollläden nach Helligkeit"): one after another, Core's rules
+        return _runtime(hass).windows.move(
+            call.data["action"], call.data.get("stagger"), call.data["once"]
+        )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_WINDOWS_MOVE,
+        windows_move,
+        schema=vol.Schema(
+            {
+                vol.Required("action"): vol.In(["open", "close"]),
+                vol.Optional("stagger"): vol.All(vol.Coerce(float), vol.Range(min=0, max=600)),
+                vol.Optional("once", default=True): cv.boolean,
+            }
+        ),
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     async def test_notify(call: ServiceCall) -> None:

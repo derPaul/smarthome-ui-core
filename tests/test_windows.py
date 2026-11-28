@@ -272,3 +272,94 @@ async def test_window_follows_rename(hass: HomeAssistant, notify_calls) -> None:
     await hass.async_block_till_done()
     assert devices.async_get(dev_id) is None
     assert hass.states.get(f"switch.window_{wid}_automatic") is None
+
+
+def test_windows_blueprint_valid() -> None:
+    from pathlib import Path  # noqa: PLC0415
+
+    from homeassistant.components.blueprint import models  # noqa: PLC0415
+    from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA  # noqa: PLC0415
+    from homeassistant.util.yaml import load_yaml  # noqa: PLC0415
+
+    path = Path(__file__).parent.parent / "custom_components/smarthome_ui/blueprints"
+    bp = models.Blueprint(
+        load_yaml(path / "windows_brightness.yaml"),
+        expected_domain="automation",
+        schema=BLUEPRINT_SCHEMA,
+    )
+    assert bp.metadata["source_url"].endswith("windows_brightness.yaml")
+
+
+async def test_windows_automation(hass: HomeAssistant, notify_calls, freezer) -> None:
+    """The blueprint as a real automation: dark → all close, light → open, not before morning."""
+    from datetime import datetime, timedelta  # noqa: PLC0415
+
+    from pytest_homeassistant_custom_component.common import (  # noqa: PLC0415
+        async_fire_time_changed,
+    )
+
+    from homeassistant.setup import async_setup_component  # noqa: PLC0415
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    tz = dt_util.get_default_time_zone()
+    freezer.move_to(dt_util.as_utc(datetime(2026, 12, 7, 16, 30, tzinfo=tz)))  # Monday
+    calls = {s: async_mock_service(hass, "cover", s) for s in ("open_cover", "close_cover")}
+    hass.states.async_set("binary_sensor.cam_ist_dunkel", "off")
+    entry = await _setup(hass)
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "id": "rollos",
+                "alias": "Rollläden nach Helligkeit",
+                "use_blueprint": {
+                    "path": "smarthome_ui/windows_brightness.yaml",
+                    "input": {"dark_sensor": "binary_sensor.cam_ist_dunkel", "stagger": 0},
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+
+    async def later(minutes: float) -> None:
+        freezer.tick(timedelta(minutes=minutes))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    # dark for 10 minutes (HA's "for": flicker does not count): all windows close
+    hass.states.async_set("binary_sensor.cam_ist_dunkel", "on")
+    await hass.async_block_till_done()
+    await later(11)
+    assert [c.data["entity_id"] for c in calls["close_cover"]] == [
+        "cover.arbeitszimmer_rollladen",
+        "cover.terrassentur",
+    ]
+    # restart: unavailable → on is no dusk
+    hass.states.async_set("binary_sensor.cam_ist_dunkel", "unavailable")
+    await later(1)
+    hass.states.async_set("binary_sensor.cam_ist_dunkel", "on")
+    await later(11)
+    assert len(calls["close_cover"]) == 2
+    # light at 06:30 the next morning: waits for 07:00, then opens (once)
+    freezer.move_to(dt_util.as_utc(datetime(2026, 12, 8, 6, 30, tzinfo=tz)))
+    hass.states.async_set("binary_sensor.cam_ist_dunkel", "off")
+    await later(11)
+    assert calls["open_cover"] == []
+    await later(20)  # 07:01
+    assert len(calls["open_cover"]) == 2
+    # the service on its own: not twice the same; with once off it moves again
+    win = entry.runtime_data.windows
+    res = await hass.services.async_call(
+        "smarthome_ui", "windows_move", {"action": "open"}, blocking=True, return_response=True
+    )
+    assert res == {"started": 0, "skipped": True}
+    await hass.services.async_call(
+        "smarthome_ui",
+        "windows_move",
+        {"action": "open", "once": False, "stagger": 0},
+        blocking=True,
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert len(calls["open_cover"]) == 4
+    assert win.info()["last_run"]["why"] == "morning"

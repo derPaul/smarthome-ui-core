@@ -60,6 +60,7 @@ SERVICE_WASTE_SKIP: Final = "waste_skip"
 SERVICE_AREA_MOWED: Final = "area_mowed"
 SERVICE_TEST_NOTIFY: Final = "test_notify"
 SERVICE_VACUUM_ROOMS: Final = "vacuum_rooms"
+SERVICE_WINDOWS_MOVE: Final = "windows_move"
 
 ATTR_TASK: Final = "task"
 ATTR_DATE: Final = "date"

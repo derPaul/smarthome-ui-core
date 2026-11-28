@@ -794,6 +794,24 @@
           "description": "Wischen dabei ausschalten (falls der Sauger wischen kann)."
         }
       }
+    },
+    "windows_move": {
+      "name": "Fenster fahren",
+      "description": "Öffnet oder schließt die Rollläden aller Fenster mit eingeschalteter Automatik, einen nach dem anderen in der Reihenfolge der Räume (eine offene Terrassentür wird nicht zugefahren).",
+      "fields": {
+        "action": {
+          "name": "Aktion",
+          "description": "Öffnen oder schließen."
+        },
+        "stagger": {
+          "name": "Versatz",
+          "description": "Sekunden zwischen zwei Rollläden (zufällig die Hälfte mehr oder weniger); leer = Einstellung im Dashboard."
+        },
+        "once": {
+          "name": "Nur einmal",
+          "description": "Nicht noch einmal, wenn der letzte Aufruf dasselbe getan hat (z. B. die Morgen-Uhrzeit, nachdem es schon früher hell wurde)."
+        }
+      }
     }
   },
   "exceptions": {
@@ -851,6 +869,12 @@
         "tv": "Fernseher",
         "player": "Zuspieler (Apple TV …)",
         "syncbox": "Sync-Box"
+      }
+    },
+    "windows_action": {
+      "options": {
+        "open": "Öffnen",
+        "close": "Schließen"
       }
     }
   },

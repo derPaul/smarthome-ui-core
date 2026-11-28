@@ -1,0 +1,126 @@
+blueprint:
+  name: Rollläden nach Helligkeit (Smarthome UI Core)
+  description: >-
+    Schließt die Rollläden, wenn es dunkel wird, und öffnet sie, wenn es hell wird –
+    einer nach dem anderen, Raum für Raum, als ginge jemand durchs Haus. Gefahren
+    wird über Smarthome UI Core: alle Fenster mit eingeschalteter Automatik
+    (auch neue Rollläden), eine offene Terrassentür wird nicht zugefahren
+    (Aussperrschutz). Ein „ist dunkel“-Sensor (z. B. einer Kamera) entscheidet;
+    Flackern und Neustarts zählen nicht.
+  domain: automation
+  source_url: https://github.com/derPaul/smarthome-ui-core/blob/main/custom_components/smarthome_ui/blueprints/windows_brightness.yaml
+  input:
+    dark_sensor:
+      name: Sensor „ist dunkel“
+      description: An = dunkel (z. B. binary_sensor.…_ist_dunkel einer Kamera).
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    delay:
+      name: Gleich bleibend für
+      description: So lange muss es dunkel bzw. hell sein, bevor gefahren wird.
+      default: 10
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: min
+    close:
+      name: Schließen, wenn es dunkel wird
+      default: true
+      selector:
+        boolean:
+    open:
+      name: Öffnen, wenn es hell wird
+      default: true
+      selector:
+        boolean:
+    morning:
+      name: Frühestens öffnen (Mo–Fr)
+      description: Wird es früher hell, öffnen die Rollläden um diese Uhrzeit.
+      default: "07:00:00"
+      selector:
+        time:
+    morning_weekend:
+      name: Frühestens öffnen (Sa, So)
+      default: "08:30:00"
+      selector:
+        time:
+    stagger:
+      name: Versatz je Rollladen
+      description: Abstand zwischen zwei Rollläden (zufällig die Hälfte mehr oder weniger).
+      default: 45
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: s
+
+variables:
+  do_close: !input close
+  do_open: !input open
+  stagger: !input stagger
+
+triggers:
+  - trigger: state
+    entity_id: !input dark_sensor
+    from: "off"
+    to: "on"
+    for:
+      minutes: !input delay
+    id: dark
+  - trigger: state
+    entity_id: !input dark_sensor
+    from: "on"
+    to: "off"
+    for:
+      minutes: !input delay
+    id: light
+  - trigger: time
+    at: !input morning
+    id: morning
+  - trigger: time
+    at: !input morning_weekend
+    id: morning
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: dark
+          - condition: template
+            value_template: "{{ do_close }}"
+        sequence:
+          - action: smarthome_ui.windows_move
+            data:
+              action: close
+              stagger: "{{ stagger }}"
+      - conditions:
+          - condition: trigger
+            id:
+              - light
+              - morning
+          - condition: template
+            value_template: "{{ do_open }}"
+          - condition: state
+            entity_id: !input dark_sensor
+            state: "off"
+          # nicht vor der Morgen-Uhrzeit des Tages (Wochenende eigene Uhrzeit), nicht am Abend
+          - condition: or
+            conditions:
+              - condition: time
+                weekday: [mon, tue, wed, thu, fri]
+                after: !input morning
+                before: "15:00:00"
+              - condition: time
+                weekday: [sat, sun]
+                after: !input morning_weekend
+                before: "15:00:00"
+        sequence:
+          - action: smarthome_ui.windows_move
+            data:
+              action: open
+              stagger: "{{ stagger }}"
+
+mode: queued
